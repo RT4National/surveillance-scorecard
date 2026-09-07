@@ -1,0 +1,7 @@
+/ /scorecard/ 302
+/scorecard /index.html 200
+/scorecard/ /index.html 200
+/scorecard/research /index.html 200
+/scorecard/methodology /index.html 200
+/scorecard/archive /index.html 200
+/scorecard/members/:member /index.html 200
