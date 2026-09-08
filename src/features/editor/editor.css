@@ -1,0 +1,84 @@
+.editor-workspace {
+  max-width: 1100px;
+  margin: auto;
+  padding: 32px 20px;
+}
+.editor-workspace fieldset {
+  border: 1px solid #c9d0d7;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 24px 0;
+}
+.editor-workspace label {
+  display: block;
+  margin: 16px 0;
+}
+.editor-workspace input,
+.editor-workspace textarea,
+.editor-workspace select {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #9da9b4;
+  border-radius: 6px;
+  color: #162332;
+  background: white;
+}
+.editor-workspace textarea {
+  font-family: monospace;
+  font-size: 13px;
+}
+.editor-workspace button {
+  padding: 10px 14px;
+  margin: 5px;
+  border: 1px solid #36526c;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.editor-workspace button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.editor-workspace table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.editor-workspace td,
+.editor-workspace th {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+.editor-workspace article {
+  padding: 15px;
+  border: 1px solid #ddd;
+  margin: 12px 0;
+}
+.editor-workspace pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.editor-workspace .editor-error {
+  border-left: 4px solid #b42318;
+  padding: 12px;
+  background: #fff1ed;
+}
+.editor-workspace code {
+  overflow-wrap: anywhere;
+}
+.editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.structured-editor h2 {
+  margin-top: 32px;
+}
+.structured-editor table {
+  display: block;
+  overflow-x: auto;
+}
+.structured-editor details {
+  margin: 16px 0;
+}

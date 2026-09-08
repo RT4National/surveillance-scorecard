@@ -14,8 +14,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run types
       - run: npm test
       - run: npm run build
       - run: npx wrangler deploy --dry-run
+        env:
+          WRANGLER_SEND_METRICS: "false"
+      - run: npx wrangler deploy --dry-run --env production
         env:
           WRANGLER_SEND_METRICS: "false"

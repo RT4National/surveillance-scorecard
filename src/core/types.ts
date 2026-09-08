@@ -13,6 +13,13 @@ export interface Member {
   committees: string[];
   caucuses: string[];
   since: number;
+  portrait?: {
+    url: string;
+    attribution: string;
+    rights: "public-domain" | "licensed";
+    rightsSource: string;
+    reviewedBy: string;
+  };
 }
 export interface Vote {
   id: string;
@@ -39,4 +46,8 @@ export interface Rubric {
   minVotes: number;
   minPerContext: number;
   consistencyThreshold: number;
+  gradeBands?: { label: string; minimum: number }[];
+  lookbackYears?: number;
+  halfLifeYears?: number;
+  minSharedTopics?: number;
 }

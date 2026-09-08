@@ -1,28 +1,30 @@
 # Surveillance Scorecard
 
-A modern scorecard for Restore the Fourth, designed for `restorethe4th.com/scorecard` and Cloudflare Workers Static Assets.
+A modern scorecard for Restore the Fourth, designed for `restorethe4th.com/scorecard` with a Cloudflare Worker, static assets, and D1 publications.
 
-**Status: working design preview, not a production congressional dataset.** All twelve members and twelve roll calls are fictional. Grades and consistency categories are calculated, not hardcoded. The interface identifies the preview, and indexing is disabled.
+**Status: integrated implementation with local publication fixtures; not yet a launched congressional scorecard.** The supplied twelve members and twelve roll calls are fictional. Source adapters, authenticated publishing, archives, and public research are implemented. Live data, staff identities, rubric approval, and production configuration are still required. The app never labels fixture evidence as real.
 
 ## Run
 
-Node.js 22.12+ (Node 24 recommended).
+Node.js 24.
 
 ```sh
 npm ci
-npm run dev
+npm run db:migrate
+npm run db:seed:local
+npm run build
+npm run preview
 ```
 
-Open http://localhost:5173/scorecard/.
+Open http://localhost:8787/scorecard/. The local-only seeder creates two immutable fictional publications for archive and comparison testing; it accepts no remote flag. To develop the frontend with hot reload, run `npm run dev` in a second terminal; Vite proxies the API to the local Worker.
 
 ```sh
 npm test
-npm run build
-npm run preview
+npm run types
 npm run deploy:check
 ```
 
-`preview` serves the built site using Wrangler at http://localhost:8787/scorecard/. No Cloudflare login is needed for local preview or a deployment dry run. `npm run deploy` publishes to Cloudflare and requires the intended account to be configured.
+No Cloudflare login is needed for local preview, local D1 or deployment dry runs. The default environment has no AI binding. The `production` environment adds Workers AI; its placeholder D1 ID and Access settings must be configured before deploying. Staff HTTP endpoints always require a verified Access identity, including locally. Tests use signed identity fixtures and simulated D1; there is no authentication bypass.
 
 ## Included
 
@@ -30,13 +32,18 @@ npm run deploy:check
 - Search and independent chamber, state, party, committee/caucus and consistency filters; shareable query parameters.
 - Stable `/scorecard/members/:id` URLs and date-based evidence exploration.
 - Normalized weighted letter grades, separate own-party/opposing-party consistency, explicit evidence minimums, and a rubric sandbox.
-- Former-member archive with distinct inactive and deceased statuses.
-- Exact two-vote intersections and independent party rankings; copyable tables, CSV and SVG exports.
-- A small natural-language ranking template. **No LLM is connected.** Unsupported questions are explicitly declined.
-- Asset and application routes under `/scorecard`, with security headers and deployment dry-run checks.
+- Immutable publication archives, source-pinned URLs, integrity checks and explanations of grade changes.
+- Legislation pages, party roll-call breakdowns, member comparisons, issue/date/context filters, and state-based representative discovery.
+- Validated vote intersections and separate party rankings; formula-safe table/CSV exports, attributed SVG charts, and printing.
+- An optional Workers AI question-to-query adapter. All results are executed deterministically against one publication; unsupported or ambiguous questions fail explicitly. Live model inference has not been qualified.
+- Staff draft/import/edit/review/publish workflow, structured editing forms, role enforcement, optimistic concurrency, impact preview, audit history, correction queue and pointer rollback.
+- Congress.gov roster ingestion, House/Senate roll-call adapters, sourced affiliation histories, reviewed portrait staging, legacy sheet migration and a daily private staging workflow.
+- Subpath routing, source-based profile metadata, true unknown-member 404s, security headers and deployment dry-run checks.
 
 ## Before production
 
-See [the stories and staged plan](docs/PLAN.md) and [production architecture](docs/ARCHITECTURE.md). Remaining work includes authoritative ingestion and reconciliation, licensed portraits, reviewed methodology, immutable historical publications, authenticated editorial operations, grounded AI, and deployment to the existing domain. The preview's historical view recomputes scores; it does not claim to preserve previously published grades.
+See [the original stories](docs/PLAN.md), [architecture](docs/ARCHITECTURE.md), [data pipeline](docs/DATA-PIPELINE.md), [publishing operations](docs/PUBLISHING.md), and [feature status](docs/FEATURE-STATUS.md).
+
+Supply a Congress API key, reviewed historical evidence and Senate identity crosswalk, current memberships, licensed portraits, staff Access identities, an approved rubric and exact content license. Configure and qualify the production D1 database, route and model budget. Reconcile staged data before publishing. No production infrastructure or public publication has been created by this implementation work.
 
 Inspired by [RT4National/DecideTheFuture](https://github.com/RT4National/DecideTheFuture). The project owner confirmed authorization to reuse its code. This implementation is new code. The requested content license is provisionally interpreted as CC BY 4.0; exact terms await confirmation. Dependency licenses remain applicable.

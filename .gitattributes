@@ -1,0 +1,2 @@
+# Wrangler owns this generated runtime declaration; do not hand-format it.
+worker/env.d.ts linguist-generated=true -whitespace

@@ -137,6 +137,7 @@ describe("research and export", () => {
     ).toBe(false);
   });
   it("escapes quotes, delimiters and dangerous spreadsheet prefixes", () => {
+    expect(csvCell("\u0000=1+1")).toBe('"\'=1+1"');
     expect(csvCell('a,"b"')).toBe('"a,""b"""');
     expect(csvCell('=IMPORTXML("url")')).toBe('"\'=IMPORTXML(""url"")"');
     expect(

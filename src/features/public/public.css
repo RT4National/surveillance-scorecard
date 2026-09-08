@@ -1,0 +1,146 @@
+.public-print-only {
+  display: none;
+}
+.public-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 36px 24px 60px;
+}
+.public-page h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  letter-spacing: -1px;
+}
+.public-page h2 {
+  font-size: 23px;
+}
+.public-page a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.public-provenance {
+  background: #edf3e8;
+  border-left: 3px solid #416850;
+  padding: 14px 18px;
+  font-size: 13px;
+  margin: 20px 0;
+}
+.public-provenance p {
+  margin: 5px 0;
+}
+.public-controls,
+.public-actions {
+  display: flex;
+  gap: 14px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin: 22px 0;
+}
+.public-page label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.public-page select,
+.public-page input,
+.public-page textarea {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 7px;
+  padding: 10px;
+  max-width: 100%;
+  color: var(--ink);
+}
+.public-page button {
+  padding: 9px 14px;
+  border: 1px solid #bccbbe;
+  border-radius: 7px;
+  background: #edf3e8;
+}
+.public-page button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.public-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 20px;
+  margin: 24px 0;
+}
+.public-page article {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px;
+  margin-bottom: 16px;
+  background: white;
+}
+.public-table {
+  overflow: auto;
+  margin: 24px 0;
+}
+.public-table table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.public-table th,
+.public-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.public-score {
+  font-size: 24px;
+}
+.public-correction {
+  max-width: 700px;
+  margin-top: 32px;
+}
+.public-correction textarea {
+  min-height: 110px;
+  margin-bottom: 14px;
+}
+.public-page fieldset {
+  border: 1px solid var(--line);
+  margin: 20px 0;
+}
+.public-page pre {
+  overflow: auto;
+  white-space: pre-wrap;
+}
+.public-page :focus-visible {
+  outline: 3px solid #42755b;
+  outline-offset: 3px;
+}
+@media print {
+  .public-print-only {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+  .public-page button,
+  .public-controls,
+  .public-actions,
+  .public-correction {
+    display: none;
+  }
+  .public-page {
+    padding: 0;
+  }
+  .public-grid {
+    display: block;
+  }
+  .public-page article {
+    break-inside: avoid;
+  }
+  .public-table {
+    overflow: visible;
+  }
+  .public-table th,
+  .public-table td {
+    white-space: normal;
+  }
+  .public-page details {
+    display: block;
+  }
+}

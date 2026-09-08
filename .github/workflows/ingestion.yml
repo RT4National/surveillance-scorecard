@@ -1,0 +1,61 @@
+name: Stage congressional roster
+on:
+  schedule:
+    - cron: '17 8 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: congressional-roster-staging
+  cancel-in-progress: false
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check ingestion configuration
+        id: configuration
+        env:
+          CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [ "$REPOSITORY_PRIVATE" != "true" ]; then
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Ingestion skipped: staging artifacts are restricted to private repositories.' >> "$GITHUB_STEP_SUMMARY"
+          elif [ -z "$CONGRESS_API_KEY" ]; then
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Ingestion skipped: configure the CONGRESS_API_KEY repository secret. No roster was fetched or published.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.configuration.outputs.enabled == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.configuration.outputs.enabled == 'true'
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        if: steps.configuration.outputs.enabled == 'true'
+      - name: Validate ingestion adapters
+        if: steps.configuration.outputs.enabled == 'true'
+        run: npx vitest run src/ingestion/ingestion.test.ts
+      - name: Capture complete current roster
+        if: steps.configuration.outputs.enabled == 'true'
+        env:
+          CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
+        run: node --import tsx scripts/ingestion/import.mjs members --out "$RUNNER_TEMP/scorecard-roster"
+      - name: Retain private review artifact
+        if: steps.configuration.outputs.enabled == 'true' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: roster-staging-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/scorecard-roster/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Summarize review boundary
+        if: steps.configuration.outputs.enabled == 'true' && success()
+        run: echo 'Complete roster staged with exact source captures. Artifact retained for 14 days. Reconcile against the published dataset and submit for editorial review; this workflow never publishes or deactivates members.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Report failure
+        if: failure()
+        run: echo 'Roster staging failed. No import was published. Inspect the failing step; the last published roster remains unchanged.' >> "$GITHUB_STEP_SUMMARY"

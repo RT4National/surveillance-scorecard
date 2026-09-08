@@ -43,7 +43,10 @@ export function rankByParty(
   );
 }
 export function csvCell(value: string | number) {
-  const text = String(value);
+  const text = String(value).replace(
+    /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,
+    "",
+  );
   // Guard spreadsheet formula execution when public names or query text are exported.
   return `"${(/^[\s]*[=+@-]/.test(text) ? "'" : "") + text.replaceAll('"', '""')}"`;
 }
