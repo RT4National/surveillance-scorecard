@@ -4,6 +4,11 @@ import { digest, validateDataset } from "./validation";
 import { research } from "./ai";
 import { createPublicationScoring } from "../src/core/publication-scores";
 import { members as demoMembers, votes as demoVotes } from "../src/data/demo";
+import {
+  encodeStoredJson,
+  decodeStoredJson,
+  MAX_STORED_BYTES,
+} from "./storage";
 
 const prefix = "/scorecard/api";
 const json = (data: unknown, status = 200) =>
@@ -14,7 +19,10 @@ const json = (data: unknown, status = 200) =>
       "X-Content-Type-Options": "nosniff",
     },
   });
-async function body(request: Request): Promise<Record<string, unknown>> {
+async function body(
+  request: Request,
+  maxBytes = 12_000_000,
+): Promise<Record<string, unknown>> {
   if (!request.headers.get("content-type")?.includes("application/json"))
     throw new HttpError(415, "JSON required");
   const reader = request.body?.getReader();
@@ -25,11 +33,11 @@ async function body(request: Request): Promise<Record<string, unknown>> {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.length;
-    if (size > 1_800_000) {
+    if (size > maxBytes) {
       await reader.cancel();
       throw new HttpError(
         413,
-        "Payload exceeds the 1,800,000-byte draft limit",
+        `Payload exceeds the ${maxBytes.toLocaleString("en-US")}-byte upload limit`,
       );
     }
     chunks.push(value);
@@ -59,6 +67,34 @@ interface Draft {
   updated_at: string;
   base_publication_id: string | null;
 }
+async function buildPublication(
+  dataset: Dataset,
+  summary: string,
+  previousId: string | null,
+  publishedBy: string,
+): Promise<Publication> {
+  return {
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    publishedBy,
+    previousId,
+    summary,
+    digest: await digest(dataset),
+    dataset,
+    scoring: await createPublicationScoring(dataset),
+  };
+}
+function storePublication(p: Publication) {
+  return encodeStoredJson(p, {
+    id: p.id,
+    createdAt: p.createdAt,
+    publishedBy: p.publishedBy,
+    summary: p.summary,
+    digest: p.digest,
+    previousId: p.previousId,
+    datasetId: p.dataset.id,
+  });
+}
 async function publication(env: Env, id?: string): Promise<Publication | null> {
   const row = await env.DB.prepare(
     id
@@ -67,7 +103,7 @@ async function publication(env: Env, id?: string): Promise<Publication | null> {
   )
     .bind(...(id ? [id] : []))
     .first<{ snapshot: string }>();
-  return row ? (JSON.parse(row.snapshot) as Publication) : null;
+  return row ? decodeStoredJson<Publication>(row.snapshot) : null;
 }
 async function api(
   request: Request,
@@ -84,20 +120,10 @@ async function api(
   if (method === "POST" && path === "/research") return research(request, env);
   if (method === "GET" && path === "/publications") {
     const rows = await env.DB.prepare(
-      "SELECT snapshot FROM publications ORDER BY created_at DESC LIMIT 200",
-    ).all<{ snapshot: string }>();
+      "SELECT id,json_extract(snapshot,'$.createdAt') AS createdAt,json_extract(snapshot,'$.summary') AS summary,json_extract(snapshot,'$.digest') AS digest,COALESCE(json_extract(snapshot,'$.datasetId'),json_extract(snapshot,'$.dataset.id')) AS datasetId,json_extract(snapshot,'$.previousId') AS previousId FROM publications ORDER BY created_at DESC LIMIT 200",
+    ).all();
     return json({
-      publications: rows.results.map((r) => {
-        const p: Publication = JSON.parse(r.snapshot);
-        return {
-          id: p.id,
-          createdAt: p.createdAt,
-          summary: p.summary,
-          digest: p.digest,
-          datasetId: p.dataset.id,
-          previousId: p.previousId,
-        };
-      }),
+      publications: rows.results,
     });
   }
   if (method === "GET" && path.startsWith("/publications/")) {
@@ -107,7 +133,7 @@ async function api(
     return json(p);
   }
   if (method === "POST" && path === "/corrections") {
-    const b = await body(request);
+    const b = await body(request, 20_000);
     const p =
       typeof b.publicationId === "string"
         ? await publication(env, b.publicationId)
@@ -207,11 +233,12 @@ async function api(
       ).results,
     );
   if (path.startsWith("/staff/corrections/") && method === "PATCH") {
-    const b = await body(request);
+    const b = await body(request, 20_000);
     if (
       !["resolved", "dismissed"].includes(String(b.status)) ||
       typeof b.resolution !== "string" ||
-      b.resolution.trim().length < 5
+      b.resolution.trim().length < 5 ||
+      b.resolution.length > 4000
     )
       throw new HttpError(400, "Status and resolution required");
     const id = path.split("/").at(-1)!;
@@ -231,26 +258,36 @@ async function api(
     return json(
       (
         await env.DB.prepare(
-          "SELECT * FROM drafts ORDER BY updated_at DESC LIMIT 100",
-        ).all<Draft>()
-      ).results.map((d) => ({ ...d, dataset: JSON.parse(d.dataset) })),
+          "SELECT id,summary,version,status,author,reviewer,updated_at,base_publication_id,json_extract(dataset,'$.id') AS datasetId,json_extract(dataset,'$.asOf') AS asOf,json_extract(dataset,'$.demo') AS demo FROM drafts ORDER BY updated_at DESC LIMIT 100",
+        ).all()
+      ).results.map((d) => ({ ...d, demo: d.demo === 1 })),
     );
   if (path === "/staff/drafts" && method === "POST") {
     const b = await body(request);
     const errors = validateDataset(b.dataset);
     if (errors.length)
       return json({ error: "Dataset validation failed", errors }, 422);
-    if (typeof b.summary !== "string" || !b.summary.trim())
-      throw new HttpError(400, "Summary required");
+    if (
+      typeof b.summary !== "string" ||
+      !b.summary.trim() ||
+      b.summary.length > 4000
+    )
+      throw new HttpError(400, "Summary must contain 1–4000 characters");
     const id = crypto.randomUUID();
     if (b.basePublicationId !== null && typeof b.basePublicationId !== "string")
       throw new HttpError(400, "Explicit basePublicationId required");
+    const dataset = b.dataset as Dataset;
+    const storedDataset = await encodeStoredJson(dataset, {
+      id: dataset.id,
+      asOf: dataset.asOf,
+      demo: dataset.demo,
+    });
     const created = await env.DB.batch([
       env.DB.prepare(
         "INSERT INTO drafts(id,dataset,summary,status,author,updated_at,base_publication_id) SELECT ?,?,?,'draft',?,?,? WHERE EXISTS(SELECT 1 FROM current_publication WHERE publication_id IS ?)",
       ).bind(
         id,
-        JSON.stringify(b.dataset),
+        storedDataset,
         b.summary,
         actor.email,
         new Date().toISOString(),
@@ -271,12 +308,19 @@ async function api(
   const match = path.match(
     /^\/staff\/drafts\/([^/]+)(?:\/(review|publish|rebase))?$/,
   );
+  if (match && !match[2] && method === "GET") {
+    const d = await env.DB.prepare("SELECT * FROM drafts WHERE id=?")
+      .bind(match[1])
+      .first<Draft>();
+    if (!d) throw new HttpError(404, "Draft not found");
+    return json({ ...d, dataset: await decodeStoredJson<Dataset>(d.dataset) });
+  }
   if (match && ["PUT", "POST"].includes(method)) {
     const d = await env.DB.prepare("SELECT * FROM drafts WHERE id=?")
       .bind(match[1])
       .first<Draft>();
     if (!d) throw new HttpError(404, "Draft not found");
-    const b = await body(request);
+    const b = await body(request, method === "PUT" ? 12_000_000 : 20_000);
     if (b.version !== d.version)
       throw new HttpError(409, "Draft changed; reload before editing");
     if (match[2] === "rebase" && method === "POST") {
@@ -309,13 +353,23 @@ async function api(
       const errors = validateDataset(b.dataset);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
-      if (typeof b.summary !== "string" || !b.summary.trim())
-        throw new HttpError(400, "Summary required");
+      if (
+        typeof b.summary !== "string" ||
+        !b.summary.trim() ||
+        b.summary.length > 4000
+      )
+        throw new HttpError(400, "Summary must contain 1–4000 characters");
+      const dataset = b.dataset as Dataset;
+      const storedDataset = await encodeStoredJson(dataset, {
+        id: dataset.id,
+        asOf: dataset.asOf,
+        demo: dataset.demo,
+      });
       const r = await env.DB.prepare(
         "UPDATE drafts SET dataset=?,summary=?,status='draft',reviewer=NULL,author=?,version=version+1,updated_at=? WHERE id=? AND version=? AND status!='published' AND EXISTS(SELECT 1 FROM current_publication WHERE publication_id IS drafts.base_publication_id)",
       )
         .bind(
-          JSON.stringify(b.dataset),
+          storedDataset,
           b.summary,
           actor.email,
           new Date().toISOString(),
@@ -331,9 +385,34 @@ async function api(
         throw new HttpError(403, "Reviewer role required");
       if (d.author === actor.email)
         throw new HttpError(403, "A second person must review");
-      const errors = validateDataset(JSON.parse(d.dataset));
+      const dataset = await decodeStoredJson<Dataset>(d.dataset);
+      const errors = validateDataset(dataset);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
+      try {
+        const prospective = await buildPublication(
+          dataset,
+          d.summary,
+          d.base_publication_id,
+          "p".repeat(254),
+        );
+        const stored = await storePublication(prospective);
+        if (
+          new TextEncoder().encode(stored).byteLength >
+          MAX_STORED_BYTES - 4096
+        )
+          throw new HttpError(
+            413,
+            "Publication needs additional metadata capacity",
+          );
+      } catch (error) {
+        if (error instanceof HttpError && error.status === 413)
+          throw new HttpError(
+            413,
+            "Review refused: the complete publication exceeds storage capacity. Reduce the evidence period or payload before requesting review.",
+          );
+        throw error;
+      }
       const r = await env.DB.prepare(
         "UPDATE drafts SET status='review',reviewer=?,version=version+1,updated_at=? WHERE id=? AND version=? AND status='draft' AND EXISTS(SELECT 1 FROM current_publication WHERE publication_id IS drafts.base_publication_id)",
       )
@@ -348,26 +427,17 @@ async function api(
         throw new HttpError(403, "Publisher role required");
       if (d.status !== "review" || !d.reviewer)
         throw new HttpError(409, "Review required");
-      const dataset: Dataset = JSON.parse(d.dataset);
+      const dataset = await decodeStoredJson<Dataset>(d.dataset);
       const errors = validateDataset(dataset);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
-      const p: Publication = {
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-        publishedBy: actor.email,
-        previousId: d.base_publication_id,
-        summary: d.summary,
-        digest: await digest(dataset),
+      const p = await buildPublication(
         dataset,
-        scoring: await createPublicationScoring(dataset),
-      };
-      const serialized = JSON.stringify(p);
-      if (new TextEncoder().encode(serialized).byteLength > 1_800_000)
-        throw new HttpError(
-          413,
-          "Publication exceeds the 1.8 MB snapshot limit; reduce the evidence period or configure larger snapshot storage before publishing",
-        );
+        d.summary,
+        d.base_publication_id,
+        actor.email,
+      );
+      const serialized = await storePublication(p);
       const r = await env.DB.prepare(
         "INSERT INTO publications(id,draft_id,snapshot,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM drafts WHERE id=? AND version=? AND status='review') AND EXISTS(SELECT 1 FROM current_publication WHERE publication_id IS ?)",
       )
@@ -389,12 +459,13 @@ async function api(
   if (path === "/staff/rollback" && method === "POST") {
     if (actor.role !== "publisher")
       throw new HttpError(403, "Publisher role required");
-    const b = await body(request);
+    const b = await body(request, 20_000);
     if (
       typeof b.publicationId !== "string" ||
       !(await publication(env, b.publicationId)) ||
       typeof b.reason !== "string" ||
       b.reason.trim().length < 10 ||
+      b.reason.length > 4000 ||
       !Number.isInteger(b.revision)
     )
       throw new HttpError(

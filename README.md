@@ -20,11 +20,14 @@ Open http://localhost:8787/scorecard/. The local-only seeder creates two immutab
 
 ```sh
 npm test
+npm run test:capacity
 npm run types
 npm run deploy:check
 ```
 
 No Cloudflare login is needed for local preview, local D1 or deployment dry runs. The default environment has no AI binding. The `production` environment adds Workers AI; its placeholder D1 ID and Access settings must be configured before deploying. Staff HTTP endpoints always require a verified Access identity, including locally. Tests use signed identity fixtures and simulated D1; there is no authentication bypass.
+
+Congressional-scale qualification exercises the actual local Workers runtime with 535 fictional legislators and 12, 50 and 250 roll calls. Larger snapshots use bounded, checksum-verified gzip envelopes in D1; old inline publications remain readable. See [capacity results](docs/CAPACITY.md) and [UI qualification](docs/QUALIFICATION.md). These are local checks, not production load certification.
 
 ## Included
 
@@ -45,5 +48,7 @@ No Cloudflare login is needed for local preview, local D1 or deployment dry runs
 See [the original stories](docs/PLAN.md), [architecture](docs/ARCHITECTURE.md), [data pipeline](docs/DATA-PIPELINE.md), [publishing operations](docs/PUBLISHING.md), and [feature status](docs/FEATURE-STATUS.md).
 
 Supply a Congress API key, reviewed historical evidence and Senate identity crosswalk, current memberships, licensed portraits, staff Access identities, an approved rubric and exact content license. Configure and qualify the production D1 database, route and model budget. Reconcile staged data before publishing. No production infrastructure or public publication has been created by this implementation work.
+
+A [real-evidence review packet](docs/REAL-DATA-STAGING.md) now captures 23 official roll calls referenced by the legacy application plus supplemental current directories. Its raw captures remain in ignored private staging. Historical identities, Senate mapping, editorial interpretations and Congress.gov reconciliation are explicitly incomplete; the public preview remains fictional.
 
 Inspired by [RT4National/DecideTheFuture](https://github.com/RT4National/DecideTheFuture). The project owner confirmed authorization to reuse its code. This implementation is new code. The requested content license is provisionally interpreted as CC BY 4.0; exact terms await confirmation. Dependency licenses remain applicable.

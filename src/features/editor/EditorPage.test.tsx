@@ -10,6 +10,8 @@ import {
 import { EditorPage } from "./EditorPage";
 import { dataset, members, votes, records } from "../../data/demo";
 import { rubric, scoreMember } from "../../core/scoring";
+import { createHash, webcrypto } from "node:crypto";
+import { createPublicationScoring } from "../../core/publication-scores";
 const fixture = {
   ...dataset,
   members,
@@ -27,14 +29,16 @@ let draft = {
   status: "draft",
   author: "author@example.org",
   reviewer: null,
-  base_publication_id: null,
+  base_publication_id: null as string | null,
 };
 beforeEach(() => {
+  vi.stubGlobal("crypto", webcrypto);
   draft = {
     ...draft,
     dataset: structuredClone(fixture),
     status: "draft",
     version: 1,
+    base_publication_id: null,
   };
   vi.stubGlobal(
     "fetch",
@@ -43,12 +47,20 @@ beforeEach(() => {
       const payload = path.endsWith("/session")
         ? { email: "publisher@example.org", role: "publisher" }
         : path.endsWith("/drafts")
-          ? [draft]
-          : path.endsWith("/status")
-            ? { pointer: { revision: 1 } }
-            : path.includes("/publications/")
-              ? { id: "pub-1", dataset: fixture }
-              : [];
+          ? [{ ...draft, dataset: undefined }]
+          : path.endsWith("/drafts/draft-1")
+            ? draft
+            : path.endsWith("/status")
+              ? { pointer: { revision: 1 } }
+              : path.includes("/publications/")
+                ? {
+                    id: "pub-1",
+                    dataset: fixture,
+                    digest: createHash("sha256")
+                      .update(JSON.stringify(fixture))
+                      .digest("hex"),
+                  }
+                : [];
       return Response.json(payload);
     }),
   );
@@ -58,6 +70,68 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("Staff editing workflow", () => {
+  it("compares drafts to verified frozen grades, not recalculated historical grades", async () => {
+    const scoring = await createPublicationScoring(fixture);
+    scoring.scores[members[0].id].grade = "D";
+    scoring.scores[members[0].id].value = 47;
+    scoring.digest = createHash("sha256")
+      .update(JSON.stringify(scoring.scores))
+      .digest("hex");
+    const p = {
+      id: "pub-1",
+      dataset: fixture,
+      digest: createHash("sha256")
+        .update(JSON.stringify(fixture))
+        .digest("hex"),
+      scoring,
+    };
+    draft.base_publication_id = "pub-1";
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (...args) => {
+      const path = new URL(String(args[0]), "http://localhost").pathname;
+      if (path.endsWith("/status"))
+        return Response.json({
+          pointer: { publication_id: "pub-1", revision: 1 },
+        });
+      if (path.endsWith("/publications/pub-1")) return Response.json(p);
+      return original(...args);
+    });
+    render(<EditorPage dataset={fixture} />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Review fixture · draft · v1",
+      }),
+    );
+    const heading = await screen.findByRole("heading", {
+      name: "Grade impact preview",
+    });
+    await waitFor(() => {
+      const cells = heading.nextElementSibling?.nextElementSibling
+        ?.querySelector("tbody tr")
+        ?.querySelectorAll("td");
+      expect(cells?.[1].textContent).toBe("D");
+      expect(cells?.[2].textContent).toBe("A+");
+    });
+  });
+  it("loads draft summaries first and fetches only the selected dataset", async () => {
+    render(<EditorPage dataset={fixture} />);
+    const open = await screen.findByRole("button", {
+      name: "Review fixture · draft · v1",
+    });
+    const fetcher = vi.mocked(fetch);
+    expect(
+      fetcher.mock.calls.some(([url]) =>
+        String(url).endsWith("/drafts/draft-1"),
+      ),
+    ).toBe(false);
+    fireEvent.click(open);
+    await screen.findByLabelText("Scoring weight");
+    expect(
+      fetcher.mock.calls.filter(([url]) =>
+        String(url).endsWith("/drafts/draft-1"),
+      ),
+    ).toHaveLength(1);
+  });
   it("updates structured evidence and grade impact and refuses review of unsaved edits", async () => {
     render(<EditorPage dataset={fixture} />);
     fireEvent.click(
@@ -65,9 +139,9 @@ describe("Staff editing workflow", () => {
         name: "Review fixture · draft · v1",
       }),
     );
-    const review = screen.getByRole("button", {
+    const review = (await screen.findByRole("button", {
       name: "Approve reviewed draft",
-    }) as HTMLButtonElement;
+    })) as HTMLButtonElement;
     expect(review.disabled).toBe(false);
     fireEvent.change(screen.getByLabelText("Scoring weight"), {
       target: { value: "100" },
@@ -158,9 +232,9 @@ describe("Staff editing workflow", () => {
         name: "Review fixture · review · v1",
       }),
     );
-    const publish = screen.getByRole("button", {
+    const publish = (await screen.findByRole("button", {
       name: "Publish approved snapshot",
-    }) as HTMLButtonElement;
+    })) as HTMLButtonElement;
     expect(publish.disabled).toBe(false);
     fireEvent.change(screen.getByLabelText("Minimum scored votes"), {
       target: { value: "40" },

@@ -19,6 +19,7 @@ import { useScorecard } from "./data/context";
 import { groupLabels, scoreMember } from "./core/scoring";
 import type { Dataset, Publication } from "./core/publication";
 import { publishedScore } from "./core/publication-scores";
+import { publicationUrl } from "./core/navigation";
 import {
   LegislationPage,
   ComparePage,
@@ -43,16 +44,6 @@ const readAsOf = (dataset: Dataset) => {
     date <= dataset.asOf
     ? date
     : dataset.asOf;
-};
-const publicationUrl = (
-  path: string,
-  publicationId?: string,
-  asOf?: string,
-) => {
-  const params = new URLSearchParams();
-  if (publicationId) params.set("publication", publicationId);
-  if (asOf) params.set("asOf", asOf);
-  return path + (params.size ? `?${params}` : "");
 };
 const defaults = {
   q: "",
@@ -107,9 +98,9 @@ function exportRows(
     ["As of", asOf ?? dataset.asOf],
     [
       "Name",
-      "Party",
+      "Current party",
       "State",
-      "Chamber",
+      "Current chamber",
       "Grade",
       "Reform alignment",
       "Category",
@@ -206,7 +197,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
         <thead>
           <tr>
             <th>Legislator</th>
-            <th>Party / Chamber</th>
+            <th>Current party / chamber</th>
             <th>Grade</th>
             <th>Reform alignment</th>
             <th>Across administrations</th>
@@ -389,7 +380,10 @@ export default function App() {
       </div>
       <header className="site-header">
         <div className="header-inner">
-          <a className="brand" href={`${base}/`}>
+          <a
+            className="brand"
+            href={publicationUrl(`${base}/`, publication?.id)}
+          >
             <span className="brand-symbol">
               IV
               <span />
@@ -461,7 +455,9 @@ export default function App() {
           <section className="container empty">
             <h1>Profile not found</h1>
             <p>This address does not match a member in this preview.</p>
-            <a href={`${base}/`}>Return to the scorecard</a>
+            <a href={publicationUrl(`${base}/`, publication?.id)}>
+              Return to the scorecard
+            </a>
           </section>
         ) : (
           <>
@@ -490,7 +486,10 @@ export default function App() {
                     ? "Explore former members and revisit the evidence available at a moment in time."
                     : "Follow the votes. Understand the record. See who protects your privacy—and whose principles change with the presidency."}
                 </p>
-                <a className="text-link" href={`${base}/methodology`}>
+                <a
+                  className="text-link"
+                  href={publicationUrl(`${base}/methodology`, publication?.id)}
+                >
                   Every grade has a paper trail <ArrowRight size={16} />
                 </a>
               </div>
@@ -537,7 +536,10 @@ export default function App() {
                     </span>
                   </h2>
                 </div>
-                <a className="subtle-link" href={`${base}/research`}>
+                <a
+                  className="subtle-link"
+                  href={publicationUrl(`${base}/research`, publication?.id)}
+                >
                   Build a research report <ArrowUpRight size={16} />
                 </a>
               </div>
@@ -558,7 +560,10 @@ export default function App() {
                   record can—and cannot—tell us.
                 </p>
               </div>
-              <a className="button dark" href={`${base}/methodology`}>
+              <a
+                className="button dark"
+                href={publicationUrl(`${base}/methodology`, publication?.id)}
+              >
                 Explore the methodology <ArrowRight size={16} />
               </a>
             </section>
@@ -573,7 +578,14 @@ export default function App() {
         <div>
           Independent. Nonpartisan. Evidence-led.
           <br />
-          <a href={`${base}/methodology#sources`}>Sources & reuse</a>
+          <a
+            href={publicationUrl(
+              `${base}/methodology#sources`,
+              publication?.id,
+            )}
+          >
+            Sources & reuse
+          </a>
           <span>
             {" "}
             ·{" "}
@@ -583,7 +595,9 @@ export default function App() {
           </span>
           <br />
           <a href={`${base}/editor`}>Staff workspace</a> ·{" "}
-          <a href={`${base}/find`}>Find my representatives</a>
+          <a href={publicationUrl(`${base}/find`, publication?.id)}>
+            Find my representatives
+          </a>
         </div>
       </footer>
       {notice && (
@@ -728,6 +742,11 @@ function Directory({
         ))}
       </div>
       <div className="directory-panel">
+        <p>
+          Current party and chamber describe the roster in this publication,
+          including the last recorded affiliation for former members. Historical
+          date filters narrow vote evidence, not roster membership.
+        </p>
         <div className="filter-bar">
           <label className="search-box">
             <Search size={18} />
@@ -740,7 +759,7 @@ function Directory({
             />
           </label>
           <Select
-            label="Chamber"
+            label="Current chamber"
             value={filters.chamber}
             onChange={(v) => setFilter("chamber", v)}
           >
@@ -759,7 +778,7 @@ function Directory({
             ))}
           </Select>
           <Select
-            label="Party"
+            label="Current party"
             value={filters.party}
             onChange={(v) => setFilter("party", v)}
           >
@@ -843,7 +862,10 @@ function Directory({
           <Info size={14} />
           <span>
             Grades reflect reform-aligned votes. Consistency is evaluated
-            separately. <a href={`${base}/methodology`}>How scoring works</a>
+            separately.{" "}
+            <a href={publicationUrl(`${base}/methodology`, publication?.id)}>
+              How scoring works
+            </a>
           </span>
           <span className="demo-stamp">
             {dataset.demo ? "FICTIONAL DATA" : dataset.asOf}
@@ -865,7 +887,10 @@ function Profile({
   const s = score(member, asOf);
   return (
     <section className="container inner-page">
-      <a className="back-link" href={`${base}/`}>
+      <a
+        className="back-link"
+        href={publicationUrl(`${base}/`, publication?.id)}
+      >
         <ArrowLeft size={16} /> All legislators
       </a>
       <div className="profile-heading">
@@ -1032,7 +1057,10 @@ function Profile({
                   <small>
                     {e.vote.date} ·{" "}
                     <a
-                      href={`${base}/legislation/${encodeURIComponent(e.vote.id)}${publication ? `?publication=${encodeURIComponent(publication.id)}` : ""}`}
+                      href={publicationUrl(
+                        `${base}/legislation/${encodeURIComponent(e.vote.id)}`,
+                        publication?.id,
+                      )}
                     >
                       {e.vote.bill}
                     </a>{" "}

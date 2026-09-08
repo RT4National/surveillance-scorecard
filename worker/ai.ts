@@ -2,6 +2,7 @@ import type { Dataset, Publication } from "../src/core/publication";
 import { executeReport, validateReportQuery } from "../src/core/reports";
 import { HttpError } from "./auth";
 import { digest } from "./validation";
+import { decodeStoredJson } from "./storage";
 
 const model = "@cf/meta/llama-3.1-8b-instruct-fast";
 export function interpretModelResponse(response: unknown, dataset: Dataset) {
@@ -95,7 +96,7 @@ export async function research(request: Request, env: Env): Promise<Response> {
       404,
       "Choose an existing publication before asking a research question",
     );
-  const publication: Publication = JSON.parse(row.snapshot);
+  const publication = await decodeStoredJson<Publication>(row.snapshot);
   const data = publication.dataset;
   if (data.demo)
     throw new HttpError(

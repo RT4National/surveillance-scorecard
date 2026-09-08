@@ -19,11 +19,12 @@ September 7, 2026. Three implementation agents plus root integration built the f
 ## Local evidence
 
 - Local official House 2025 roll call 003 import succeeded with 434 ballot records and retained source bytes. This does not establish live roster or full historical coverage.
-- All 79 tests pass across nine suites, exercising scoring policy, query scope, source adapters, signed Access JWT checks, publication loading, structured editing and real local D1 workflow/immutability. Type generation, production build and default/production Cloudflare deployment dry runs pass.
+- All 102 tests pass across 14 suites, exercising scoring policy, query scope, source adapters, signed Access JWT checks, publication loading, structured editing, compressed storage, pinned navigation and real local D1 workflow/immutability. Production build passes; CI also runs the actual local Worker capacity harness.
+- Private staging recovered all 23 official roll calls linked by the pinned legacy implementation: 12 House files with 5,204 normalized ballots and 11 Senate files with 1,100 raw ballots. Current public directories and unresolved historical identities are retained for review. No real grades were published; see [real-data staging](REAL-DATA-STAGING.md).
 - Local D1 contains two explicitly fictional published snapshots for UI verification.
 - Exported local D1 to SQL, restored into a separate SQLite database, verified two publications, pointer `demo-publication-2`, and SQLite `integrity_check = ok`. This is a local restore rehearsal, not production disaster-recovery qualification.
 - A second fresh database applied both migrations and seeded compact frozen scores. SQLite backup to a separate database preserved two publications, the current pointer and both migrations; dataset and frozen-score digests verified after restoration. Wrangler export does not accept a custom `--persist-to` directory, so this second isolated rehearsal used SQLite backup instead.
-- Earlier browser checks covered publication-backed rendering, archive comparison and pinned navigation. Final-build browser navigation/DOM inspection timed out repeatedly; a fresh final visual/mobile check remains outstanding. Final HTTP checks passed for public routes, both archived identities, unknown-member 404 and unauthenticated staff 401.
+- Fresh desktop and 390 px mobile browser checks covered profiles, research, comparisons, archives, state finding and policy simulation. Final rebuilt navigation preserved publication IDs and source anchors. Full accessibility, authenticated Access UI and large-payload mobile performance remain unqualified; see [bounded qualification](QUALIFICATION.md).
 
 ## Deliberate boundaries
 
@@ -31,4 +32,6 @@ No automatic classification of missing members as retired/deceased. No inference
 
 Address-to-district lookup is intentionally replaced with a state finder until a geocoding provider and address-retention policy are chosen. Non-voting delegates, exact historic service intervals, independent party alignment and co-sponsorship scoring require explicit policy/data treatment; unsupported cases are retained or rejected for review rather than guessed.
 
-Draft requests and complete published snapshots are bounded at 1,800,000 UTF-8 bytes. Larger evidence collections require partitioned/object-backed storage before adoption; production capacity must be qualified against the intended historical scope. AI catalog translation is separately capped at 250 votes and 1,000 members, with structured research available beyond that catalog limit.
+Draft requests are bounded at 12 MB; versioned compressed storage allows at most 32 MB expanded and 1.8 MB encoded per D1 payload. Review preflights the prospective frozen publication before approving a draft. The actual local Worker passed synthetic 535-member workflows at 12, 50 and 250 roll calls; this is not an edge load or memory-headroom certification. Larger evidence collections may require partitioned/object-backed storage; see [capacity evidence](CAPACITY.md). AI catalog translation is separately capped at 250 votes and 1,000 members, with structured research available beyond that catalog limit.
+
+Cloudflare's saved login could not refresh, and no Congress API credential was configured. Private cloud staging, authoritative roster reconciliation and editorial approval remain external gates.

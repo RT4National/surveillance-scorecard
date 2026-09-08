@@ -1,5 +1,7 @@
 # Data ingestion and migration
 
+The first credential-free official-source qualification is recorded in [REAL-DATA-STAGING.md](REAL-DATA-STAGING.md), including the private evidence packet, legacy mapping discrepancy, coverage counts, and remaining publication gates. `stage-real-evidence.mjs` captures official rollcalls cited by a pinned legacy component plus public House/Senate directory observations; these supplemental observations explicitly cannot be passed off as a complete Congress.gov roster run.
+
 The importer writes reviewable staging artifacts and exact source captures. It does not publish, infer an advocacy position, deactivate absent members, or replace fictional votes with purported real evidence. The production editorial workflow must approve the staged dataset separately.
 
 ## Commands

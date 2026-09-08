@@ -4,6 +4,8 @@
 
 Vite compiles React to static files. The Worker serves known `/scorecard` routes, publication-aware profile metadata and API requests. D1 holds drafts, immutable publications, the current publication pointer, audit history, corrections and abuse counters. Compiled JS and CSS live below `/scorecard/assets/`. The browser loads one explicit publication and verifies its dataset checksum; API failure does not silently display demonstration evidence.
 
+Large Dataset/Publication values use versioned gzip/base64 envelopes in the existing D1 columns, with bounded expansion, checksums and queryable metadata. Small and legacy inline JSON remain readable. Public APIs retain their original decoded contracts; staff lists return summaries and fetch a full draft only when selected. Storage bounds and actual local Workers runtime qualification are documented in [CAPACITY.md](CAPACITY.md); production memory, CPU and concurrency still require measurement on the chosen account.
+
 Cloudflare references consulted September 7, 2026:
 
 - https://developers.cloudflare.com/workers/static-assets/

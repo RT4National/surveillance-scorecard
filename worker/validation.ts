@@ -11,6 +11,8 @@ function checkDataset(value: unknown): string[] {
   const errors: string[] = [];
   if (!value || typeof value !== "object") return ["Dataset must be an object"];
   const d = value as Dataset;
+  if (Object.hasOwn(d, "storage"))
+    return ["Dataset field storage is reserved for the persistence envelope"];
   const nonempty = (v: unknown) => typeof v === "string" && v.trim().length > 0;
   const https = (v: unknown) => {
     try {

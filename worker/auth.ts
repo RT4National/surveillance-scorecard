@@ -67,7 +67,8 @@ export async function authenticate(
       typeof claims.iat !== "number" ||
       claims.iat > now + 30 ||
       (claims.nbf !== undefined && claims.nbf > now) ||
-      typeof claims.email !== "string"
+      typeof claims.email !== "string" ||
+      claims.email.length > 254
     )
       throw Error();
     const mapping = JSON.parse(env.STAFF_ROLES) as Record<string, Role>;

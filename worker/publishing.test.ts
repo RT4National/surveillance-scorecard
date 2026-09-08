@@ -472,7 +472,7 @@ describe("D1 editorial workflow", () => {
     expect(rebased?.base_publication_id).toBe(current.id);
     identity.mockRestore();
   });
-  it("returns a clear capacity error before inserting an oversized UTF8 publication", async () => {
+  it("bounds UTF8 uploads and publishes compressible snapshots beyond the old raw-row limit", async () => {
     const base = (await (await send("/publications/latest")).json()) as {
       id: string;
     };
@@ -483,7 +483,7 @@ describe("D1 editorial workflow", () => {
     const large = {
       ...fixture,
       votes: fixture.votes.map((v, i) =>
-        i === 0 ? { ...v, rationale: "界".repeat(600_000) } : v,
+        i === 0 ? { ...v, rationale: "界".repeat(4_000_000) } : v,
       ),
     };
     const payload = {
@@ -517,14 +517,12 @@ describe("D1 editorial workflow", () => {
     const response = await send(`/staff/drafts/${d.id}/publish`, "POST", {
       version: 2,
     });
-    expect(response.status).toBe(413);
-    expect(await response.json()).toMatchObject({
-      error: expect.stringContaining("1.8 MB"),
-    });
+    expect(response.status).toBe(201);
+    const published = (await response.json()) as { id: string };
     expect(
       ((await (await send("/publications/latest")).json()) as { id: string })
         .id,
-    ).toBe(base.id);
+    ).toBe(published.id);
     identity.mockRestore();
   }, 30000);
 });

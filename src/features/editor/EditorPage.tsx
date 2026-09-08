@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Dataset, Publication } from "../../core/publication";
 import { scoreMember } from "../../core/scoring";
+import { publishedScore } from "../../core/publication-scores";
+import { loadArchivedPublication } from "../../core/reports";
 import { StructuredEditor } from "./StructuredEditor";
 import "./editor.css";
 
@@ -14,6 +16,7 @@ type Draft = {
   reviewer: string | null;
   base_publication_id: string | null;
 };
+type DraftSummary = Omit<Draft, "dataset">;
 type Correction = {
   id: string;
   publication_id: string;
@@ -40,7 +43,7 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
     email: string;
     role: string;
   } | null>(null);
-  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [drafts, setDrafts] = useState<DraftSummary[]>([]);
   const [active, setActive] = useState<Draft | null>(null);
   const [text, setText] = useState("");
   const [summary, setSummary] = useState("");
@@ -54,13 +57,15 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
   const [reason, setReason] = useState("");
   const [cloneId, setCloneId] = useState("");
   const [currentBase, setCurrentBase] = useState<string | null>(null);
+  const [comparisonPublication, setComparisonPublication] =
+    useState<Publication | null>(null);
   const [comparisonDataset, setComparisonDataset] = useState<
     Dataset | undefined
   >(dataset);
   const refresh = async () => {
     const [s, d, c, o, a] = await Promise.all([
       call<{ email: string; role: string }>("session"),
-      call<Draft[]>("drafts"),
+      call<DraftSummary[]>("drafts"),
       call<Correction[]>("corrections"),
       call<Record<string, unknown>>("status"),
       call<unknown[]>("audit"),
@@ -74,14 +79,13 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
       (o.pointer as { publication_id?: string | null } | undefined)
         ?.publication_id ?? null;
     if (base) {
-      const response = await fetch(
-        `/scorecard/api/publications/${encodeURIComponent(base)}`,
-      );
-      if (!response.ok)
-        throw new Error("Current comparison publication unavailable");
-      const p = (await response.json()) as Publication;
+      const p = await loadArchivedPublication(base);
+      setComparisonPublication(p);
       setComparisonDataset(p.dataset);
-    } else setComparisonDataset(dataset);
+    } else {
+      setComparisonDataset(dataset);
+      setComparisonPublication(null);
+    }
     setCurrentBase(base);
     return d;
   };
@@ -106,18 +110,29 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
     setText(JSON.stringify(d.dataset, null, 2));
     setSummary(d.summary);
   };
-  let preview: Dataset | null = null;
+  const loadDraft = async (id: string) => {
+    const draft = await call<Draft>(`drafts/${encodeURIComponent(id)}`);
+    if (draft.id !== id || !draft.dataset)
+      throw new Error("Requested draft could not be loaded");
+    select(draft);
+  };
+  const parsed = useMemo(() => {
+    try {
+      return {
+        preview: text ? (JSON.parse(text) as Dataset) : null,
+        error: "",
+      };
+    } catch {
+      return { preview: null, error: "The dataset must be valid JSON." };
+    }
+  }, [text]);
+  const preview = parsed.preview;
   const unsaved =
     !!active &&
     (text !== JSON.stringify(active.dataset, null, 2) ||
       summary !== active.summary);
   const staleBase = !!active && active.base_publication_id !== currentBase;
-  let parseError = "";
-  try {
-    if (text) preview = JSON.parse(text);
-  } catch {
-    parseError = "The dataset must be valid JSON.";
-  }
+  let parseError = parsed.error;
   const canEdit =
     !!preview &&
     typeof preview.id === "string" &&
@@ -140,31 +155,45 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
     preview.coverage.every((c) => typeof c === "string") &&
     !!preview.rubric &&
     typeof preview.rubric.version === "string";
-  let changes: { name: string; before: string; after: string }[] = [];
-  try {
-    if (preview)
-      changes = preview.members.map((m) => ({
-        name: m.name,
-        before: comparisonDataset
-          ? scoreMember(
-              m,
-              comparisonDataset.votes,
-              comparisonDataset.records,
-              comparisonDataset.rubric,
-              comparisonDataset.asOf,
-            ).grade
-          : "—",
-        after: scoreMember(
-          m,
-          preview!.votes,
-          preview!.records,
-          preview!.rubric,
-          preview!.asOf,
-        ).grade,
-      }));
-  } catch (e) {
-    parseError = e instanceof Error ? e.message : "Invalid preview";
-  }
+  const impact = useMemo(() => {
+    let changes: { name: string; before: string; after: string }[] = [];
+    try {
+      if (preview)
+        changes = preview.members.map((m) => ({
+          name: m.name,
+          before: comparisonPublication
+            ? comparisonPublication.dataset.members.some(
+                (member) => member.id === m.id,
+              )
+              ? publishedScore(comparisonPublication, m).grade
+              : "—"
+            : comparisonDataset
+              ? scoreMember(
+                  m,
+                  comparisonDataset.votes,
+                  comparisonDataset.records,
+                  comparisonDataset.rubric,
+                  comparisonDataset.asOf,
+                ).grade
+              : "—",
+          after: scoreMember(
+            m,
+            preview!.votes,
+            preview!.records,
+            preview!.rubric,
+            preview!.asOf,
+          ).grade,
+        }));
+    } catch (e) {
+      return {
+        changes: [],
+        error: e instanceof Error ? e.message : "Invalid preview",
+      };
+    }
+    return { changes, error: "" };
+  }, [preview, comparisonDataset, comparisonPublication]);
+  const changes = impact.changes;
+  parseError ||= impact.error;
   return (
     <section className="editor-workspace">
       <p className="eyebrow">Editorial workspace</p>
@@ -242,8 +271,8 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
                       version: active.version,
                       basePublicationId: currentBase,
                     });
-                    const ds = await refresh();
-                    select(ds.find((d) => d.id === active.id)!);
+                    await refresh();
+                    await loadDraft(active.id);
                     setNotice(
                       "Draft rebased on the displayed publication. Review is required again.",
                     );
@@ -264,11 +293,7 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
               disabled={!cloneId}
               onClick={() =>
                 void run(async () => {
-                  const r = await fetch(
-                    `/scorecard/api/publications/${encodeURIComponent(cloneId)}`,
-                  );
-                  if (!r.ok) throw new Error("Publication could not be loaded");
-                  const p = (await r.json()) as Publication;
+                  const p = await loadArchivedPublication(cloneId);
                   setActive(null);
                   setText(
                     JSON.stringify(
@@ -290,7 +315,10 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
               Start correction draft
             </button>
             {drafts.map((d) => (
-              <button key={d.id} onClick={() => select(d)}>
+              <button
+                key={d.id}
+                onClick={() => void run(() => loadDraft(d.id))}
+              >
                 {d.summary} · {d.status} · v{d.version}
               </button>
             ))}
@@ -309,11 +337,16 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    if (file.size > 4_000_000) {
-                      setError("File exceeds 4 MB");
+                    if (file.size > 12_000_000) {
+                      setError("File exceeds 12 MB");
                       return;
                     }
-                    void file.text().then(setText);
+                    void file
+                      .text()
+                      .then(setText)
+                      .catch(() =>
+                        setError("The selected file could not be read"),
+                      );
                   }
                 }}
               />
@@ -375,8 +408,8 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
                         : currentBase,
                     },
                   );
-                  const ds = await refresh();
-                  select(ds.find((d) => d.id === b.id)!);
+                  await refresh();
+                  await loadDraft(b.id);
                   setNotice(
                     "Draft saved. Any previous review has been cleared.",
                   );
@@ -400,8 +433,8 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
                       await call(`drafts/${active.id}/review`, "POST", {
                         version: active.version,
                       });
-                      const ds = await refresh();
-                      select(ds.find((d) => d.id === active.id)!);
+                      await refresh();
+                      await loadDraft(active.id);
                       setNotice("Review recorded.");
                     })
                   }

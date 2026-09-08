@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dataset, Publication } from "../../core/publication";
 import type { Outcome } from "../../core/types";
+import { publicationUrl } from "../../core/navigation";
 import {
   executeReport,
   publicationChanges,
@@ -21,7 +22,7 @@ const base = "/scorecard";
 function publicUrl(path: string, publication?: Publication) {
   const id =
     publication?.id ?? new URLSearchParams(location.search).get("publication");
-  return path + (id ? `?publication=${encodeURIComponent(id)}` : "");
+  return publicationUrl(path, id ?? undefined);
 }
 function save(name: string, text: string, type: string) {
   const url = URL.createObjectURL(new Blob([text], { type }));
@@ -547,7 +548,9 @@ export function ReportsPage({ dataset, publication }: Props) {
           This report requires publication {pinned}. It cannot be reproduced
           with the currently loaded dataset.
         </p>
-        <a href={`${base}/archives`}>Browse published archives</a>
+        <a href={publicUrl(`${base}/archives`, publication)}>
+          Browse published archives
+        </a>
       </section>
     );
   return (
