@@ -55,7 +55,9 @@ try {
   } else if (command === 'legacy') {
     const raw = await readFile(requireFlag('input'), 'utf8');
     const url = requireFlag('source');
-    result = await stageLegacySheet(raw, url, { reviewedPaths: flag('redirects') ? JSON.parse(await readFile(flag('redirects'), 'utf8')) : undefined });
+    const format = flag('format') ?? (requireFlag('input').endsWith('.csv') ? 'csv' : 'values');
+    if (!['csv', 'values'].includes(format)) throw new Error('--format must be csv or values');
+    result = await stageLegacySheet(raw, url, { format, reviewedPaths: flag('redirects') ? JSON.parse(await readFile(flag('redirects'), 'utf8')) : undefined });
     captures.push({ url, body: raw });
   } else throw new Error('Command must be members, house, senate, affiliations, or legacy');
   // Fresh directory only: never replace a prior capture or published artifact.
