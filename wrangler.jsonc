@@ -23,7 +23,7 @@
         {
           "binding": "DB",
           "database_name": "surveillance-scorecard-staging",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "1eeaa6f2-983e-4cc5-8fc7-27449033b022",
           "migrations_dir": "migrations",
         },
       ],

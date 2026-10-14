@@ -65,7 +65,7 @@ Deploys use Wrangler; account and D1 operations use the Cloudflare CLI ([`cf`](h
    npm run build
    ```
 
-5. **Deploy to staging.** The staging Worker is `restore-the-fourth-scorecard-staging` on its `workers.dev` URL; no route on the main site is touched.
+5. **Deploy to staging.** First deployed October 14, 2026 (UTC) to the personal `zaki@iqlusion.io` Cloudflare account, which does not hold `restorethe4th.com`: <https://restore-the-fourth-scorecard-staging.zaki-0c1.workers.dev/scorecard/>, D1 `1eeaa6f2-983e-4cc5-8fc7-27449033b022`. Production must be created in the account that holds `restorethe4th.com`; Workers and D1 databases cannot be moved between accounts. The staging Worker is `restore-the-fourth-scorecard-staging` on its `workers.dev` URL; no route on the main site is touched.
 
    ```sh
    npx wrangler deploy --dry-run --env staging

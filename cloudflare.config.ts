@@ -33,7 +33,7 @@ export default defineConfig((ctx) => {
             AI_MODEL: bindings.text(""),
             DB: bindings.d1({
               name: "surveillance-scorecard-staging",
-              id: "00000000-0000-0000-0000-000000000000",
+              id: "1eeaa6f2-983e-4cc5-8fc7-27449033b022",
             }),
             ASSETS: bindings.assets(),
           },
