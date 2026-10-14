@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ingestCurrentMembers, publishablePortrait, reconcileRoster, readSource, type RosterRun } from './members';
 import { parseHouseRollcall, parseSenateRollcall, reviewRollcall } from './rollcalls';
-import { stageLegacySheet } from './legacy';
+import { sheetValuesFromCsv, stageLegacySheet } from './legacy';
 import { stageAffiliations, affiliationsOn, reconcileAffiliations } from './affiliations';
 import { cachePortrait } from './portraits';
 import type { Dataset } from '../core/publication';
@@ -105,16 +105,38 @@ describe('Official roll calls', () => {
 });
 
 describe('DecideTheFuture migration', () => {
-  const cells = Array.from({ length: 25 }, (_,i) => i === 16 ? 'A000001' : `cell ${i}`);
-  const raw = JSON.stringify({ values: [cells.map((_,i) => `header ${i}`), cells] });
+  // The live sheet has a twitter column at 16 and bioguide at 17; the original code's entry[16] is stale.
+  const header = Array.from({ length: 25 }, (_,i) => i === 16 ? 'twitter' : i === 17 ? 'Bioguide ' : `header ${i}`);
+  const cells = header.map((_,i) => i === 16 ? 'senexample' : i === 17 ? 'A000001' : `cell ${i}`);
+  const raw = JSON.stringify({ values: [header, cells] });
   it('preserves every old cell, creates only reviewed local redirects, and does not fabricate votes', async () => {
     const stage = await stageLegacySheet(raw, 'https://sheets.googleapis.com/v4/spreadsheets/example/values/newsb?key=secret', { reviewedPaths: { '/politician/example': 'A000001' } });
-    expect(stage.rows[0].cells).toEqual(cells); expect(stage.redirects['/politician/example']).toBe('/scorecard/?member=A000001');
+    expect(stage.rows[0].cells).toEqual(cells); expect(stage.rows[0].memberId).toBe('A000001');
+    expect(stage.redirects['/politician/example']).toBe('/scorecard/?member=A000001');
     expect(stage.source.url).not.toContain('secret'); expect(stage.requiresReview).toBe(true);
   });
-  it('refuses duplicate identities and open redirects', async () => {
-    await expect(stageLegacySheet(JSON.stringify({ values: [cells, cells, cells] }), 'https://example.org')).rejects.toThrow('Duplicate');
+  it('refuses duplicate identities, open redirects and sheets without exactly one bioguide column', async () => {
+    await expect(stageLegacySheet(JSON.stringify({ values: [header, cells, cells] }), 'https://example.org')).rejects.toThrow('Duplicate');
     await expect(stageLegacySheet(raw, 'https://example.org', { reviewedPaths: { '//evil.org': 'A000001' } })).rejects.toThrow('local path');
+    await expect(stageLegacySheet(JSON.stringify({ values: [header.map(h => h === 'Bioguide ' ? 'id' : h), cells] }), 'https://example.org')).rejects.toThrow('bioguide');
+    await expect(stageLegacySheet(JSON.stringify({ values: [[...header, 'bioguide'], [...cells, 'A000001']] }), 'https://example.org')).rejects.toThrow('bioguide');
+  });
+  it('keeps rows without an identity as unidentified instead of matching names, and rejects malformed IDs', async () => {
+    const blank = cells.map((c,i) => i === 17 ? '' : c);
+    const stage = await stageLegacySheet(JSON.stringify({ values: [header, cells, blank] }), 'https://example.org');
+    expect(stage.rows).toHaveLength(1);
+    expect(stage.unidentifiedRows).toEqual([{ rowNumber: 3, cells: blank }]);
+    expect(stage.warnings.some(w => w.includes('1 row'))).toBe(true);
+    await expect(stageLegacySheet(JSON.stringify({ values: [header, cells.map((c,i) => i === 17 ? 'senexample' : c)] }), 'https://example.org')).rejects.toThrow();
+  });
+  it('reads the CSV export with quoted commas, quotes and newlines, refusing malformed CSV', async () => {
+    const csv = 'name,bioguide,notes\r\n"Example, Ann",A000001,"said ""no""\nthen yes"\r\nBo,,plain\r\n';
+    expect(sheetValuesFromCsv(csv)).toEqual([['name','bioguide','notes'], ['Example, Ann','A000001','said "no"\nthen yes'], ['Bo','','plain']]);
+    const stage = await stageLegacySheet(csv, 'https://docs.google.com/spreadsheets/d/example/gviz/tq?tqx=out:csv&sheet=newsb', { format: 'csv' });
+    expect(stage.rows.map(r => r.memberId)).toEqual(['A000001']);
+    expect(stage.unidentifiedRows).toHaveLength(1);
+    expect(() => sheetValuesFromCsv('a,"b\n')).toThrow();
+    expect(() => sheetValuesFromCsv('a,b"c"\n')).toThrow();
   });
 });
 

@@ -21,8 +21,9 @@ node --import tsx scripts/ingestion/import.mjs house --url https://clerk.house.g
 # A reviewed JSON object maps Senate LIS IDs to Bioguide IDs, e.g. {"S123":"A000001"}.
 node --import tsx scripts/ingestion/import.mjs senate --url https://www.senate.gov/legislative/LIS/roll_call_votes/vote1191/vote_119_1_00001.xml --crosswalk /path/to/lis-bioguide.json --out /tmp/scorecard-senate-001
 
-# Export the original newsb sheet as Google Sheets values JSON first.
-node --import tsx scripts/ingestion/import.mjs legacy --input /path/to/newsb.json --source https://sheets.googleapis.com/v4/spreadsheets/SHEET_ID/values/newsb --out /tmp/scorecard-legacy
+# The newsb sheet (Senate only) is public; its CSV export needs no API key. Values JSON is also accepted.
+# curl -sf -o /path/to/newsb.csv 'https://docs.google.com/spreadsheets/d/1d8HRGJU8p8tHDoTiSnVbqZuHTW9lSeqG-dWMyeC-v3E/gviz/tq?tqx=out:csv&sheet=newsb'
+node --import tsx scripts/ingestion/import.mjs legacy --input /path/to/newsb.csv --source 'https://docs.google.com/spreadsheets/d/1d8HRGJU8p8tHDoTiSnVbqZuHTW9lSeqG-dWMyeC-v3E/gviz/tq?tqx=out:csv&sheet=newsb' --out /tmp/scorecard-legacy
 
 # Supplemental sourced party, committee, caucus, and term intervals:
 node --import tsx scripts/ingestion/import.mjs affiliations --input /path/to/affiliations.json --dataset /path/to/dataset.json --source https://example.org/editorial-import --out /tmp/scorecard-affiliations
@@ -40,7 +41,7 @@ Congress credentials are sent in the `X-Api-Key` request header, never captured 
 - `reconcileRoster(previousDataset, run)` returns `{dataset, missingMemberIds, requiresReview: true}`. Existing absent members remain intact. Missing active members require an explicit, independently evidenced editorial status change. Existing committee/caucus fields are preserved. The prior `demo` flag is preserved to prevent real roster data from relabeling fictional votes as real.
 - `parseHouseRollcall(xml, sourceUrl)` and `parseSenateRollcall(xml, sourceUrl, lisToBioguide)` return unscored ballot stages. Vote identity, source URL, member uniqueness, total count, and Yes/No counts must agree. Malformed XML, entity declarations, unsupported outcomes, unresolved Senate IDs, and source mismatches abort.
 - `reviewRollcall(stage, editorial)` constructs a `Vote` and its `RecordEntry[]` only when title, administration, president party, reform direction, positive weight, topic, and rationale are supplied. This validates required fields; the authenticated editorial review/publish workflow supplies actual approval authority. Confirm every ballot's member exists in the target dataset before submission.
-- `stageLegacySheet(rawJson, sourceUrl, {reviewedPaths?})` preserves all cells and maps `entry[16]` to validated Bioguide IDs. Optional redirects require reviewed local paths and known identities. These mappings are an artifact for a routing migration, not a deployed redirect configuration.
+- `stageLegacySheet(raw, sourceUrl, {format?, reviewedPaths?})` accepts values JSON or the CSV export, preserves all cells and finds the identity column by its `bioguide` header. The live sheet has gained columns since the original code read `entry[16]`, which is now `twitter`. Rows with a blank `bioguide` are kept in `unidentifiedRows`; names are never used to infer an identity. Optional redirects require reviewed local paths and known identities. These mappings are an artifact for a routing migration, not a deployed redirect configuration.
 
 Official names and state names are preserved. Bioguide IDs are stable uppercase identifiers. Unsupported party labels fail closed instead of being silently mapped to Independent. House at-large district `0` is retained. Terms from the member list have year precision; exact service dates must not be inferred from them. API portrait attribution is retained as untrusted text, not rendered HTML.
 
