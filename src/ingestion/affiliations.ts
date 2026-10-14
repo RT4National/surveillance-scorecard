@@ -52,9 +52,15 @@ export function affiliationsOn(rows: readonly DatedAffiliation[], memberId: stri
 }
 
 export async function reconcileAffiliations(previous: Dataset, stage: Awaited<ReturnType<typeof stageAffiliations>>): Promise<{ dataset: Dataset; requiresReview: true }> {
-  const rows = mergeAffiliationRows(previous.affiliations ?? [], stage.rows);
+  // Exact-day terms supersede a member's coarse year terms, which would otherwise overlap them.
+  const exactTerms = new Set(stage.rows.filter(r => r.kind === 'term' && r.precision === 'day').map(r => r.memberId));
+  const previousRows = previous.affiliations ?? [];
+  const retained = previousRows.filter(r => !(r.kind === 'term' && r.precision === 'year' && exactTerms.has(r.memberId)));
+  const replaced = previousRows.length - retained.length;
+  const rows = mergeAffiliationRows(retained, stage.rows);
   // Check the combined chronology: individually valid imports can conflict with published history.
   await stageAffiliations(JSON.stringify(rows), stage.source.url, previous.members.map(m => m.id), stage.source.retrievedAt);
   return { requiresReview: true, dataset: { ...previous, id: `staging-${crypto.randomUUID()}`, affiliations: rows,
-    sources: [...previous.sources, stage.source], coverage: [...previous.coverage, ...stage.warnings] } };
+    sources: [...previous.sources, stage.source], coverage: [...previous.coverage, ...stage.warnings,
+      ...(replaced ? [`Replaced ${replaced} year-precision term row${replaced === 1 ? '' : 's'} with exact-day terms from ${stage.source.url}.`] : [])] } };
 }
