@@ -12,6 +12,22 @@
     "AI_MODEL": "",
   },
   "env": {
+    "staging": {
+      "vars": {
+        "ACCESS_ISSUER": "",
+        "ACCESS_AUDIENCE": "",
+        "STAFF_ROLES": "{}",
+        "AI_MODEL": "",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "surveillance-scorecard-staging",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations",
+        },
+      ],
+    },
     "production": {
       "vars": {
         "ACCESS_ISSUER": "",

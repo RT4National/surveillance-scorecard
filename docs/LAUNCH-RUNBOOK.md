@@ -28,60 +28,48 @@ Constraints that apply even with placeholders:
 
 ## 1. Tooling and credentials
 
-The project moves from Wrangler to the Cloudflare CLI ([`cf`](https://developers.cloudflare.com/cf/)). `cf` is in beta (npm `cf@1.0.0-beta.16` as of this date). Its commands, configuration and build output can change before the stable release.
+Deploys use Wrangler; account and D1 operations use the Cloudflare CLI ([`cf`](https://developers.cloudflare.com/cf/)). `cf` is in beta and pinned to `1.0.0-beta.16`. `cf deploy` cannot build this project: it detects `vite.config.ts`, runs plain `vite build`, and finds no Worker build output. Deploying through `cf` would require the Cloudflare Vite plugin beta, which is deferred until it has a numbered 2.0 release. `cloudflare.config.ts` (from `cf migrate`) is kept for that later switch but is not used by any current command; `wrangler.jsonc` is authoritative.
 
-1. **Approve the dependency.** `cf` is not in the approved-dependency list. Package details: MIT OR Apache-2.0, published by Cloudflare (`wrangler-publisher`), 7 direct dependencies including `miniflare` beta.
-2. Install it and sign in. `cf` does not reuse the Wrangler login.
-
-   ```sh
-   npm install --global cf
-   cf auth login
-   ```
-
-3. Migrate the project config. `cf migrate` writes `cloudflare.config.ts` beside `wrangler.jsonc` and adds `cf` as a dev dependency. It keeps the Worker name, bindings, resource IDs, routes and environments. Each `env` block becomes a `--mode` case.
+1. **Sign in to both CLIs.** `cf` does not reuse the Wrangler login, and both need an interactive browser sign-in.
 
    ```sh
-   cf migrate --dry-run
-   cf migrate
+   npx cf auth login
+   npx wrangler login
    ```
 
-   Resolve every `TODO(@cloudflare)` it leaves. This project has no Durable Objects or Workflows. Expect these follow-ups:
-   - **D1 migrations directory:** pass `--dir migrations` to `cf d1 migrations apply`, because it is not converted.
-   - **Package scripts:** update the scripts in `package.json`.
-   - **Assets:** confirm `assets.run_worker_first` became `worker.assets.runWorkerFirst`.
+2. **Congress API key.** Locally it lives in the gitignored `.env.ingestion` (not `.env`, which Wrangler would load into the local Worker); run importers with `node --env-file=.env.ingestion`. It is set as the `CONGRESS_API_KEY` secret on `RT4National/surveillance-scorecard` for the daily ingestion workflow. The repository is public, so roster artifacts (official public data, never the key) are downloadable by any signed-in GitHub user for 14 days.
 
-4. **Keep `wrangler.jsonc` and the Wrangler dev dependency for now.** The test harness still uses Wrangler and Miniflare: `npm run preview`, `npm run db:migrate`, `npm run test:capacity`, and the D1 tests in `worker/publishing.test.ts`. Wrangler does not read `cloudflare.config.ts`, so keep binding changes in both files until the harness is ported. Do not run `cf dev`, `cf build` or `cf deploy` before `cf migrate`.
-5. Get a `CONGRESS_API_KEY`. Locally it lives in the gitignored `.env`; run importers with `node --env-file=.env`. Set it as the `CONGRESS_API_KEY` secret on `RT4National/surveillance-scorecard` for the daily ingestion workflow. The repository is public, so roster artifacts (official public data) are downloadable by any signed-in GitHub user for 14 days.
-
-**Undocumented `cf` commands.** The `cf` docs do not show commands for D1 create, D1 export, routes or Access applications. Find each with `cf cli search "<task>"` and `cf schema <command>` before use. Where `cf` has no equivalent, use the Wrangler command already in [PUBLISHING](PUBLISHING.md).
+`cf` resource commands take database IDs, not names. Find commands with `cf cli search "<task>"`. It has no D1 export command, so backups use `wrangler d1 export`.
 
 ## 2. Staging infrastructure
 
-1. **Create the D1 databases.** Create `surveillance-scorecard-staging` and `surveillance-scorecard-production`. Find the create command with `cf cli search "create a D1 database"`.
-2. **Add a staging mode.** Add a `staging` case to `cloudflare.config.ts` and an `env.staging` block to `wrangler.jsonc`. Use the real staging database ID in both, and replace the all-zeros production ID.
-3. **Apply migrations.** `cf d1 migrations apply` applies to the remote database unless you pass `--local`.
+1. **Create the D1 databases.** Then replace the all-zeros IDs for `staging` and `production` in `wrangler.jsonc`.
 
    ```sh
-   cf d1 migrations apply <STAGING_DATABASE_ID> --dir migrations
+   npx cf d1 create --help
    ```
 
-4. **Set up Access.** Create a Cloudflare Access self-hosted application covering `/scorecard/editor*` and `/scorecard/api/staff/*`. In staging, set `ACCESS_ISSUER`, `ACCESS_AUDIENCE` and the placeholder `STAFF_ROLES` from step 0, with two real identities mapped.
-5. **Verify.** Generate types and run the full local suite:
+2. **Apply migrations.** `cf d1 migrations apply` targets the remote database unless you pass `--local`, and uses the same bookkeeping table as Wrangler.
 
    ```sh
-   cf workers types
+   npx cf d1 migrations apply <STAGING_DATABASE_ID> --dir migrations
+   ```
+
+3. **Set up Access.** Create a Cloudflare Access self-hosted application covering `/scorecard/editor*` and `/scorecard/api/staff/*`. In `env.staging`, set `ACCESS_ISSUER`, `ACCESS_AUDIENCE` and the placeholder `STAFF_ROLES` from step 0, with two real identities mapped.
+4. **Verify.**
+
+   ```sh
+   npm run types
    npm test
    npm run test:capacity
    npm run build
    ```
 
-   `cf workers types` writes `.cloudflare/types/index.d.ts`. The Worker currently reads `worker/env.d.ts`, so point `tsconfig.json` at the new file or keep `npm run types` until then.
-
-6. **Deploy to staging.** `cf deploy --dry-run` makes no API requests.
+5. **Deploy to staging.** The staging Worker is `restore-the-fourth-scorecard-staging` on its `workers.dev` URL; no route on the main site is touched.
 
    ```sh
-   cf deploy --dry-run --mode staging
-   cf deploy --mode staging
+   npx wrangler deploy --dry-run --env staging
+   npx wrangler deploy --env staging
    ```
 
 ## 3. Real data
@@ -109,7 +97,7 @@ This is the critical path. Commands are in [DATA-PIPELINE](DATA-PIPELINE.md).
 - **API checks:** unauthenticated staff writes return 401, staff roles map correctly, and valid detail pages return 200 while unknown IDs return 404. An archived publication keeps its digest after a new one is published.
 - **Routing:** `/scorecard` and `/scorecard/*` work without affecting other site routes.
 - **Accessibility and performance:** run an accessibility audit (WCAG, screen reader, contrast). Measure mobile performance with the real-size payload.
-- **Recovery:** export the staging D1 database (find the command with `cf cli search "export a D1 database"`). Restore it into a separate database and verify the publication count, current pointer, digests and audit history.
+- **Recovery:** export the staging D1 database with `npx wrangler d1 export surveillance-scorecard-staging --remote --env staging --output <PATH>`. Restore it into a separate database and verify the publication count, current pointer, digests and audit history.
 - **Alerts:** configure alerts at the step 0 destination for 5xx responses, ingestion failures and data freshness.
 - **AI:** if it is enabled, run live question-answer qualification within an approved budget.
 
@@ -119,14 +107,14 @@ This is the critical path. Commands are in [DATA-PIPELINE](DATA-PIPELINE.md).
 2. **Production database.**
 
    ```sh
-   cf d1 migrations apply <PRODUCTION_DATABASE_ID> --dir migrations
+   npx cf d1 migrations apply <PRODUCTION_DATABASE_ID> --dir migrations
    ```
 
 3. **Deploy production.** Set production `ACCESS_*` and `STAFF_ROLES` with real identities.
 
    ```sh
-   cf deploy --dry-run --mode production
-   cf deploy --mode production
+   npx wrangler deploy --dry-run --env production
+   npx wrangler deploy --env production
    ```
 
 4. **Route.** Route only `restorethe4th.com/scorecard` and `restorethe4th.com/scorecard/*` to the Worker.
