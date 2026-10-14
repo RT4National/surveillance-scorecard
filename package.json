@@ -27,6 +27,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "cf": "1.0.0-beta.16",
     "esbuild": "^0.28.2",
     "jsdom": "^30.0.1",
     "miniflare": "^5.20260907.0-alpha",
@@ -35,6 +36,6 @@
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
     "vitest": "^5.0.0",
-    "wrangler": "^4.129.1"
+    "wrangler": "^4.150.0"
   }
 }

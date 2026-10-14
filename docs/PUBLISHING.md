@@ -71,7 +71,7 @@ Corrections collect no name, email, or address. They are tied to an immutable pu
 
 ## Operational handoff
 
-The status endpoint reports evidence freshness, not scheduler health. The included GitHub workflow stages a roster daily or on dispatch only when private-repository checks and the Congress API secret are configured; without them it explicitly skips. Preserve captures and reconciliation reports, alert on failures or missing roster records, and stage updates for editorial review. Choose and configure a monitoring destination before production: this repository does not send external alert messages.
+The status endpoint reports evidence freshness, not scheduler health. The included GitHub workflow stages a roster daily or on dispatch only when the Congress API secret is configured; without them it explicitly skips. Preserve captures and reconciliation reports, alert on failures or missing roster records, and stage updates for editorial review. Choose and configure a monitoring destination before production: this repository does not send external alert messages.
 
 Enable provider logs and alert on 5xx, ingestion failures and freshness outside the organization's chosen threshold. Do not log JWTs, raw correction messages or Access email allowlists. Cloudflare observability is enabled; Worker failures log only event/error class.
 
