@@ -40,6 +40,7 @@ describe("grounded AI boundary", () => {
       autorag: unexpected,
       models: unexpected,
       toMarkdown: unexpected,
+      websearch: unexpected,
     };
     env.DB = {
       batch: unexpected,

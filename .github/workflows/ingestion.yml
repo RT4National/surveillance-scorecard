@@ -17,12 +17,8 @@ jobs:
         id: configuration
         env:
           CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
-          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
         run: |
-          if [ "$REPOSITORY_PRIVATE" != "true" ]; then
-            echo 'enabled=false' >> "$GITHUB_OUTPUT"
-            echo 'Ingestion skipped: staging artifacts are restricted to private repositories.' >> "$GITHUB_STEP_SUMMARY"
-          elif [ -z "$CONGRESS_API_KEY" ]; then
+          if [ -z "$CONGRESS_API_KEY" ]; then
             echo 'enabled=false' >> "$GITHUB_OUTPUT"
             echo 'Ingestion skipped: configure the CONGRESS_API_KEY repository secret. No roster was fetched or published.' >> "$GITHUB_STEP_SUMMARY"
           else
@@ -45,7 +41,7 @@ jobs:
         env:
           CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
         run: node --import tsx scripts/ingestion/import.mjs members --out "$RUNNER_TEMP/scorecard-roster"
-      - name: Retain private review artifact
+      - name: Retain review artifact
         if: steps.configuration.outputs.enabled == 'true' && success()
         uses: actions/upload-artifact@v4
         with:
