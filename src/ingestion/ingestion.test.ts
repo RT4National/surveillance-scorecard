@@ -92,6 +92,12 @@ describe('Official roll calls', () => {
     expect(stage.records[0].outcome).toBe('No'); expect(stage.records[0].partyAtVote).toBe('Independent');
     expect(stage.date).toBe('2025-01-09');
   });
+  it('identifies Senate amendment votes, whose document name is empty, by amendment and target document', async () => {
+    const amendment = senate.replace('<document><document_name>S. 5</document_name></document>',
+      '<document><document_type>S.Amdt.</document_type><document_name/></document><amendment><amendment_number>S.Amdt. 1583</amendment_number><amendment_to_document_number>H.R. 6172</amendment_to_document_number></amendment>');
+    expect((await parseSenateRollcall(amendment, senateUrl, { S123: 'B000002' })).bill).toBe('S.Amdt. 1583 to H.R. 6172');
+    await expect(parseSenateRollcall(amendment.replace('S.Amdt. 1583', ''), senateUrl, { S123: 'B000002' })).rejects.toThrow();
+  });
   it('rejects malicious entities and invalid XML', async () => {
     await expect(parseHouseRollcall('<!ENTITY leak SYSTEM "file:///etc/passwd">' + house, houseUrl)).rejects.toThrow('entity');
     await expect(parseHouseRollcall(house.slice(0,-12), houseUrl)).rejects.toThrow('Invalid');
@@ -132,6 +138,15 @@ describe('Supplemental membership chronology', () => {
     expect(candidate.dataset.affiliations).toEqual(stage.rows);
     const conflicting = await stageAffiliations(JSON.stringify([{ ...row, name: 'Democratic' }]), 'https://example.org/import', ['A000001']);
     await expect(reconcileAffiliations(candidate.dataset, conflicting)).rejects.toThrow('Overlapping');
+  });
+  it('replaces a member\'s year-precision terms with incoming exact-day terms and reports it', async () => {
+    const year = { memberId: 'A000001', kind: 'term', name: 'Senate', start: '2019', end: '2025', precision: 'year', source: 'https://api.congress.gov/v3/member' } as const;
+    const other = { ...year, memberId: 'B000002' };
+    const exact = { memberId: 'A000001', kind: 'term', name: 'Senate', start: '2019-01-03', end: '2025-01-02', precision: 'day', source: 'https://example.org/terms' };
+    const stage = await stageAffiliations(JSON.stringify([exact]), 'https://example.org/terms', ['A000001', 'B000002']);
+    const candidate = await reconcileAffiliations({ ...base, members: [{ id: 'A000001' }, { id: 'B000002' }] as never, affiliations: [year, other] }, stage);
+    expect(candidate.dataset.affiliations).toEqual([other, exact]);
+    expect(candidate.dataset.coverage.at(-1)).toContain('1 year-precision term row');
   });
 });
 

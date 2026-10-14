@@ -78,6 +78,13 @@ export async function parseHouseRollcall(xml: string, sourceUrl: string, retriev
     sources: [await capture(xml, sourceUrl, 'votes', retrievedAt)], warnings: ['Present ballots are retained in the source capture and treated as Not voting by the current outcome schema.'], requiresReview: true };
 }
 
+/** Amendment votes leave document_name empty; the amendment block names the amendment and its target. */
+function senateDocument(root: Record<string, unknown>): string {
+  const name = object(root.document).document_name;
+  if (typeof name === 'string' && name.trim()) return name.trim();
+  const amendment = object(root.amendment);
+  return `${requiredString(amendment.amendment_number)} to ${requiredString(amendment.amendment_to_document_number)}`;
+}
 /** Senate XML uses LIS IDs. Caller supplies an independently reviewed LIS -> Bioguide crosswalk. */
 export async function parseSenateRollcall(xml: string, sourceUrl: string, lisToBioguide: Readonly<Record<string,string>>, retrievedAt = new Date().toISOString()): Promise<RollcallStage> {
   const source = new URL(sourceUrl);
@@ -93,7 +100,7 @@ export async function parseSenateRollcall(xml: string, sourceUrl: string, lisToB
   });
   const counts = object(root.count);
   validateRecords(records, ['yeas','nays','present','absent'].reduce((n,key) => n + total(counts[key]),0), total(counts.yeas), total(counts.nays));
-  return { id, chamber: 'Senate', congress, session, roll, date: date(root.vote_date), question: requiredString(root.question), bill: requiredString(object(root.document).document_name), records,
+  return { id, chamber: 'Senate', congress, session, roll, date: date(root.vote_date), question: requiredString(root.question), bill: senateDocument(root), records,
     sources: [await capture(xml, sourceUrl, 'votes', retrievedAt)], warnings: ['Senate identity mapping must be sourced and reviewed separately; present ballots use Not voting.'], requiresReview: true };
 }
 
