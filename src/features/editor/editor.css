@@ -213,9 +213,17 @@
   color: #fff;
   font-size: 13px;
 }
+.editor-tabs {
+  overflow-wrap: normal;
+}
 .editor-badge {
-  color: var(--orange-text);
-  font-size: 13px;
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--orange-text);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
 }
 .editor-panel {
   padding: 8px 0 24px;

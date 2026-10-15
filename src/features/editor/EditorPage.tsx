@@ -608,11 +608,8 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
                 {t.id === "corrections" &&
                   corrections.some((c) => c.status === "open") && (
                     <span className="editor-badge">
-                      {" "}
-                      {
-                        corrections.filter((c) => c.status === "open").length
-                      }{" "}
-                      open
+                      {corrections.filter((c) => c.status === "open").length}
+                      <span className="sr-only"> open</span>
                     </span>
                   )}
               </button>
