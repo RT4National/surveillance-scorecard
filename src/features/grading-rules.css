@@ -1,0 +1,118 @@
+/* Shared grading-rule controls (staff workspace and public rubric lab). Scoped to .gr-* classes. */
+.gr-field,
+.gr-cutoff {
+  margin: 18px 0;
+}
+.gr-field > label,
+.gr-cutoff > label,
+.gr-label {
+  display: block;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+.gr-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.gr-slider-row input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--blue);
+}
+.gr-step {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--blue-text);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--blue-text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.gr-step:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.gr-value {
+  flex: 0 0 auto;
+  min-width: 4.5em;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.gr-help {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.gr-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gr-choices button {
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--blue-text);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--blue-text);
+  font: inherit;
+  cursor: pointer;
+}
+.gr-choices button[aria-pressed="true"] {
+  background: var(--blue-text);
+  color: #fff;
+}
+.gr-choices .gr-custom {
+  align-self: center;
+  font-size: 13px;
+  color: var(--orange-text);
+}
+.gr-rules button:focus-visible,
+.gr-cutoffs button:focus-visible,
+.gr-choices button:focus-visible,
+.gr-slider-row input:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+.gr-subhead {
+  margin: 28px 0 8px;
+}
+.gr-bar {
+  display: flex;
+  margin: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+}
+.gr-bar-segment {
+  flex-basis: 0;
+  min-width: 0;
+  padding: 6px 2px;
+  text-align: center;
+  background: var(--paper);
+  color: var(--ink);
+  border-left: 1px solid var(--line);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.gr-bar-segment:first-child {
+  border-left: 0;
+}
