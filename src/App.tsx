@@ -31,6 +31,7 @@ import {
 import { EditorPage } from "./features/editor/EditorPage";
 import { PolicyLab } from "./features/PolicyLab";
 import { toCsv } from "./core/research";
+import { evidenceLabel } from "./core/evidence";
 /** Demo datasets without sources are the fictional preview; others hold real records with placeholder scoring. */
 export const fictional = (dataset: { demo: boolean; sources: unknown[] }) =>
   dataset.demo && !dataset.sources.length;
@@ -1093,7 +1094,7 @@ function Profile({
                   </small>
                 </div>
                 <div className="vote-result">
-                  <strong>{e.outcome}</strong>
+                  <strong>{evidenceLabel(e.vote, e.outcome)}</strong>
                   <small>
                     {e.scored
                       ? `${Number((e.aligned ? e.effectiveWeight : 0).toFixed(2))} / ${Number(e.effectiveWeight.toFixed(2))} points`
