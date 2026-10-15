@@ -18,8 +18,8 @@
   text-underline-offset: 3px;
 }
 .public-provenance {
-  background: #edf3e8;
-  border-left: 3px solid #416850;
+  background: #e8f0f3;
+  border-left: 3px solid #415e68;
   padding: 14px 18px;
   font-size: 13px;
   margin: 20px 0;
@@ -54,9 +54,9 @@
 }
 .public-page button {
   padding: 9px 14px;
-  border: 1px solid #bccbbe;
+  border: 1px solid #bcc7cb;
   border-radius: 7px;
-  background: #edf3e8;
+  background: #e8f0f3;
 }
 .public-page button:disabled {
   opacity: 0.55;
@@ -110,7 +110,7 @@
   white-space: pre-wrap;
 }
 .public-page :focus-visible {
-  outline: 3px solid #42755b;
+  outline: 3px solid #426875;
   outline-offset: 3px;
 }
 @media print {

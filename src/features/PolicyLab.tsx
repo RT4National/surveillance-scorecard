@@ -224,7 +224,9 @@ export function PolicyLab({ dataset }: { dataset: Dataset }) {
             <h2>Sources, corrections and reuse</h2>
             <p>
               {dataset.demo
-                ? "This dataset is fictional."
+                ? dataset.sources.length
+                  ? "Real records with unreviewed placeholder vote directions."
+                  : "This dataset is fictional."
                 : "Each published observation carries a source and a reviewable interpretation."}{" "}
               {dataset.coverage.join(" ")}
             </p>

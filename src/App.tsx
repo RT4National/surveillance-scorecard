@@ -31,6 +31,9 @@ import {
 import { EditorPage } from "./features/editor/EditorPage";
 import { PolicyLab } from "./features/PolicyLab";
 import { toCsv } from "./core/research";
+/** Demo datasets without sources are the fictional preview; others hold real records with placeholder scoring. */
+export const fictional = (dataset: { demo: boolean; sources: unknown[] }) =>
+  dataset.demo && !dataset.sources.length;
 import type { Group, Member } from "./core/types";
 
 const base = "/scorecard";
@@ -88,7 +91,9 @@ function exportRows(
   return [
     [
       dataset.demo
-        ? "Fictional preview — not actual congressional records"
+        ? fictional(dataset)
+          ? "Fictional preview — not actual congressional records"
+          : "Preview — real records, unreviewed placeholder scores"
         : "Restore the Fourth surveillance scorecard",
     ],
     ["Dataset", dataset.id],
@@ -376,7 +381,9 @@ export default function App() {
             : "PUBLISHED SCORECARD"}{" "}
         <span className="preview-copy">
           {dataset.demo
-            ? "Fictional members and votes. Explore the proposed experience."
+            ? fictional(dataset)
+              ? "Fictional members and votes. Explore the proposed experience."
+              : "Real congressional records. Scores use unreviewed placeholder vote directions, not Restore the Fourth's positions."
             : `Evidence through ${dataset.asOf} · Publication ${publication?.id}`}
         </span>
       </div>
@@ -534,7 +541,7 @@ export default function App() {
                             : m.status === "active",
                         ).length
                       }{" "}
-                      {dataset.demo ? "demo members" : "members"}
+                      {fictional(dataset) ? "demo members" : "members"}
                     </span>
                   </h2>
                 </div>
@@ -592,7 +599,9 @@ export default function App() {
             {" "}
             ·{" "}
             {dataset.demo
-              ? "Fictional preview"
+              ? fictional(dataset)
+                ? "Fictional preview"
+                : `Placeholder preview · evidence through ${dataset.asOf}`
               : `Evidence through ${dataset.asOf}`}
           </span>
           <br />
@@ -1098,7 +1107,9 @@ function Profile({
             {!s.evidence.length && <p>No evidence before this date.</p>}
             <p className="footnote">
               {dataset.demo
-                ? "Fictional evidence is not an official source."
+                ? fictional(dataset)
+                  ? "Fictional evidence is not an official source."
+                  : "Official records; the vote directions used for scoring are unreviewed placeholders."
                 : `Publication ${publication?.id} · rubric ${rubric.version}.`}{" "}
               {dataset.coverage.join(" ")}
             </p>
