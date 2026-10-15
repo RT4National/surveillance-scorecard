@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ingestCurrentMembers, publishablePortrait, reconcileRoster, readSource, type RosterRun } from './members';
-import { parseHouseRollcall, parseSenateRollcall, reviewRollcall } from './rollcalls';
+import { parseHouseRollcall, parseSenateRollcall, reviewRollcall, senateBallots } from './rollcalls';
 import { sheetValuesFromCsv, stageLegacySheet } from './legacy';
 import { stageAffiliations, affiliationsOn, reconcileAffiliations } from './affiliations';
 import { cachePortrait } from './portraits';
@@ -91,6 +91,11 @@ describe('Official roll calls', () => {
     const stage = await parseSenateRollcall(senate, senateUrl, { S123: 'B000002' });
     expect(stage.records[0].outcome).toBe('No'); expect(stage.records[0].partyAtVote).toBe('Independent');
     expect(stage.date).toBe('2025-01-09');
+  });
+  it('lists Senate ballots by LIS ID for an identity crosswalk, before any mapping exists', () => {
+    const named = senate.replace('<lis_member_id>', '<member_full>Sanders (I-VT)</member_full><state>VT</state><lis_member_id>');
+    expect(senateBallots(named)).toEqual([{ lisId: 'S123', name: 'Sanders (I-VT)', state: 'VT', party: 'I', date: '2025-01-09' }]);
+    expect(() => senateBallots(senate)).toThrow();
   });
   it('identifies Senate amendment votes, whose document name is empty, by amendment and target document', async () => {
     const amendment = senate.replace('<document><document_name>S. 5</document_name></document>',

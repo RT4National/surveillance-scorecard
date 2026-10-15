@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dataset, Publication } from "../../core/publication";
 import type { Outcome } from "../../core/types";
 import { publicationUrl } from "../../core/navigation";
+import { evidenceLabel } from "../../core/evidence";
 import {
   executeReport,
   publicationChanges,
@@ -383,7 +384,7 @@ export function ComparePage({ dataset, publication }: Props) {
                   >
                     {e.vote.bill}
                   </a>
-                  : {e.outcome} · {e.vote.topic}
+                  : {evidenceLabel(e.vote, e.outcome)} · {e.vote.topic}
                   {!e.inWindow ? " · Outside rubric time window" : ""}
                 </p>
               ))}
@@ -1111,7 +1112,7 @@ export function ArchivesPage({ dataset, publication }: Props) {
                         >
                           {e.vote.bill}
                         </a>
-                        : {e.outcome} · {e.vote.date} ·{" "}
+                        : {evidenceLabel(e.vote, e.outcome)} · {e.vote.date} ·{" "}
                         {e.scored ? "Scored" : "Not scored"} ·{" "}
                         <Source url={e.vote.source} />
                       </p>
