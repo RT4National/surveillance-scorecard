@@ -36,7 +36,10 @@ function Provenance({ dataset, publication }: Props) {
   return (
     <aside className="public-provenance">
       {dataset.demo && (
-        <strong>Fictional demo — not actual congressional records. </strong>
+        <strong>
+          Demo publication — scores and vote directions are unreviewed
+          placeholders, not Restore the Fourth's positions.{" "}
+        </strong>
       )}
       Dataset {dataset.id} · As of {dataset.asOf} · Rubric{" "}
       {dataset.rubric.version} ·{" "}
@@ -434,7 +437,9 @@ export function RepresentativeFinder({ dataset }: { dataset: Dataset }) {
       <p>
         Member status reflects dataset {dataset.id} as of {dataset.asOf}.
       </p>
-      {dataset.demo && <p>Fictional demo members only.</p>}
+      {dataset.demo && (
+        <p>Demo publication: grades are unreviewed placeholders.</p>
+      )}
     </section>
   );
 }

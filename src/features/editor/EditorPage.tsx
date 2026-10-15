@@ -24,14 +24,27 @@ type Correction = {
   message: string;
   status: string;
 };
+// Staging's open staff mode identifies people by a self-chosen name, not a login.
+const stagingNameKey = "scorecard-staging-name";
+function readStagingName() {
+  try {
+    return localStorage.getItem(stagingNameKey) ?? "";
+  } catch {
+    return "";
+  }
+}
 async function call<T>(
   path: string,
   method = "GET",
   data?: unknown,
 ): Promise<T> {
+  const name = readStagingName();
   const r = await fetch(`/scorecard/api/staff/${path}`, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : undefined,
+    headers: {
+      ...(data ? { "Content-Type": "application/json" } : {}),
+      ...(name ? { "X-Staging-Staff": encodeURIComponent(name) } : {}),
+    },
     body: data ? JSON.stringify(data) : undefined,
   });
   const b = (await r.json()) as T & { error?: string; errors?: string[] };
@@ -42,7 +55,9 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
   const [session, setSession] = useState<{
     email: string;
     role: string;
+    open?: boolean;
   } | null>(null);
+  const [stagingName, setStagingName] = useState(readStagingName);
   const [drafts, setDrafts] = useState<DraftSummary[]>([]);
   const [active, setActive] = useState<Draft | null>(null);
   const [text, setText] = useState("");
@@ -64,7 +79,7 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
   >(dataset);
   const refresh = async () => {
     const [s, d, c, o, a] = await Promise.all([
-      call<{ email: string; role: string }>("session"),
+      call<{ email: string; role: string; open?: boolean }>("session"),
       call<DraftSummary[]>("drafts"),
       call<Correction[]>("corrections"),
       call<Record<string, unknown>>("status"),
@@ -209,6 +224,35 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
         </p>
       )}
       {notice && <p role="status">{notice}</p>}
+      {(session?.open || error.includes("staging name")) && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            try {
+              localStorage.setItem(stagingNameKey, stagingName.trim());
+            } catch {
+              setError("This browser cannot store a staging name");
+              return;
+            }
+            void run(async () => {});
+          }}
+        >
+          <p>
+            Staging only: these staff pages are open to anyone with the link.
+            Choose a name so drafts record who wrote and who reviewed them. It
+            is not a login, and a second person must review each draft.
+          </p>
+          <label>
+            Your name{" "}
+            <input
+              value={stagingName}
+              maxLength={40}
+              onChange={(e) => setStagingName(e.target.value)}
+            />
+          </label>{" "}
+          <button disabled={busy || !stagingName.trim()}>Use this name</button>
+        </form>
+      )}
       {!session ? (
         <p>
           Sign in through the organization’s Cloudflare Access application to

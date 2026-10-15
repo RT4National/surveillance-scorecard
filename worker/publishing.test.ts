@@ -291,6 +291,23 @@ describe("D1 editorial workflow", () => {
       `Recorded party contradicts exact-day affiliation: ${m.id}/${v.id}`,
     );
   });
+  it("keeps open staging drafts demo-only", async () => {
+    const identity = vi.spyOn(auth, "authenticate").mockResolvedValue({
+      email: "ada@staging.invalid",
+      role: "publisher",
+      open: true,
+    });
+    const response = await send("/staff/drafts", "POST", {
+      dataset: { ...fixture, demo: false },
+      summary: "Open staging attempt",
+      basePublicationId: null,
+    });
+    expect(response.status).toBe(422);
+    expect(JSON.stringify(await response.json())).toContain(
+      "Open staging access can only save demo datasets",
+    );
+    identity.mockRestore();
+  });
   it("requires independent review, rejects stale edits, publishes immutable snapshots and audits rollback", async () => {
     const identity = vi
       .spyOn(auth, "authenticate")
