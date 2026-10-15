@@ -887,7 +887,11 @@ function Directory({
             </a>
           </span>
           <span className="demo-stamp">
-            {dataset.demo ? "FICTIONAL DATA" : dataset.asOf}
+            {fictional(dataset)
+              ? "FICTIONAL DATA"
+              : dataset.demo
+                ? "PLACEHOLDER SCORES"
+                : dataset.asOf}
           </span>
         </div>
       </div>
@@ -913,10 +917,19 @@ function Profile({
         <ArrowLeft size={16} /> All legislators
       </a>
       <div className="profile-heading">
-        <Avatar member={member} large />
+        <figure className="profile-portrait">
+          <Avatar member={member} large />
+          {member.portrait?.url.startsWith("/scorecard/portraits/") && (
+            <figcaption>
+              <a href={member.portrait.rightsSource} rel="noreferrer">
+                {member.portrait.attribution}
+              </a>
+            </figcaption>
+          )}
+        </figure>
         <div>
           <div className="eyebrow">
-            {dataset.demo ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} ·{" "}
+            {fictional(dataset) ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} ·{" "}
             {member.status.toUpperCase()}
           </div>
           <h1>{member.name}</h1>
@@ -952,7 +965,7 @@ function Profile({
           </p>
           <p className="muted">
             Service begins {member.since}.{" "}
-            {dataset.demo
+            {fictional(dataset)
               ? "Demonstration record."
               : "See the publication sources for verification."}
           </p>
