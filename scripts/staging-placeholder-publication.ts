@@ -293,7 +293,7 @@ for (const item of historyBills) {
 }
 if (withheld.length)
   dataset.coverage.push(
-    `${withheld.length} ballot(s) withheld for members without a supported party: ${withheld.join(", ")}.`,
+    `${withheld.length} ballot or bill-support record(s) withheld for members without a supported party: ${withheld.join(", ")}.`,
   );
 if (membershipsDir) {
   const committees = JSON.parse(
