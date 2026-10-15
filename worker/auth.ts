@@ -13,11 +13,37 @@ function decode(part: string): Uint8Array<ArrayBuffer> {
     (c) => c.charCodeAt(0),
   );
 }
+export type Actor = { email: string; role: Role; open?: true };
+/**
+ * Staging only: STAFF_OPEN_STAGING="true" lets anyone use the staff pages under a
+ * self-chosen name, so collaborators can try the workflow before Access exists.
+ * The name only separates authors from reviewers; it proves nothing. Production
+ * config must never set the flag (enforced by staging-access.test.ts).
+ */
+function openStagingActor(request: Request): Actor {
+  let raw: string;
+  try {
+    raw = decodeURIComponent(request.headers.get("X-Staging-Staff") ?? "");
+  } catch {
+    raw = "";
+  }
+  const name = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (!name || name.length > 40)
+    throw new HttpError(401, "Enter a staging name to use the staff pages");
+  return { email: `${name}@staging.invalid`, role: "publisher", open: true };
+}
 export async function authenticate(
   request: Request,
-  env: Pick<Env, "ACCESS_ISSUER" | "ACCESS_AUDIENCE" | "STAFF_ROLES">,
+  env: Pick<Env, "ACCESS_ISSUER" | "ACCESS_AUDIENCE" | "STAFF_ROLES"> & {
+    STAFF_OPEN_STAGING?: string;
+  },
   fetcher: typeof fetch = fetch,
-) {
+): Promise<Actor> {
+  if (env.STAFF_OPEN_STAGING === "true") return openStagingActor(request);
   const token = request.headers.get("Cf-Access-Jwt-Assertion");
   if (!token) throw new HttpError(401, "Staff sign-in required");
   if (
