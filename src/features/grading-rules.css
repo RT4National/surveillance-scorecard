@@ -3,8 +3,8 @@
 .gr-cutoff {
   margin: 18px 0;
 }
-.gr-field > label,
-.gr-cutoff > label,
+div.gr-field > label,
+div.gr-cutoff > label,
 .gr-label {
   display: block;
   font-weight: 600;
@@ -27,7 +27,7 @@
   background: transparent;
   accent-color: var(--blue);
 }
-.gr-step {
+.gr-slider-row .gr-step {
   flex: 0 0 auto;
   width: 36px;
   height: 36px;
@@ -41,7 +41,7 @@
   line-height: 1;
   cursor: pointer;
 }
-.gr-step:disabled {
+.gr-slider-row .gr-step:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -64,7 +64,7 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-.gr-choices button {
+.gr-field .gr-choices button {
   margin: 0;
   padding: 8px 14px;
   border: 1px solid var(--blue-text);
@@ -74,7 +74,7 @@
   font: inherit;
   cursor: pointer;
 }
-.gr-choices button[aria-pressed="true"] {
+.gr-field .gr-choices button[aria-pressed="true"] {
   background: var(--blue-text);
   color: #fff;
 }

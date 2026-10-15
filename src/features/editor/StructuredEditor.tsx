@@ -1,147 +1,153 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { Dataset } from "../../core/publication";
 import type { Member, Outcome, Party, Rubric, Vote } from "../../core/types";
-import { defaultGradeBands } from "../../core/scoring";
+import { ChoiceButtons, GradingRulesControls } from "../GradingRules";
+import { importanceLabel, importanceOptions } from "./plain";
 
-export function StructuredEditor({
-  dataset: d,
-  onChange,
-}: {
+type PanelProps = {
   dataset: Dataset;
   onChange: (d: Dataset) => void;
-}) {
+};
+
+const partyOptions = (
+  <>
+    <option>Democratic</option>
+    <option>Republican</option>
+    <option>Independent</option>
+  </>
+);
+
+/** Tab 1: which votes we score, which side is pro-privacy, and how much each counts. */
+export function VotesPanel({ dataset: d, onChange }: PanelProps) {
   const [voteId, setVoteId] = useState("");
-  const [memberId, setMemberId] = useState("");
   const [recordMember, setRecordMember] = useState("");
   const [outcome, setOutcome] = useState<Outcome>("Yes");
   const [party, setParty] = useState<Party>("Democratic");
+  const topicsId = useId();
   const v = d.votes.find((v) => v.id === voteId) ?? d.votes[0];
-  const m = d.members.find((m) => m.id === memberId) ?? d.members[0];
   const vote = (patch: Partial<Vote>) =>
     onChange({
       ...d,
       votes: d.votes.map((x) => (x.id === v?.id ? { ...x, ...patch } : x)),
     });
-  const member = (patch: Partial<Member>) =>
-    onChange({
-      ...d,
-      members: d.members.map((x) => (x.id === m?.id ? { ...x, ...patch } : x)),
-    });
-  const rubric = (patch: Partial<Rubric>) =>
-    onChange({ ...d, rubric: { ...d.rubric, ...patch } });
-  const num = (value: string) => (value === "" ? undefined : Number(value));
+  const topics = [...new Set(d.votes.map((x) => x.topic).filter(Boolean))];
+  const custom = v ? importanceLabel(v.weight) === null : false;
   return (
     <div className="structured-editor">
-      <h2>Dataset identity</h2>
-      <div className="editor-grid">
+      <p className="editor-lede">
+        Pick a vote to review. For each one, say which side protects privacy and
+        how much it should count toward grades.
+      </p>
+      <div className="editor-row">
         <label>
-          Dataset identifier
-          <input
-            value={d.id}
-            onChange={(e) => onChange({ ...d, id: e.target.value })}
-          />
-        </label>
-        <label>
-          Evidence cutoff date
-          <input
-            type="date"
-            value={d.asOf.slice(0, 10)}
-            onChange={(e) => onChange({ ...d, asOf: e.target.value })}
-          />
-        </label>
-        <label>
-          Data classification
+          Choose a vote
           <select
-            value={d.demo ? "demo" : "live"}
-            onChange={(e) =>
-              onChange({ ...d, demo: e.target.value === "demo" })
-            }
+            value={v?.id ?? ""}
+            onChange={(e) => setVoteId(e.target.value)}
           >
-            <option value="demo">Fictional demonstration</option>
-            <option value="live">Reviewed real evidence</option>
+            {d.votes.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.bill || "Untitled"} – {x.title || "no title yet"} ({x.date})
+              </option>
+            ))}
           </select>
         </label>
-      </div>
-      <p>
-        Changing the classification does not verify records. Fictional
-        identifiers are refused in live publications.
-      </p>
-      <label>
-        Coverage and known gaps (one note per line)
-        <textarea
-          rows={3}
-          value={d.coverage.join("\n")}
-          onChange={(e) =>
+        <button
+          type="button"
+          onClick={() => {
+            const id = crypto.randomUUID();
             onChange({
               ...d,
-              coverage: e.target.value.split("\n").filter(Boolean),
-            })
-          }
-        />
-      </label>
-      <h2>Legislation and scored votes</h2>
-      <label>
-        Select a vote
-        <select value={v?.id ?? ""} onChange={(e) => setVoteId(e.target.value)}>
-          {d.votes.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.bill} · {x.title}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button
-        type="button"
-        onClick={() => {
-          const id = crypto.randomUUID();
-          onChange({
-            ...d,
-            votes: [
-              ...d.votes,
-              {
-                id,
-                bill: "",
-                title: "",
-                date: d.asOf.slice(0, 10),
-                administration: "",
-                presidentParty: "Democratic",
-                chamber: "House",
-                reformVote: "Yes",
-                weight: 1,
-                topic: "",
-                rationale: "",
-                source: null,
-              },
-            ],
-          });
-          setVoteId(id);
-        }}
-      >
-        Add a vote
-      </button>
+              votes: [
+                ...d.votes,
+                {
+                  id,
+                  bill: "",
+                  title: "",
+                  date: d.asOf.slice(0, 10),
+                  administration: "",
+                  presidentParty: "Democratic",
+                  chamber: "House",
+                  reformVote: "Yes",
+                  weight: 1,
+                  topic: "",
+                  rationale: "",
+                  source: null,
+                },
+              ],
+            });
+            setVoteId(id);
+          }}
+        >
+          Add a vote
+        </button>
+      </div>
+      {!v && <p>No votes yet. Use “Add a vote” to start.</p>}
       {v && (
-        <>
+        <article className="editor-card">
+          <h2>
+            {v.bill || "New vote"} – {v.title || "untitled"}
+          </h2>
+          <ChoiceButtons
+            label="Is a YES vote good for privacy?"
+            help="Members who vote this way are counted as voting for privacy."
+            options={[
+              { label: "Yes", value: "Yes" as const },
+              { label: "No", value: "No" as const },
+            ]}
+            value={v.reformVote}
+            onChange={(reformVote) => vote({ reformVote })}
+          />
+          <ChoiceButtons
+            label="How much should it count?"
+            help="“More” counts twice as much as a normal vote; “Less” counts half as much."
+            options={importanceOptions.map((o) => ({
+              label: o.label,
+              value: o.value as number,
+            }))}
+            value={v.weight}
+            onChange={(weight) => vote({ weight })}
+            extra={
+              custom ? (
+                <span className="gr-custom">Custom ({v.weight})</span>
+              ) : null
+            }
+          />
           <div className="editor-grid">
-            {(["bill", "title", "topic", "administration"] as const).map(
-              (key) => (
-                <label key={key}>
-                  {
-                    {
-                      bill: "Bill or amendment",
-                      title: "Plain-language title",
-                      topic: "Issue topic",
-                      administration: "Presidential administration",
-                    }[key]
-                  }
-                  <input
-                    value={v[key]}
-                    onChange={(e) => vote({ [key]: e.target.value })}
-                  />
-                </label>
-              ),
-            )}
+            <div>
+              <label>
+                Topic
+                <input
+                  list={topicsId}
+                  value={v.topic}
+                  onChange={(e) => vote({ topic: e.target.value })}
+                />
+              </label>
+              <p className="gr-help">
+                Votes on the same topic are compared across presidents.
+              </p>
+            </div>
+            <datalist id={topicsId}>
+              {topics.map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
             <label>
-              Vote date
+              Bill or amendment number
+              <input
+                value={v.bill}
+                onChange={(e) => vote({ bill: e.target.value })}
+              />
+            </label>
+            <label>
+              Short title readers will see
+              <input
+                value={v.title}
+                onChange={(e) => vote({ title: e.target.value })}
+              />
+            </label>
+            <label>
+              Date of the vote
               <input
                 type="date"
                 value={v.date}
@@ -149,15 +155,7 @@ export function StructuredEditor({
               />
             </label>
             <label>
-              Source URL
-              <input
-                type="url"
-                value={v.source ?? ""}
-                onChange={(e) => vote({ source: e.target.value || null })}
-              />
-            </label>
-            <label>
-              Chamber
+              House or Senate
               <select
                 value={v.chamber}
                 onChange={(e) =>
@@ -169,52 +167,198 @@ export function StructuredEditor({
               </select>
             </label>
             <label>
-              President's party
-              <select
-                value={v.presidentParty}
-                onChange={(e) =>
-                  vote({ presidentParty: e.target.value as Party })
-                }
-              >
-                <option>Democratic</option>
-                <option>Republican</option>
-                <option>Independent</option>
-              </select>
-            </label>
-            <label>
-              Reform position
-              <select
-                value={v.reformVote}
-                onChange={(e) =>
-                  vote({ reformVote: e.target.value as "Yes" | "No" })
-                }
-              >
-                <option>Yes</option>
-                <option>No</option>
-              </select>
-            </label>
-            <label>
-              Scoring weight
+              Link to the official record
               <input
-                type="number"
-                min={0.01}
-                max={100}
-                step={0.1}
-                value={v.weight}
-                onChange={(e) => vote({ weight: Number(e.target.value) })}
+                type="url"
+                value={v.source ?? ""}
+                onChange={(e) => vote({ source: e.target.value || null })}
               />
             </label>
+            <label>
+              President at the time
+              <input
+                value={v.administration}
+                onChange={(e) => vote({ administration: e.target.value })}
+              />
+            </label>
+            <div>
+              <label>
+                President's party
+                <select
+                  value={v.presidentParty}
+                  onChange={(e) =>
+                    vote({ presidentParty: e.target.value as Party })
+                  }
+                >
+                  {partyOptions}
+                </select>
+              </label>
+              <p className="gr-help">
+                Used to check whether members vote the same way under presidents
+                of each party.
+              </p>
+            </div>
           </div>
-          <label>
-            Why this position advances surveillance reform
-            <textarea
-              rows={4}
-              value={v.rationale}
-              onChange={(e) => vote({ rationale: e.target.value })}
-            />
-          </label>
+          <div>
+            <label>
+              Why it matters
+              <textarea
+                rows={4}
+                value={v.rationale}
+                onChange={(e) => vote({ rationale: e.target.value })}
+              />
+            </label>
+            <p className="gr-help">
+              Shown to readers. Explain in a sentence or two why this side
+              protects privacy.
+            </p>
+          </div>
+          <details className="editor-details">
+            <summary>
+              How each legislator voted (
+              {d.records.filter((r) => r.voteId === v.id).length})
+            </summary>
+            <p className="gr-help">
+              Add or fix a legislator's recorded vote. “Did not vote” and “Not
+              eligible” are left out of grades.
+            </p>
+            <div className="editor-grid">
+              <label>
+                Legislator
+                <select
+                  value={recordMember}
+                  onChange={(e) => {
+                    setRecordMember(e.target.value);
+                    const selected = d.members.find(
+                      (m) => m.id === e.target.value,
+                    );
+                    if (selected) setParty(selected.party);
+                  }}
+                >
+                  <option value="">Choose a legislator</option>
+                  {d.members
+                    .filter((m) => m.chamber === v.chamber)
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                How they voted
+                <select
+                  value={outcome}
+                  onChange={(e) => setOutcome(e.target.value as Outcome)}
+                >
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                  <option value="Not voting">Did not vote</option>
+                  <option value="Not eligible">Not eligible</option>
+                </select>
+              </label>
+              <label>
+                Their party at the time
+                <select
+                  value={party}
+                  onChange={(e) => setParty(e.target.value as Party)}
+                >
+                  {partyOptions}
+                </select>
+              </label>
+            </div>
+            <button
+              type="button"
+              disabled={!recordMember}
+              onClick={() =>
+                onChange({
+                  ...d,
+                  records: [
+                    ...d.records.filter(
+                      (r) =>
+                        !(r.memberId === recordMember && r.voteId === v.id),
+                    ),
+                    {
+                      memberId: recordMember,
+                      voteId: v.id,
+                      outcome,
+                      partyAtVote: party,
+                    },
+                  ],
+                })
+              }
+            >
+              Save this legislator's vote
+            </button>
+            <div className="editor-scroll">
+              <table aria-label="Recorded votes">
+                <thead>
+                  <tr>
+                    <th>Legislator</th>
+                    <th>Vote</th>
+                    <th>Party then</th>
+                    <th>
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.records
+                    .filter((r) => r.voteId === v.id)
+                    .map((r) => {
+                      const name =
+                        d.members.find((m) => m.id === r.memberId)?.name ??
+                        r.memberId;
+                      return (
+                        <tr key={r.memberId}>
+                          <td>{name}</td>
+                          <td>
+                            {r.outcome === "Not voting"
+                              ? "Did not vote"
+                              : r.outcome}
+                          </td>
+                          <td>{r.partyAtVote}</td>
+                          <td>
+                            <button
+                              type="button"
+                              aria-label={`Edit ${name}'s vote`}
+                              onClick={() => {
+                                setRecordMember(r.memberId);
+                                setOutcome(r.outcome);
+                                setParty(r.partyAtVote);
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${name}'s vote`}
+                              onClick={() =>
+                                onChange({
+                                  ...d,
+                                  records: d.records.filter(
+                                    (x) =>
+                                      !(
+                                        x.memberId === r.memberId &&
+                                        x.voteId === r.voteId
+                                      ),
+                                  ),
+                                })
+                              }
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </details>
           <button
             type="button"
+            className="editor-danger"
             onClick={() => {
               onChange({
                 ...d,
@@ -224,226 +368,35 @@ export function StructuredEditor({
               setVoteId("");
             }}
           >
-            Exclude this vote and its evidence from the draft
+            Stop scoring this vote
           </button>
-          <p>
-            Exclusion affects only this unsaved draft. Existing publications
-            remain available.
+          <p className="gr-help">
+            Removes the vote and its recorded votes from this draft only.
+            Published versions are not changed.
           </p>
-          <h3>Member evidence for this vote</h3>
-          <div className="editor-grid">
-            <label>
-              Member
-              <select
-                value={recordMember}
-                onChange={(e) => {
-                  setRecordMember(e.target.value);
-                  const selected = d.members.find(
-                    (m) => m.id === e.target.value,
-                  );
-                  if (selected) setParty(selected.party);
-                }}
-              >
-                <option value="">Select a member</option>
-                {d.members
-                  .filter((m) => m.chamber === v.chamber)
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label>
-              Recorded outcome
-              <select
-                value={outcome}
-                onChange={(e) => setOutcome(e.target.value as Outcome)}
-              >
-                {["Yes", "No", "Not voting", "Not eligible"].map((x) => (
-                  <option key={x}>{x}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Party at time of vote
-              <select
-                value={party}
-                onChange={(e) => setParty(e.target.value as Party)}
-              >
-                <option>Democratic</option>
-                <option>Republican</option>
-                <option>Independent</option>
-              </select>
-            </label>
-          </div>
-          <button
-            type="button"
-            disabled={!recordMember}
-            onClick={() =>
-              onChange({
-                ...d,
-                records: [
-                  ...d.records.filter(
-                    (r) => !(r.memberId === recordMember && r.voteId === v.id),
-                  ),
-                  {
-                    memberId: recordMember,
-                    voteId: v.id,
-                    outcome,
-                    partyAtVote: party,
-                  },
-                ],
-              })
-            }
-          >
-            Add or replace member evidence
-          </button>
-          <table>
-            <thead>
-              <tr>
-                <th>Member</th>
-                <th>Outcome</th>
-                <th>Party at vote</th>
-                <th>Draft action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.records
-                .filter((r) => r.voteId === v.id)
-                .map((r) => (
-                  <tr key={r.memberId}>
-                    <td>
-                      {d.members.find((m) => m.id === r.memberId)?.name ??
-                        r.memberId}
-                    </td>
-                    <td>{r.outcome}</td>
-                    <td>{r.partyAtVote}</td>
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRecordMember(r.memberId);
-                          setOutcome(r.outcome);
-                          setParty(r.partyAtVote);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onChange({
-                            ...d,
-                            records: d.records.filter(
-                              (x) =>
-                                !(
-                                  x.memberId === r.memberId &&
-                                  x.voteId === r.voteId
-                                ),
-                            ),
-                          })
-                        }
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </>
+        </article>
       )}
-      <h2>Scoring policy</h2>
-      <div className="editor-grid">
-        <label>
-          Methodology version
-          <input
-            value={d.rubric.version}
-            onChange={(e) => rubric({ version: e.target.value })}
-          />
-        </label>
-        {(
-          [
-            { key: "minVotes", label: "Minimum scored votes", min: 1 },
-            {
-              key: "minPerContext",
-              label: "Minimum votes per presidential-party context",
-              min: 1,
-            },
-            {
-              key: "consistencyThreshold",
-              label: "Consistency threshold (%)",
-              min: 51,
-            },
-            {
-              key: "lookbackYears",
-              label: "Lookback years (blank = all)",
-              min: 0.1,
-            },
-            {
-              key: "halfLifeYears",
-              label: "Weight half-life years (blank = no decay)",
-              min: 0.1,
-            },
-            {
-              key: "minSharedTopics",
-              label: "Minimum comparable issue topics",
-              min: 0,
-            },
-          ] as const
-        ).map((f) => (
-          <label key={f.key}>
-            {f.label}
-            <input
-              type="number"
-              min={f.min}
-              step={f.key.includes("Years") ? 0.1 : 1}
-              value={d.rubric[f.key] ?? ""}
-              onChange={(e) => rubric({ [f.key]: num(e.target.value) })}
-            />
-          </label>
-        ))}
-      </div>
-      <h3>Grade thresholds</h3>
-      <p>Highest threshold first; the final threshold must be zero.</p>
-      {(d.rubric.gradeBands ?? defaultGradeBands).map((band, i) => (
-        <div className="editor-grid" key={i}>
-          <label>
-            Grade label
-            <input
-              value={band.label}
-              onChange={(e) =>
-                rubric({
-                  gradeBands: (d.rubric.gradeBands ?? defaultGradeBands).map(
-                    (b, j) => (j === i ? { ...b, label: e.target.value } : b),
-                  ),
-                })
-              }
-            />
-          </label>
-          <label>
-            Minimum score
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={band.minimum}
-              onChange={(e) =>
-                rubric({
-                  gradeBands: (d.rubric.gradeBands ?? defaultGradeBands).map(
-                    (b, j) =>
-                      j === i ? { ...b, minimum: Number(e.target.value) } : b,
-                  ),
-                })
-              }
-            />
-          </label>
-        </div>
-      ))}
-      <h2>Member details</h2>
+    </div>
+  );
+}
+
+/** Tab 2: legislators' names, party, committees and photos. */
+export function LegislatorsPanel({ dataset: d, onChange }: PanelProps) {
+  const [memberId, setMemberId] = useState("");
+  const m = d.members.find((m) => m.id === memberId) ?? d.members[0];
+  const member = (patch: Partial<Member>) =>
+    onChange({
+      ...d,
+      members: d.members.map((x) => (x.id === m?.id ? { ...x, ...patch } : x)),
+    });
+  return (
+    <div className="structured-editor">
+      <p className="editor-lede">
+        Correct how a legislator appears on the scorecard. Their votes are
+        edited under “Votes to score”.
+      </p>
       <label>
-        Member
+        Choose a legislator
         <select
           value={m?.id ?? ""}
           onChange={(e) => setMemberId(e.target.value)}
@@ -456,25 +409,25 @@ export function StructuredEditor({
         </select>
       </label>
       {m && (
-        <>
+        <article className="editor-card">
           <div className="editor-grid">
             <label>
-              Display name
+              Name as shown
               <input
                 value={m.name}
                 onChange={(e) => member({ name: e.target.value })}
               />
             </label>
             <label>
-              Status
+              In office?
               <select
                 value={m.status}
                 onChange={(e) =>
                   member({ status: e.target.value as Member["status"] })
                 }
               >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="active">Currently serving</option>
+                <option value="inactive">No longer serving</option>
                 <option value="deceased">Deceased</option>
               </select>
             </label>
@@ -484,9 +437,7 @@ export function StructuredEditor({
                 value={m.party}
                 onChange={(e) => member({ party: e.target.value as Party })}
               >
-                <option>Democratic</option>
-                <option>Republican</option>
-                <option>Independent</option>
+                {partyOptions}
               </select>
             </label>
             <label>
@@ -514,11 +465,11 @@ export function StructuredEditor({
               />
             </label>
           </div>
-          <details>
-            <summary>Portrait and rights review</summary>
-            <p>
-              Portraits need a documented license or public-domain basis and a
-              named reviewer.
+          <details className="editor-details">
+            <summary>Photo and permission to use it</summary>
+            <p className="gr-help">
+              Only use a photo we have permission for (a license or public
+              domain), and name the person who checked it.
             </p>
             {(
               ["url", "attribution", "rightsSource", "reviewedBy"] as const
@@ -526,10 +477,10 @@ export function StructuredEditor({
               <label key={key}>
                 {
                   {
-                    url: "Image URL",
-                    attribution: "Attribution",
-                    rightsSource: "Rights evidence URL",
-                    reviewedBy: "Rights reviewer",
+                    url: "Photo link",
+                    attribution: "Photo credit",
+                    rightsSource: "Link showing we may use it",
+                    reviewedBy: "Checked by",
                   }[key]
                 }
                 <input
@@ -551,7 +502,7 @@ export function StructuredEditor({
               </label>
             ))}
             <label>
-              Rights status
+              Permission type
               <select
                 value={m.portrait?.rights ?? "licensed"}
                 onChange={(e) =>
@@ -575,11 +526,91 @@ export function StructuredEditor({
               type="button"
               onClick={() => member({ portrait: undefined })}
             >
-              Remove portrait from draft
+              Remove photo from this draft
             </button>
           </details>
-        </>
+        </article>
       )}
+    </div>
+  );
+}
+
+/** Tab 3: grading rules with sliders and buttons. */
+export function GradingRulesPanel({ dataset: d, onChange }: PanelProps) {
+  const rubric = (next: Rubric) => onChange({ ...d, rubric: next });
+  return (
+    <div className="structured-editor">
+      <p className="editor-lede">
+        These rules turn votes into grades for every legislator. Check “Review
+        &amp; publish” to see whose grade would change.
+      </p>
+      <div>
+        <label>
+          Name for this set of rules
+          <input
+            value={d.rubric.version}
+            onChange={(e) => rubric({ ...d.rubric, version: e.target.value })}
+          />
+        </label>
+        <p className="gr-help">
+          Shown on the methodology page so readers know which rules were used.
+        </p>
+      </div>
+      <GradingRulesControls rubric={d.rubric} onChange={rubric} />
+    </div>
+  );
+}
+
+/** Developer tools: identity and classification of the scorecard data. */
+export function ScorecardDataDetails({ dataset: d, onChange }: PanelProps) {
+  return (
+    <div className="structured-editor">
+      <div className="editor-grid">
+        <label>
+          Dataset identifier
+          <input
+            value={d.id}
+            onChange={(e) => onChange({ ...d, id: e.target.value })}
+          />
+        </label>
+        <label>
+          Votes counted through (evidence cutoff date)
+          <input
+            type="date"
+            value={d.asOf.slice(0, 10)}
+            onChange={(e) => onChange({ ...d, asOf: e.target.value })}
+          />
+        </label>
+        <label>
+          Data classification
+          <select
+            value={d.demo ? "demo" : "live"}
+            onChange={(e) =>
+              onChange({ ...d, demo: e.target.value === "demo" })
+            }
+          >
+            <option value="demo">Fictional demonstration</option>
+            <option value="live">Reviewed real evidence</option>
+          </select>
+        </label>
+      </div>
+      <p className="gr-help">
+        Changing the classification does not verify records. Fictional
+        identifiers are refused in live publications.
+      </p>
+      <label>
+        Coverage and known gaps (one note per line)
+        <textarea
+          rows={3}
+          value={d.coverage.join("\n")}
+          onChange={(e) =>
+            onChange({
+              ...d,
+              coverage: e.target.value.split("\n").filter(Boolean),
+            })
+          }
+        />
+      </label>
     </div>
   );
 }
