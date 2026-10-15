@@ -110,3 +110,12 @@ export function reviewRollcall(stage: RollcallStage, editorial: Pick<Vote,'title
   party(editorial.presidentParty);
   return { vote: { ...editorial, id: stage.id, chamber: stage.chamber, date: stage.date, bill: stage.bill, source: stage.sources[0].url }, records: stage.records };
 }
+
+/** Ballot identities from official Senate XML, for building a reviewed LIS crosswalk (see legislators.ts). */
+export function senateBallots(xml: string): { lisId: string; name: string; state: string; party: string; date: string }[] {
+  const root = object(parse(xml).roll_call_vote), voteDate = date(root.vote_date);
+  return list(object(root.members).member).map(item => {
+    const row = object(item);
+    return { lisId: requiredString(row.lis_member_id), name: requiredString(row.member_full), state: requiredString(row.state), party: requiredString(row.party), date: voteDate };
+  });
+}

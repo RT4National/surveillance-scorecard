@@ -34,6 +34,8 @@ export interface Vote {
   topic: string;
   rationale: string;
   source: string | null;
+  /** Absent means a roll call. A cosponsorship item has records only for the sponsor and cosponsors. */
+  kind?: "rollcall" | "cosponsorship";
 }
 export interface RecordEntry {
   memberId: string;
