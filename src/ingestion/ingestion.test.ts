@@ -180,6 +180,15 @@ describe('Reviewed portrait caching', () => {
     expect(result.portrait.url).toMatch(/^\/scorecard\/portraits\/A000001-[a-f0-9]{64}\.jpg$/);
     expect(result.source.url).toBe(manifest.url); expect(result.portrait.rightsSource).toBe(manifest.rightsSource);
   });
+  it('accepts Wikimedia Commons uploads and identifies itself to the host', async () => {
+    let agent = '';
+    const commons = { ...manifest, url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Example.jpg/400px-Example.jpg' };
+    const result = await cachePortrait(commons, (async (_url: string, init: RequestInit) => { agent = new Headers(init.headers).get('User-Agent') ?? ''; return new Response(jpeg, { headers: { 'Content-Type': 'image/jpeg' } }); }) as unknown as typeof fetch);
+    expect(result.source.url).toBe(commons.url);
+    expect(agent).toMatch(/scorecard/i);
+    for (const url of ['https://upload.wikimedia.org/wikipedia/en/a/ab/Fair_use.jpg', 'https://commons.wikimedia.org/wiki/File:Example.jpg', 'https://upload.wikimedia.org.evil.example/wikipedia/commons/a.jpg'])
+      await expect(cachePortrait({ ...manifest, url })).rejects.toThrow('official');
+  });
   it('refuses unreviewed assets, remote hosts, SVG, and mismatched MIME', async () => {
     await expect(cachePortrait({ ...manifest, rights: 'unreviewed' })).rejects.toThrow('rights');
     await expect(cachePortrait({ ...manifest, url: 'https://localhost/private.jpg' })).rejects.toThrow('official');

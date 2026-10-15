@@ -1,7 +1,11 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { reconcileRoster } from "../src/ingestion/members";
+import { capture, reconcileRoster } from "../src/ingestion/members";
+import {
+  applyMemberships,
+  type CaucusList,
+} from "../src/ingestion/memberships";
 import {
   reconcileAffiliations,
   stageAffiliations,
@@ -27,12 +31,18 @@ const EXCLUDED = new Set(["senate-115-2-12"]);
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
+const option = (name: string) => {
+  const i = args.indexOf(name);
+  return i < 0 ? undefined : args.splice(i, 2)[1];
+};
+const membershipsDir = option("--memberships");
+const portraitsPath = option("--portraits");
 const [manifestPath, rosterPath, legislatorsPath] = args.filter(
   (a) => a !== "--dry-run",
 );
 if (!manifestPath || !rosterPath || !legislatorsPath)
   throw new Error(
-    "Usage: staging-placeholder-publication.ts REVIEW_MANIFEST ROSTER_STAGING LEGISLATORS_STAGING [--dry-run]",
+    "Usage: staging-placeholder-publication.ts REVIEW_MANIFEST ROSTER_STAGING LEGISLATORS_STAGING [--memberships DIR] [--portraits CACHE_STAGING] [--dry-run]",
   );
 const evidenceDir = join(manifestPath, "..");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -178,6 +188,83 @@ if (withheld.length)
   dataset.coverage.push(
     `${withheld.length} ballot(s) withheld for members without a supported party: ${withheld.join(", ")}.`,
   );
+if (membershipsDir) {
+  const committees = JSON.parse(
+    await readFile(join(membershipsDir, "committees.json"), "utf8"),
+  );
+  const caucuses = JSON.parse(
+    await readFile(join(membershipsDir, "caucuses.json"), "utf8"),
+  ).caucuses.filter(
+    (c: { sourceUrl?: string; members: unknown[] }) =>
+      c.sourceUrl && c.members.length,
+  ) as (CaucusList & {
+    sourceUrl: string;
+    sourceKind: string;
+    asOf: string;
+  })[];
+  const applied = applyMemberships(dataset.members, committees.rows, caucuses);
+  dataset.members = applied.members;
+  // Committee rows come from the pinned congress-legislators snapshot.
+  const committeeUrl = `https://raw.githubusercontent.com/unitedstates/congress-legislators/${legislators.snapshot}/committee-membership-current.json`;
+  dataset.sources.push(
+    await capture(
+      await readFile(
+        join(membershipsDir, "raw-congress-legislators", "cm.json"),
+        "utf8",
+      ),
+      committeeUrl,
+      "memberships",
+      now,
+    ),
+  );
+  const raw = join(membershipsDir, "raw-caucus");
+  const rawFiles = await readdir(raw);
+  for (const caucus of caucuses) {
+    const oldid = /oldid=(\d+)/.exec(caucus.sourceUrl)?.[1];
+    const file = rawFiles.find((f) =>
+      oldid
+        ? f.includes(`.${oldid}.`)
+        : (caucus.sourceUrl.includes("newdemocrat") && f.includes("ndc")) ||
+          (caucus.sourceUrl.includes("mainstreet") && f.includes("rmsp")) ||
+          (caucus.sourceUrl.includes("lofgren") && f.includes("fourth")),
+    );
+    if (file)
+      dataset.sources.push(
+        await capture(
+          await readFile(join(raw, file), "utf8"),
+          caucus.sourceUrl,
+          "memberships",
+          now,
+        ),
+      );
+  }
+  dataset.coverage.push(
+    "Committees are top-level assignments from the congress-legislators snapshot; they are current memberships, not dated history.",
+    `Caucus rosters (each from its cited source, many incomplete or stale): ${caucuses.map((c) => `${c.name} (${c.sourceKind}, ${c.asOf})`).join("; ")}.`,
+  );
+  console.log(
+    `Memberships applied; skipped ${JSON.stringify(applied.skipped)}`,
+  );
+}
+if (portraitsPath) {
+  const { images } = JSON.parse(await readFile(portraitsPath, "utf8")) as {
+    images: {
+      memberId: string;
+      portrait: NonNullable<Dataset["members"][number]["portrait"]>;
+      source: Dataset["sources"][number];
+    }[];
+  };
+  const byId = new Map(images.map((i) => [i.memberId, i]));
+  dataset.members = dataset.members.map((m) =>
+    byId.has(m.id) ? { ...m, portrait: byId.get(m.id)!.portrait } : m,
+  );
+  dataset.sources.push(
+    ...images.filter((i) => memberIds.has(i.memberId)).map((i) => i.source),
+  );
+  dataset.coverage.push(
+    "Portraits are Wikimedia Commons images, shown as cleared at the user's direction; each keeps its Commons license and attribution.",
+  );
+}
 dataset.id = `staging-placeholder-${now.slice(0, 10)}`;
 
 const errors = validateDataset(dataset);
