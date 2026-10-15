@@ -148,7 +148,7 @@ export function scoreMember(
     own.length >= settings.minPerContext &&
     other.length >= settings.minPerContext &&
     sharedTopics.length >= (settings.minSharedTopics ?? 0);
-  let group: Group = "conditional";
+  let group: Group = comparable ? "mixed" : "unproven";
   if (comparable && ownScore !== null && otherScore !== null) {
     if (
       ownScore >= settings.consistencyThreshold &&
@@ -163,7 +163,7 @@ export function scoreMember(
   }
   const reason = !comparable
     ? "Unproven across administrations"
-    : group === "conditional"
+    : group === "mixed"
       ? "Mixed record across administrations"
       : "Consistent across both party contexts";
   return {
@@ -192,6 +192,7 @@ export function scoreMember(
 }
 export const groupLabels: Record<Group, string> = {
   reformer: "Consistent reformers",
-  conditional: "Conditional & unproven",
+  mixed: "Mixed record",
+  unproven: "Not enough evidence",
   surveillance: "Consistent surveillance supporters",
 };

@@ -64,6 +64,23 @@ describe("Immutable published scores", () => {
     expect(publishedScore(p, members[0], "2020-01-01")).toBe(changed);
     expect(spy).toHaveBeenCalledOnce();
   });
+  it("reads publications frozen before the unproven/mixed split", async () => {
+    const p = await publication();
+    const scores = p.scoring!.scores;
+    for (const score of Object.values(scores))
+      if (score.group === "unproven" || score.group === "mixed")
+        (score as { group: string }).group = "conditional";
+    const bytes = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(JSON.stringify(scores)),
+    );
+    p.scoring!.digest = [...new Uint8Array(bytes)]
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    await expect(verifyPublicationScoring(p)).resolves.toBeUndefined();
+    expect(publishedScore(p, members[2]).group).toBe("mixed");
+    expect(publishedScore(p, members[7]).group).toBe("unproven");
+  });
   it("allows explicit legacy recalculation but never falls back for malformed frozen scores", async () => {
     const p = await publication();
     const legacy = { ...p, scoring: undefined };

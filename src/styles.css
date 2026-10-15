@@ -364,7 +364,7 @@ hr {
 }
 .group-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
   margin-bottom: 23px;
 }
@@ -387,9 +387,13 @@ hr {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
-.group-card.conditional {
+.group-card.mixed {
   background: #f7f5eb;
   border-color: #e9e3ce;
+}
+.group-card.unproven {
+  background: #f3f4f2;
+  border-color: #e0e2de;
 }
 .group-card.surveillance {
   background: #f8f0ec;
@@ -416,8 +420,11 @@ hr {
   border-radius: 50%;
   background: #548169;
 }
-.conditional .category-dot {
+.mixed .category-dot {
   background: #aa9657;
+}
+.unproven .category-dot {
+  background: #9a9f99;
 }
 .surveillance .category-dot {
   background: #b47a66;
@@ -695,8 +702,11 @@ hr {
   background: currentColor;
   border-radius: 50%;
 }
-.category.conditional {
+.category.mixed {
   color: #8e7a44;
+}
+.category.unproven {
+  color: #6f746e;
 }
 .category.surveillance {
   color: #a36a56;

@@ -1,6 +1,6 @@
 export type Party = "Democratic" | "Republican" | "Independent";
 export type Outcome = "Yes" | "No" | "Not voting" | "Not eligible";
-export type Group = "reformer" | "conditional" | "surveillance";
+export type Group = "reformer" | "mixed" | "unproven" | "surveillance";
 export type Status = "active" | "inactive" | "deceased";
 export interface Member {
   id: string;

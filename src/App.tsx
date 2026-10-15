@@ -253,7 +253,9 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                       ? "Consistent reformer"
                       : s.group === "surveillance"
                         ? "Surveillance supporter"
-                        : "Conditional / unproven"}
+                        : s.group === "mixed"
+                          ? "Mixed record"
+                          : "Not enough evidence"}
                   </span>
                   <small>
                     {s.counted} scored votes ·{" "}
@@ -661,9 +663,16 @@ function Directory({
       description: "Support reform under presidents of both parties.",
     },
     {
-      key: "conditional",
-      short: "Conditional & unproven",
-      description: "A mixed record, or more evidence still needed.",
+      key: "mixed",
+      short: "Mixed record",
+      description:
+        "Voted both ways, or differently depending on the president's party.",
+    },
+    {
+      key: "unproven",
+      short: "Not enough evidence",
+      description:
+        "Too few scored votes, or votes under only one party's president.",
     },
     {
       key: "surveillance",
