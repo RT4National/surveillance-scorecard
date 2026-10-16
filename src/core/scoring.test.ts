@@ -23,15 +23,20 @@ describe("grade and consistency contracts", () => {
     expect(scoreMember(members[0], votes, records).group).toBe("reformer");
     expect(
       scoreMember(members[0], votes, records, rubric, "2024-12-31").group,
-    ).toBe("conditional");
+    ).toBe("unproven");
     expect(scoreMember(members[4], votes, records).group).toBe("surveillance");
+  });
+  it("separates a mixed record from one with too little evidence to judge", () => {
+    const mixed = scoreMember(members[2], votes, records);
+    expect(mixed.reason).toBe("Mixed record across administrations");
+    expect(mixed.group).toBe("mixed");
   });
   it("does not award a grade to a new member with only two eligible votes", () => {
     const result = scoreMember(members[7], votes, records);
     expect(result.counted).toBe(2);
     expect(result.value).toBeNull();
     expect(result.grade).toBe("—");
-    expect(result.group).toBe("conditional");
+    expect(result.group).toBe("unproven");
   });
   it("excludes abstentions rather than treating them as opposition", () => {
     const result = scoreMember(
@@ -56,7 +61,7 @@ describe("grade and consistency contracts", () => {
   it("keeps independents unproven without a reviewed presidential alignment policy", () => {
     const result = scoreMember(members[6], votes, records);
     expect(result.value).toBe(100);
-    expect(result.group).toBe("conditional");
+    expect(result.group).toBe("unproven");
     expect(result.ownCount).toBe(0);
   });
   it("uses party at the time of the vote instead of current membership", () => {

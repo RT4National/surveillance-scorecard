@@ -11,6 +11,7 @@
     "preview": "wrangler dev --local",
     "db:migrate": "wrangler d1 migrations apply DB --local",
     "db:seed:local": "node --import tsx scripts/local-seed.ts",
+    "db:seed:staging": "node --import tsx scripts/local-seed.ts --staging",
     "types": "wrangler types worker/env.d.ts --strict-vars false",
     "deploy:check": "npm run build && wrangler deploy --dry-run",
     "deploy": "npm run build && wrangler deploy"

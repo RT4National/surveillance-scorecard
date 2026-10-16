@@ -3,6 +3,7 @@ import {
   buildLisCrosswalk,
   candidateMembers,
   checkHouseCoverage,
+  identitySupplement,
   isLegislatorsUrl,
   legislatorsUrl,
   parseLegislators,
@@ -287,6 +288,51 @@ describe("congress-legislators supplemental identities", () => {
       district: 2,
       since: 2015,
     });
+  });
+
+  it("extends an existing supplement with extra ballots and bill supporters, emitting only new identities", () => {
+    const records = parseLegislators(fixture);
+    const existing = {
+      crosswalk: { S002: "B000002" },
+      affiliations: termAffiliations(records, ["B000002"], source).rows,
+      candidateMembers: [],
+    };
+    const result = identitySupplement({
+      current: [],
+      historical: records,
+      currentUrl: legislatorsUrl(sha, "current"),
+      historicalUrl: source,
+      rosterIds: ["B000002"],
+      existing,
+      senateBallots: [
+        { lisId: "S001", name: "Example (R-TN)", state: "TN", party: "R", date: "2018-01-11" },
+        { lisId: "S002", name: "Switcher (D-VT)", state: "VT", party: "D", date: "2016-01-11" },
+      ],
+      houseBallots: [],
+      supporters: [
+        { memberId: "A000001", chamber: "House", date: "2014-02-01", partyAtVote: "Republican", voteId: "cosponsor-113-hr-1" },
+        { memberId: "A000001", chamber: "Senate", date: "2014-02-01", partyAtVote: "Republican", voteId: "cosponsor-113-s-1" },
+        { memberId: "C000003", chamber: "House", date: "2019-05-01", partyAtVote: "Independent", voteId: "cosponsor-116-hr-1" },
+      ],
+    });
+    expect(result.crosswalk).toEqual({ S001: "A000001" });
+    expect(new Set(result.affiliations.map((a) => a.memberId))).toEqual(new Set(["A000001"]));
+    expect(result.affiliations).toHaveLength(3);
+    expect(result.candidateMembers.map((m) => m.id)).toEqual(["A000001"]);
+    expect(result.discrepancies.map((d) => [d.kind, d.memberId, d.voteId])).toEqual([
+      ["no-senate-term", "A000001", "cosponsor-113-s-1"],
+      ["unsupported-party", "C000003", "cosponsor-116-hr-1"],
+      ["unsupported-party", "C000003", undefined],
+      ["withheld-terms", "C000003", undefined],
+    ]);
+    expect(() =>
+      identitySupplement({
+        current: [], historical: records, currentUrl: legislatorsUrl(sha, "current"), historicalUrl: source,
+        rosterIds: [], houseBallots: [], supporters: [],
+        existing: { ...existing, crosswalk: { S001: "Z999999" } },
+        senateBallots: [{ lisId: "S001", name: "Example (R-TN)", state: "TN", party: "R", date: "2018-01-11" }],
+      }),
+    ).toThrow(/conflicts/);
   });
 
   it("returns false rather than throwing for malformed URLs", () => {

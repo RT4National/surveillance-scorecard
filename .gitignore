@@ -6,3 +6,6 @@ dist/
 !.env.example
 artifacts/
 private/
+
+# Wikimedia portraits (~62 MB) are deployed from a local cache, not committed.
+public/scorecard/portraits/

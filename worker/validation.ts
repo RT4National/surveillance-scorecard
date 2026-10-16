@@ -164,6 +164,8 @@ function checkDataset(value: unknown): string[] {
       v.weight <= 0 ||
       v.weight > 100 ||
       !["House", "Senate"].includes(v.chamber) ||
+      (v.kind !== undefined &&
+        !["rollcall", "cosponsorship"].includes(v.kind)) ||
       (v.source !== null && !https(v.source)) ||
       (!d.demo && !https(v.source))
     )
@@ -181,6 +183,9 @@ function checkDataset(value: unknown): string[] {
       errors.push(`Invalid or duplicate evidence ${key}`);
     pairs.add(key);
     const event = votes.get(r.voteId);
+    // Bill support has a record only for each sponsor or cosponsor; absence is not a No.
+    if (event?.kind === "cosponsorship" && r.outcome !== "Yes")
+      errors.push(`Bill support records only sponsors and cosponsors: ${key}`);
     const knownParty = d.affiliations?.filter(
       (a) =>
         a.memberId === r.memberId &&

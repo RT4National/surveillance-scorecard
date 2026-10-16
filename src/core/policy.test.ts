@@ -10,7 +10,7 @@ describe("versioned scoring policy", () => {
       { ...rubric, minSharedTopics: 1 },
       "2026-09-07",
     );
-    expect(result.group).toBe("conditional");
+    expect(result.group).toBe("unproven");
     expect(result.topicCoverageWarning).toContain("No shared issue");
     const matched = votes.map((v) => ({ ...v, topic: "Warrants" }));
     expect(

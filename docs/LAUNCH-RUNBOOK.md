@@ -55,8 +55,9 @@ Deploys use Wrangler; account and D1 operations use the Cloudflare CLI ([`cf`](h
    npx cf d1 migrations apply <STAGING_DATABASE_ID> --dir migrations
    ```
 
-3. **Set up Access.** Create a Cloudflare Access self-hosted application covering `/scorecard/editor*` and `/scorecard/api/staff/*`. In `env.staging`, set `ACCESS_ISSUER`, `ACCESS_AUDIENCE` and the placeholder `STAFF_ROLES` from step 0, with two real identities mapped.
-4. **Verify.**
+3. **Open staff mode (current staging setup).** `env.staging` sets `STAFF_OPEN_STAGING="true"`: anyone with the link can use `/scorecard/editor` under a self-chosen name (stored as `<name>@staging.invalid`, publisher role). The name is not authentication; it only keeps author and reviewer distinct. Open-mode drafts must be `demo: true`. `worker/staging-access.test.ts` fails if production config sets the flag. Remove the flag when Access is set up.
+4. **Set up Access (later).** Create a Cloudflare Access self-hosted application covering `/scorecard/editor*` and `/scorecard/api/staff/*`. In `env.staging`, set `ACCESS_ISSUER`, `ACCESS_AUDIENCE` and the placeholder `STAFF_ROLES` from step 0, with two real identities mapped.
+5. **Verify.**
 
    ```sh
    npm run types
@@ -65,7 +66,7 @@ Deploys use Wrangler; account and D1 operations use the Cloudflare CLI ([`cf`](h
    npm run build
    ```
 
-5. **Deploy to staging.** First deployed October 14, 2026 (UTC) to the personal `zaki@iqlusion.io` Cloudflare account, which does not hold `restorethe4th.com`: <https://restore-the-fourth-scorecard-staging.zaki-0c1.workers.dev/scorecard/>, D1 `1eeaa6f2-983e-4cc5-8fc7-27449033b022`. Production must be created in the account that holds `restorethe4th.com`; Workers and D1 databases cannot be moved between accounts. The staging Worker is `restore-the-fourth-scorecard-staging` on its `workers.dev` URL; no route on the main site is touched.
+6. **Deploy to staging.** First deployed October 14, 2026 (UTC) to the personal `zaki@iqlusion.io` Cloudflare account, which does not hold `restorethe4th.com`: <https://restore-the-fourth-scorecard-staging.zaki-0c1.workers.dev/scorecard/>, D1 `1eeaa6f2-983e-4cc5-8fc7-27449033b022`. Production must be created in the account that holds `restorethe4th.com`; Workers and D1 databases cannot be moved between accounts. The staging Worker is `restore-the-fourth-scorecard-staging` on its `workers.dev` URL; no route on the main site is touched.
 
    ```sh
    npx wrangler deploy --dry-run --env staging

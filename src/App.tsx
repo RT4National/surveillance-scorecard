@@ -31,6 +31,10 @@ import {
 import { EditorPage } from "./features/editor/EditorPage";
 import { PolicyLab } from "./features/PolicyLab";
 import { toCsv } from "./core/research";
+import { evidenceLabel } from "./core/evidence";
+/** Demo datasets without sources are the fictional preview; others hold real records with placeholder scoring. */
+export const fictional = (dataset: { demo: boolean; sources: unknown[] }) =>
+  dataset.demo && !dataset.sources.length;
 import type { Group, Member } from "./core/types";
 
 const base = "/scorecard";
@@ -88,7 +92,9 @@ function exportRows(
   return [
     [
       dataset.demo
-        ? "Fictional preview — not actual congressional records"
+        ? fictional(dataset)
+          ? "Fictional preview — not actual congressional records"
+          : "Preview — real records, unreviewed placeholder scores"
         : "Restore the Fourth surveillance scorecard",
     ],
     ["Dataset", dataset.id],
@@ -253,7 +259,9 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                       ? "Consistent reformer"
                       : s.group === "surveillance"
                         ? "Surveillance supporter"
-                        : "Conditional / unproven"}
+                        : s.group === "mixed"
+                          ? "Mixed record"
+                          : "Not enough evidence"}
                   </span>
                   <small>
                     {s.counted} scored votes ·{" "}
@@ -374,7 +382,9 @@ export default function App() {
             : "PUBLISHED SCORECARD"}{" "}
         <span className="preview-copy">
           {dataset.demo
-            ? "Fictional members and votes. Explore the proposed experience."
+            ? fictional(dataset)
+              ? "Fictional members and votes. Explore the proposed experience."
+              : "Real congressional records. Scores use unreviewed placeholder vote directions, not Restore the Fourth's positions."
             : `Evidence through ${dataset.asOf} · Publication ${publication?.id}`}
         </span>
       </div>
@@ -532,7 +542,7 @@ export default function App() {
                             : m.status === "active",
                         ).length
                       }{" "}
-                      {dataset.demo ? "demo members" : "members"}
+                      {fictional(dataset) ? "demo members" : "members"}
                     </span>
                   </h2>
                 </div>
@@ -590,7 +600,9 @@ export default function App() {
             {" "}
             ·{" "}
             {dataset.demo
-              ? "Fictional preview"
+              ? fictional(dataset)
+                ? "Fictional preview"
+                : `Placeholder preview · evidence through ${dataset.asOf}`
               : `Evidence through ${dataset.asOf}`}
           </span>
           <br />
@@ -661,9 +673,16 @@ function Directory({
       description: "Support reform under presidents of both parties.",
     },
     {
-      key: "conditional",
-      short: "Conditional & unproven",
-      description: "A mixed record, or more evidence still needed.",
+      key: "mixed",
+      short: "Mixed record",
+      description:
+        "Voted both ways, or differently depending on the president's party.",
+    },
+    {
+      key: "unproven",
+      short: "Not enough evidence",
+      description:
+        "Too few scored votes, or votes under only one party's president.",
     },
     {
       key: "surveillance",
@@ -868,7 +887,11 @@ function Directory({
             </a>
           </span>
           <span className="demo-stamp">
-            {dataset.demo ? "FICTIONAL DATA" : dataset.asOf}
+            {fictional(dataset)
+              ? "FICTIONAL DATA"
+              : dataset.demo
+                ? "PLACEHOLDER SCORES"
+                : dataset.asOf}
           </span>
         </div>
       </div>
@@ -894,10 +917,19 @@ function Profile({
         <ArrowLeft size={16} /> All legislators
       </a>
       <div className="profile-heading">
-        <Avatar member={member} large />
+        <figure className="profile-portrait">
+          <Avatar member={member} large />
+          {member.portrait?.url.startsWith("/scorecard/portraits/") && (
+            <figcaption>
+              <a href={member.portrait.rightsSource} rel="noreferrer">
+                {member.portrait.attribution}
+              </a>
+            </figcaption>
+          )}
+        </figure>
         <div>
           <div className="eyebrow">
-            {dataset.demo ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} ·{" "}
+            {fictional(dataset) ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} ·{" "}
             {member.status.toUpperCase()}
           </div>
           <h1>{member.name}</h1>
@@ -933,7 +965,7 @@ function Profile({
           </p>
           <p className="muted">
             Service begins {member.since}.{" "}
-            {dataset.demo
+            {fictional(dataset)
               ? "Demonstration record."
               : "See the publication sources for verification."}
           </p>
@@ -1075,7 +1107,7 @@ function Profile({
                   </small>
                 </div>
                 <div className="vote-result">
-                  <strong>{e.outcome}</strong>
+                  <strong>{evidenceLabel(e.vote, e.outcome)}</strong>
                   <small>
                     {e.scored
                       ? `${Number((e.aligned ? e.effectiveWeight : 0).toFixed(2))} / ${Number(e.effectiveWeight.toFixed(2))} points`
@@ -1089,7 +1121,9 @@ function Profile({
             {!s.evidence.length && <p>No evidence before this date.</p>}
             <p className="footnote">
               {dataset.demo
-                ? "Fictional evidence is not an official source."
+                ? fictional(dataset)
+                  ? "Fictional evidence is not an official source."
+                  : "Official records; the vote directions used for scoring are unreviewed placeholders."
                 : `Publication ${publication?.id} · rubric ${rubric.version}.`}{" "}
               {dataset.coverage.join(" ")}
             </p>

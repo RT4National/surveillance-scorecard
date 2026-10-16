@@ -1,5 +1,5 @@
 import type { Dataset, Publication } from "../src/core/publication";
-import { authenticate, HttpError } from "./auth";
+import { authenticate, HttpError, type Actor } from "./auth";
 import { digest, validateDataset } from "./validation";
 import { research } from "./ai";
 import { createPublicationScoring } from "../src/core/publication-scores";
@@ -66,6 +66,13 @@ interface Draft {
   reviewer: string | null;
   updated_at: string;
   base_publication_id: string | null;
+}
+/** Open staging access may not save or publish anything presented as real scoring. */
+function checkDataset(dataset: unknown, actor: Actor) {
+  const errors = validateDataset(dataset);
+  if (actor.open && (dataset as { demo?: unknown } | null)?.demo !== true)
+    errors.push("Open staging access can only save demo datasets");
+  return errors;
 }
 async function buildPublication(
   dataset: Dataset,
@@ -264,7 +271,7 @@ async function api(
     );
   if (path === "/staff/drafts" && method === "POST") {
     const b = await body(request);
-    const errors = validateDataset(b.dataset);
+    const errors = checkDataset(b.dataset, actor);
     if (errors.length)
       return json({ error: "Dataset validation failed", errors }, 422);
     if (
@@ -350,7 +357,7 @@ async function api(
         throw new HttpError(409, "Published drafts cannot be edited");
       if (b.basePublicationId !== d.base_publication_id)
         throw new HttpError(409, "Draft base changed; reload");
-      const errors = validateDataset(b.dataset);
+      const errors = checkDataset(b.dataset, actor);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
       if (
@@ -386,7 +393,7 @@ async function api(
       if (d.author === actor.email)
         throw new HttpError(403, "A second person must review");
       const dataset = await decodeStoredJson<Dataset>(d.dataset);
-      const errors = validateDataset(dataset);
+      const errors = checkDataset(dataset, actor);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
       try {
@@ -428,7 +435,7 @@ async function api(
       if (d.status !== "review" || !d.reviewer)
         throw new HttpError(409, "Review required");
       const dataset = await decodeStoredJson<Dataset>(d.dataset);
-      const errors = validateDataset(dataset);
+      const errors = checkDataset(dataset, actor);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
       const p = await buildPublication(

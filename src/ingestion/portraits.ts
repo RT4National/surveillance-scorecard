@@ -16,9 +16,12 @@ export async function cachePortrait(manifest: Portrait, fetcher: typeof fetch = 
   const memberId = bioguide(manifest.memberId);
   if (!publishablePortrait(manifest)) throw new Error('Portrait requires explicit rights evidence, attribution, and reviewer');
   const url = new URL(manifest.url);
-  if (!['congress.gov','house.gov','senate.gov'].some(host => url.hostname === host || url.hostname.endsWith(`.${host}`)) || url.username || url.password || url.search || url.hash) throw new Error('Portrait source must be an official congressional HTTPS host without credentials or query');
+  const congressional = ['congress.gov','house.gov','senate.gov'].some(host => url.hostname === host || url.hostname.endsWith(`.${host}`));
+  // Wikimedia Commons only: /wikipedia/<lang>/ holds local uploads, which may be non-free.
+  const commons = url.hostname === 'upload.wikimedia.org' && url.pathname.startsWith('/wikipedia/commons/');
+  if (url.protocol !== 'https:' || !(congressional || commons) || url.username || url.password || url.search || url.hash) throw new Error('Portrait source must be an official congressional HTTPS host or Wikimedia Commons, without credentials or query');
   if (!Number.isFinite(Date.parse(now))) throw new Error('Invalid portrait capture time');
-  const response = await fetcher(url.toString(), { redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { Accept: 'image/png,image/jpeg,image/webp' } });
+  const response = await fetcher(url.toString(), { redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { Accept: 'image/png,image/jpeg,image/webp', 'User-Agent': 'RT4-surveillance-scorecard/0.1 (https://github.com/RT4National/surveillance-scorecard)' } });
   if (!response.ok || !response.body) throw new Error(`Portrait source failed: HTTP ${response.status}`);
   const reader = response.body.getReader(), chunks: Uint8Array[] = [];
   let size = 0;

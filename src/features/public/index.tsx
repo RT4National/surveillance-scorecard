@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dataset, Publication } from "../../core/publication";
 import type { Outcome } from "../../core/types";
 import { publicationUrl } from "../../core/navigation";
+import { evidenceLabel } from "../../core/evidence";
 import {
   executeReport,
   publicationChanges,
@@ -36,7 +37,10 @@ function Provenance({ dataset, publication }: Props) {
   return (
     <aside className="public-provenance">
       {dataset.demo && (
-        <strong>Fictional demo — not actual congressional records. </strong>
+        <strong>
+          Demo publication — scores and vote directions are unreviewed
+          placeholders, not Restore the Fourth's positions.{" "}
+        </strong>
       )}
       Dataset {dataset.id} · As of {dataset.asOf} · Rubric{" "}
       {dataset.rubric.version} ·{" "}
@@ -380,7 +384,7 @@ export function ComparePage({ dataset, publication }: Props) {
                   >
                     {e.vote.bill}
                   </a>
-                  : {e.outcome} · {e.vote.topic}
+                  : {evidenceLabel(e.vote, e.outcome)} · {e.vote.topic}
                   {!e.inWindow ? " · Outside rubric time window" : ""}
                 </p>
               ))}
@@ -434,7 +438,9 @@ export function RepresentativeFinder({ dataset }: { dataset: Dataset }) {
       <p>
         Member status reflects dataset {dataset.id} as of {dataset.asOf}.
       </p>
-      {dataset.demo && <p>Fictional demo members only.</p>}
+      {dataset.demo && (
+        <p>Demo publication: grades are unreviewed placeholders.</p>
+      )}
     </section>
   );
 }
@@ -1106,7 +1112,7 @@ export function ArchivesPage({ dataset, publication }: Props) {
                         >
                           {e.vote.bill}
                         </a>
-                        : {e.outcome} · {e.vote.date} ·{" "}
+                        : {evidenceLabel(e.vote, e.outcome)} · {e.vote.date} ·{" "}
                         {e.scored ? "Scored" : "Not scored"} ·{" "}
                         <Source url={e.vote.source} />
                       </p>
