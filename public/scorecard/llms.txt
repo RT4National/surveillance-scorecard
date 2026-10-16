@@ -1,0 +1,16 @@
+# Surveillance reform scorecard (Restore the Fourth)
+
+> Congressional grades on surveillance and privacy votes. Every grade is recomputable from the
+> published dataset; scoring rules are public and experimentable.
+
+Staging data is a demo: real members, votes and records, but vote directions are unreviewed
+placeholders. Do not cite staging grades as Restore the Fourth positions.
+
+## Data (JSON, no key)
+- [Current publication](/scorecard/api/publications/latest): dataset (members, votes, records, rubric, sources) and frozen scores
+- [Publication list](/scorecard/api/publications): immutable history; fetch one at /scorecard/api/publications/<id>
+
+## Docs
+- [Agent guide](https://github.com/RT4National/surveillance-scorecard/blob/main/docs/AGENT-GUIDE.md): data shape, scoring formula, experiment CLI, draft API
+- [Scoring code](https://github.com/RT4National/surveillance-scorecard/blob/main/src/core/scoring.ts)
+- [Methodology page](/scorecard/methodology)
