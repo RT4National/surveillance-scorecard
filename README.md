@@ -45,6 +45,8 @@ Congressional-scale qualification exercises the actual local Workers runtime wit
 
 ## Before production
 
+For research on legislative scorecards, behavioral incentives, and proposed rubric design principles, see [scoring research](docs/SCORING-RESEARCH.md).
+
 See [the original stories](docs/PLAN.md), [architecture](docs/ARCHITECTURE.md), [data pipeline](docs/DATA-PIPELINE.md), [publishing operations](docs/PUBLISHING.md), and [feature status](docs/FEATURE-STATUS.md).
 
 Supply a Congress API key, reviewed historical evidence and Senate identity crosswalk, current memberships, licensed portraits, staff Access identities, an approved rubric and exact content license. Configure and qualify the production D1 database, route and model budget. Reconcile staged data before publishing. No production infrastructure or public publication has been created by this implementation work.
