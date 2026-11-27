@@ -47,7 +47,7 @@ function Provenance({ dataset, publication }: Props) {
     </aside>
   );
 }
-function Source({ url }: { url: string | null }) {
+export function Source({ url }: { url: string | null }) {
   return url && /^https?:\/\//.test(url) ? (
     <a href={url} target="_blank" rel="noreferrer">
       Original source ↗
