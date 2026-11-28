@@ -80,6 +80,10 @@ These are local elapsed times from a synthetic fixture. The request harness does
 | 6. Sharing | Worker tests cover frozen share metadata, the summary, and cache reuse. Chrome downloaded a profile PNG. Production unfurls, the summary, and edge CPU still need live verification. |
 | 7. Compare and data | Compare and report tests cover pinned selection, saved queries, and publication data. An actual screen-reader check of the member picker is pending. The party and chamber median feature waits for the D7 decision. |
 | 8. Accessibility | Local Chrome passed the six reader journeys at 390 px and the sampled contrast checks above. Repeat with the reviewed launch candidate and a screen reader before launch. |
-| 9. Cutover | The staff-approved canonical domain, legacy scope, and one-time sheet capture are still required. Follow the launch runbook for the original domain, hosting, and old key. The code and route for the approved archive still need implementation after those decisions. |
+| 9. Cutover | The October 14 legacy capture passed local digest and parser replay. The canonical domain, archive scope, reviewed redirect map, and designation of a cutover capture still need approval. Follow the launch runbook for the original domain, hosting, and old key. The code and route for the approved archive still need implementation after those decisions. |
 | 10. Staff intake | Local tests cover official roll-call and bill intake, per-item impact, and durable scheduled roster staging. Apply the D1 migrations, configure real Cloudflare Access identities and ingestion credentials, and run the workflow against the target environment. |
 | 11. Trends | Local tests cover curated series, counts, correct presidential context, and chart/CSV parity. Staff still need to approve the series and publish the reviewed vote directions before the trends appear publicly. |
+
+### Legacy capture replay
+
+The ignored October 14 `newsb` CSV matched its staged source copy and SHA-256 digest. Re-running the branch’s CSV importer reproduced all 165 columns, 65 identified rows, 35 unidentified rows, and zero reviewed redirects. The historical evidence manifest still requires review. The CSV and per-member data remain in private staging.
