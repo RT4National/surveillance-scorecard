@@ -6,6 +6,7 @@ import { bandRange, profileSummary } from "../../core/summary";
 import {
   bandLine,
   correctionCopy,
+  evidenceCopy,
   headlineCopy,
   hasCosponsorships,
   notGradedLabel,
@@ -19,8 +20,15 @@ import { CorrectionForm } from ".";
 import { base, fictional, fmt, query, readAsOf } from "./helpers";
 import { Avatar, Grade } from "./member";
 import { splitDisplay } from "./split";
-import { EvidenceRow } from "./EvidenceRow";
+import { EvidenceRow, type EvidenceEntry } from "./EvidenceRow";
 import { Legend } from "./Legend";
+
+const newestFirst = (list: EvidenceEntry[]) =>
+  [...list].sort(
+    (a, b) =>
+      b.vote.date.localeCompare(a.vote.date) ||
+      a.voteId.localeCompare(b.voteId),
+  );
 
 export function Profile({
   member,
@@ -61,6 +69,37 @@ export function Profile({
   const [side, setSide] = useState<"all" | "own" | "other">("all");
   const shownEvidence = s.evidence.filter(
     (e) => side === "all" || (e.scored && e.ownParty === (side === "own")),
+  );
+  const unscored = shownEvidence.filter((e) => !e.scored);
+  const row = (e: EvidenceEntry) => (
+    <Fragment key={e.voteId}>
+      <EvidenceRow
+        entry={e}
+        publicationId={publication?.id}
+        actions={
+          <button
+            type="button"
+            className="link-button"
+            aria-expanded={reporting === e.voteId}
+            aria-controls={`report-${e.voteId}`}
+            onClick={() =>
+              setReporting((v) => (v === e.voteId ? null : e.voteId))
+            }
+          >
+            {correctionCopy.rowAction}
+          </button>
+        }
+      />
+      {reporting === e.voteId && (
+        <CorrectionForm
+          id={`report-${e.voteId}`}
+          dataset={dataset}
+          publication={publication}
+          memberId={member.id}
+          voteId={e.voteId}
+        />
+      )}
+    </Fragment>
   );
   return (
     <section className="container inner-page">
@@ -284,44 +323,19 @@ export function Profile({
           <div className="panel">
             <div className="section-heading">
               <h2>The evidence behind the grade</h2>
-              <span className="count-pill">{shownEvidence.length} records</span>
+              <span className="count-pill evidence-scored-count">
+                {scoredLabel(s, dataset.votes)}
+              </span>
             </div>
-            {[...shownEvidence]
-              .sort(
-                (a, b) =>
-                  b.vote.date.localeCompare(a.vote.date) ||
-                  a.voteId.localeCompare(b.voteId),
-              )
-              .map((e) => (
-                <Fragment key={e.voteId}>
-                  <EvidenceRow
-                    entry={e}
-                    publicationId={publication?.id}
-                    actions={
-                      <button
-                        type="button"
-                        className="link-button"
-                        aria-expanded={reporting === e.voteId}
-                        aria-controls={`report-${e.voteId}`}
-                        onClick={() =>
-                          setReporting((v) => (v === e.voteId ? null : e.voteId))
-                        }
-                      >
-                        {correctionCopy.rowAction}
-                      </button>
-                    }
-                  />
-                  {reporting === e.voteId && (
-                    <CorrectionForm
-                      id={`report-${e.voteId}`}
-                      dataset={dataset}
-                      publication={publication}
-                      memberId={member.id}
-                      voteId={e.voteId}
-                    />
-                  )}
-                </Fragment>
-              ))}
+            <div className="evidence-scored">
+              {newestFirst(shownEvidence.filter((e) => e.scored)).map(row)}
+            </div>
+            {unscored.length > 0 && (
+              <section className="evidence-unscored">
+                <h3>{evidenceCopy.contextHeading(unscored.length)}</h3>
+                {newestFirst(unscored).map(row)}
+              </section>
+            )}
             {!s.evidence.length && <p>No evidence before this date.</p>}
             <Legend />
             <p className="footnote">

@@ -106,6 +106,8 @@ export const weightLabel = (e: {
 export const evidenceCopy = {
   votePage: "Vote page",
   legend: "Legend",
+  /** Heading for items that do not count: not cast, not in office, or outside the scoring window. */
+  contextHeading: (n: number) => `Context, not scored (${n})`,
 } as const;
 
 /**

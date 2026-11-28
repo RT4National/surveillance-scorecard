@@ -213,6 +213,72 @@ describe("profile split panel", () => {
   });
 });
 
+describe("context, not scored", () => {
+  const ids = (sel: string) =>
+    [...document.querySelectorAll(`${sel} .evidence-row`)].map(
+      (r) => r.getAttribute("data-vote-id")!,
+    );
+
+  it("puts unscored rows under the context heading, outside the scored count", () => {
+    render(<Profile member={members[7]} copy={vi.fn()} />);
+    const s = scoreMember(members[7], votes, records);
+    const unscored = s.evidence.filter((e) => !e.scored);
+    expect(unscored.length).toBeGreaterThan(0);
+    expect(ids(".evidence-scored").sort()).toEqual(
+      s.evidence.filter((e) => e.scored).map((e) => e.voteId).sort(),
+    );
+    expect(ids(".evidence-unscored").sort()).toEqual(
+      unscored.map((e) => e.voteId).sort(),
+    );
+    const heading = document.querySelector(".evidence-unscored h3")!;
+    expect(text(heading)).toBe(`Context, not scored (${unscored.length})`);
+    const pill = document.querySelector(".evidence-scored-count")!;
+    expect(text(pill)).toBe(`${s.counted} votes`);
+  });
+
+  it("keeps each group newest first", () => {
+    render(<Profile member={members[7]} copy={vi.fn()} />);
+    for (const sel of [".evidence-scored", ".evidence-unscored"]) {
+      const dates = [...document.querySelectorAll(`${sel} .evidence-row time`)].map(
+        (t) => t.getAttribute("datetime")!,
+      );
+      expect(dates).toEqual([...dates].sort().reverse());
+    }
+  });
+
+  it("keeps cosponsorships in the scored section with separate counts", () => {
+    override = (real) => {
+      const ds = {
+        ...real.dataset,
+        votes: real.votes.map((v: any, i: number) =>
+          i % 4 === 0 ? { ...v, kind: "cosponsorship" } : v,
+        ),
+      };
+      return {
+        ...real,
+        dataset: ds,
+        ...ds,
+        score: (m: any, asOf = ds.asOf) =>
+          scoreMember(m, ds.votes, ds.records, ds.rubric, asOf),
+      };
+    };
+    render(<Profile member={members[3]} copy={vi.fn()} />);
+    const s = scoreMember(members[3], votes, records);
+    const co = new Set(votes.filter((_, i) => i % 4 === 0).map((v) => v.id));
+    const scored = s.evidence.filter((e) => e.scored);
+    const nCo = scored.filter((e) => co.has(e.voteId)).length;
+    const nVotes = scored.length - nCo;
+    expect(nCo).toBeGreaterThan(0);
+    const pill = text(document.querySelector(".evidence-scored-count")!);
+    expect(pill).toBe(
+      `${nVotes} ${nVotes === 1 ? "vote" : "votes"} · ${nCo} ${nCo === 1 ? "cosponsorship" : "cosponsorships"}`,
+    );
+    for (const id of co)
+      if (scored.some((e) => e.voteId === id))
+        expect(ids(".evidence-scored")).toContain(id);
+  });
+});
+
 describe("profile headline", () => {
   const bands = [
     { label: "Gold", minimum: 60 },
