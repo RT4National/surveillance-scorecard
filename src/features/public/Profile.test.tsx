@@ -167,6 +167,108 @@ describe("profile split panel", () => {
   });
 });
 
+describe("profile headline", () => {
+  const bands = [
+    { label: "Gold", minimum: 60 },
+    { label: "Silver", minimum: 30 },
+    { label: "Bronze", minimum: 0 },
+  ];
+  function headline(memberIndex: number, gradeBands?: typeof bands) {
+    if (gradeBands)
+      override = (real) => {
+        const rubric = { ...real.rubric, gradeBands };
+        const ds = { ...real.dataset, rubric };
+        return {
+          ...real,
+          dataset: ds,
+          rubric,
+          score: (m: any, asOf = ds.asOf) =>
+            scoreMember(m, ds.votes, ds.records, rubric, asOf),
+        };
+      };
+    render(<Profile member={members[memberIndex]} copy={vi.fn()} />);
+    return document.querySelector(".profile-sidebar")!;
+  }
+
+  it("prints the band range from the active rubric", () => {
+    const real = scoreMember(members[3], votes, records, {
+      version: "t",
+      minVotes: 3,
+      minPerContext: 2,
+      consistencyThreshold: 75,
+      gradeBands: bands,
+    });
+    const i = bands.findIndex((b) => b.label === real.grade);
+    expect(i).toBeGreaterThanOrEqual(0);
+    const max = i === 0 ? 100 : bands[i - 1].minimum - 1;
+    const t = text(headline(3, bands));
+    expect(t).toContain(`${real.grade}: ${bands[i].minimum}–${max}%`);
+  });
+
+  it("states aligned of scored and the year range in words", () => {
+    const s = scoreMember(members[3], votes, records);
+    const scored = s.evidence.filter((e) => e.scored);
+    const years = scored.map((e) => Number(e.vote.date.slice(0, 4)));
+    const range =
+      Math.min(...years) === Math.max(...years)
+        ? `${Math.min(...years)}`
+        : `${Math.min(...years)}–${Math.max(...years)}`;
+    expect(text(headline(3))).toContain(
+      `${scored.filter((e) => e.aligned).length} of ${scored.length} aligned · ${range}`,
+    );
+  });
+
+  it("prints a participation line only when the member missed votes", () => {
+    expect(text(headline(3))).not.toContain("Did not vote:");
+    cleanup();
+    // Two missed roll calls for the same member.
+    override = (real) => {
+      const missed = ["demo-miss-1", "demo-miss-2"].map((id) => ({
+        ...real.votes[0],
+        id,
+      }));
+      const ds = {
+        ...real.dataset,
+        votes: [...real.votes, ...missed],
+        records: [
+          ...real.records,
+          ...missed.map((v) => ({
+            memberId: members[3].id,
+            voteId: v.id,
+            outcome: "Not voting",
+            partyAtVote: members[3].party,
+          })),
+        ],
+      };
+      return {
+        ...real,
+        dataset: ds,
+        ...ds,
+        score: (m: any, asOf = ds.asOf) =>
+          scoreMember(m, ds.votes, ds.records, ds.rubric, asOf),
+      };
+    };
+    render(<Profile member={members[3]} copy={vi.fn()} />);
+    expect(text(document.querySelector(".profile-sidebar")!)).toContain(
+      "Did not vote: 2 · not counted",
+    );
+  });
+
+  it("has a closed disclosure for what the grade does not measure", () => {
+    const d = headline(3).querySelector("details")!;
+    expect(text(d.querySelector("summary")!)).toBe(
+      "What this grade does not measure",
+    );
+    expect(d.open).toBe(false);
+  });
+
+  it("keeps the split as the first panel of the main column", () => {
+    headline(3);
+    const first = document.querySelector(".profile-main > .panel")!;
+    expect(text(first)).toContain("Principles across presidencies");
+  });
+});
+
 /** Demo data with an old vote added and the evidence stored newest first. */
 function withOldEvidence(published: boolean) {
   override = (real) => {

@@ -108,6 +108,31 @@ export const evidenceCopy = {
   legend: "Legend",
 } as const;
 
+/** "B: 80–89%". Numeric only: band phrases wait on decision D3. */
+export const bandLine = (b: { label: string; min: number; max: number }) =>
+  `${b.label}: ${b.min}–${b.max}%`;
+
+/** Profile headline lines. */
+export const headlineCopy = {
+  /** "7 of 9 aligned · 2015–2026". */
+  aligned: (
+    aligned: number,
+    scored: number,
+    years: { from: number; to: number } | null,
+  ) =>
+    `${aligned} of ${scored} aligned` +
+    (years
+      ? ` · ${years.from === years.to ? years.from : `${years.from}–${years.to}`}`
+      : ""),
+  notVoted: (n: number) => `Did not vote: ${n} · not counted`,
+  doesNotMeasure: "What this grade does not measure",
+  doesNotMeasureItems: [
+    "Why a vote was missed.",
+    "Speeches, statements and committee work.",
+    "Votes and bills not on this scorecard.",
+  ],
+} as const;
+
 /**
  * Error-report form. The response policy (decision D10: review time, retention, where outcomes appear)
  * is not decided, so nothing here promises a time or a reply channel.

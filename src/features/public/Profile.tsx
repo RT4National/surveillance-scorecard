@@ -1,9 +1,12 @@
 import { Fragment, useState } from "react";
 import { ArrowLeft, Copy, History, Info, ShieldCheck } from "lucide-react";
 import { useScorecard } from "../../data/context";
-import { groupLabels } from "../../core/scoring";
+import { defaultGradeBands, groupLabels } from "../../core/scoring";
+import { bandRange, profileSummary } from "../../core/summary";
 import {
+  bandLine,
   correctionCopy,
+  headlineCopy,
   hasCosponsorships,
   notGradedLabel,
   scoredLabel,
@@ -31,6 +34,11 @@ export function Profile({
   const [reporting, setReporting] = useState<string | null>(null);
   const s = score(member, asOf);
   const split = splitDisplay(s, member.party);
+  const summary = profileSummary(s, dataset.votes);
+  const band =
+    s.value === null
+      ? null
+      : bandRange(s.grade, rubric.gradeBands ?? defaultGradeBands);
   // The whole record, independent of the selected date, so the timeline and the date minimum stay stable.
   const dates = score(member).evidence.map((e) => e.vote.date);
   const earliest = dates.reduce<string | undefined>(
@@ -94,10 +102,28 @@ export function Profile({
               ? notGradedLabel(rubric.minVotes)
               : `${fmt(s.value)} reform alignment`}
           </h2>
-          <p>
-            {Number(s.earned.toFixed(2))} aligned weighted points out of{" "}
-            {Number(s.possible.toFixed(2))} possible · {scoredLabel(s, dataset.votes)}
-          </p>
+          <ul className="headline-lines">
+            <li>
+              {headlineCopy.aligned(
+                summary.aligned,
+                summary.scored,
+                summary.years,
+              )}
+            </li>
+            <li>{scoredLabel(s, dataset.votes)}</li>
+            {band && <li>{bandLine(band)}</li>}
+            {summary.notVoted > 0 && (
+              <li>{headlineCopy.notVoted(summary.notVoted)}</li>
+            )}
+          </ul>
+          <details className="does-not-measure">
+            <summary>{headlineCopy.doesNotMeasure}</summary>
+            <ul>
+              {headlineCopy.doesNotMeasureItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </details>
           <span className={`category ${s.group}`}>{groupLabels[s.group]}</span>
           <p>{s.reason}</p>
           <hr />
