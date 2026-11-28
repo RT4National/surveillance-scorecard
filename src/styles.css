@@ -1079,6 +1079,18 @@ input[type="date"] {
   font-size: 12px;
   color: var(--muted);
 }
+.link-button {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: var(--blue-text);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.evidence-row + .public-correction {
+  margin: 0 0 16px;
+}
 .evidence-legend {
   display: flex;
   flex-wrap: wrap;

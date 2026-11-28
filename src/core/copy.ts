@@ -108,6 +108,24 @@ export const evidenceCopy = {
   legend: "Legend",
 } as const;
 
+/**
+ * Error-report form. The response policy (decision D10: review time, retention, where outcomes appear)
+ * is not decided, so nothing here promises a time or a reply channel.
+ */
+export const correctionCopy = {
+  rowAction: "Report an error",
+  title: "Report an error",
+  label: "What is wrong, and where can we check it?",
+  hint: "No personal details. We can't reply.",
+  next: "Staff review every report. Fixes ship as a new publication; old ones stay archived.",
+  submit: "Send",
+  busy: "Sending…",
+  sent: "Sent. Staff review every report.",
+  failed: (status: number) => `Not sent (${status}). Try again later.`,
+  closedDemo: "Closed: demo data.",
+  closedUnpublished: "Closed until a publication is live.",
+} as const;
+
 /** Party context on an evidence row. Not eligible records get no party: the member was not serving. */
 const partyMember = {
   Democratic: "Democrat",

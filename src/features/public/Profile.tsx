@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { ArrowLeft, Copy, History, Info, ShieldCheck } from "lucide-react";
 import { useScorecard } from "../../data/context";
 import { groupLabels } from "../../core/scoring";
 import {
+  correctionCopy,
   hasCosponsorships,
   notGradedLabel,
   scoredLabel,
@@ -26,6 +27,8 @@ export function Profile({
 }) {
   const { score, dataset, rubric, publication } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
+  // Vote id of the row whose error report is open; one at a time.
+  const [reporting, setReporting] = useState<string | null>(null);
   const s = score(member, asOf);
   const split = splitDisplay(s, member.party);
   // The whole record, independent of the selected date, so the timeline and the date minimum stay stable.
@@ -230,11 +233,34 @@ export function Profile({
                   a.voteId.localeCompare(b.voteId),
               )
               .map((e) => (
-                <EvidenceRow
-                  key={e.voteId}
-                  entry={e}
-                  publicationId={publication?.id}
-                />
+                <Fragment key={e.voteId}>
+                  <EvidenceRow
+                    entry={e}
+                    publicationId={publication?.id}
+                    actions={
+                      <button
+                        type="button"
+                        className="link-button"
+                        aria-expanded={reporting === e.voteId}
+                        aria-controls={`report-${e.voteId}`}
+                        onClick={() =>
+                          setReporting((v) => (v === e.voteId ? null : e.voteId))
+                        }
+                      >
+                        {correctionCopy.rowAction}
+                      </button>
+                    }
+                  />
+                  {reporting === e.voteId && (
+                    <CorrectionForm
+                      id={`report-${e.voteId}`}
+                      dataset={dataset}
+                      publication={publication}
+                      memberId={member.id}
+                      voteId={e.voteId}
+                    />
+                  )}
+                </Fragment>
               ))}
             {!s.evidence.length && <p>No evidence before this date.</p>}
             <Legend />
