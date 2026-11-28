@@ -1,3 +1,4 @@
+import { isChangelogReason, publicationReasons } from "../src/core/changelog";
 import {
   authorizeRosterCapture,
   normalizeRosterCapture,
@@ -199,10 +200,18 @@ async function api(
   if (method === "POST" && path === "/research") return research(request, env);
   if (method === "GET" && path === "/publications") {
     const rows = await env.DB.prepare(
-      "SELECT id,json_extract(snapshot,'$.createdAt') AS createdAt,json_extract(snapshot,'$.summary') AS summary,json_extract(snapshot,'$.digest') AS digest,COALESCE(json_extract(snapshot,'$.datasetId'),json_extract(snapshot,'$.dataset.id')) AS datasetId,json_extract(snapshot,'$.previousId') AS previousId FROM publications ORDER BY created_at DESC LIMIT 200",
+      "SELECT id,json_extract(snapshot,'$.createdAt') AS createdAt,json_extract(snapshot,'$.summary') AS summary,json_extract(snapshot,'$.digest') AS digest,COALESCE(json_extract(snapshot,'$.datasetId'),json_extract(snapshot,'$.dataset.id')) AS datasetId,json_extract(snapshot,'$.previousId') AS previousId,change_reasons FROM publications ORDER BY created_at DESC LIMIT 200",
     ).all();
     return json({
-      publications: rows.results,
+      publications: rows.results.map(({ change_reasons, ...row }) => {
+        const reasons: unknown =
+          typeof change_reasons === "string"
+            ? JSON.parse(change_reasons)
+            : null;
+        return Array.isArray(reasons) && reasons.every(isChangelogReason)
+          ? { ...row, changeReasons: reasons }
+          : row;
+      }),
     });
   }
   const slim =
@@ -606,6 +615,12 @@ async function api(
       const errors = checkDataset(dataset, actor);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
+      const previous = d.base_publication_id
+        ? await publication(env, d.base_publication_id)
+        : null;
+      if (d.base_publication_id && !previous)
+        throw new HttpError(409, "Base publication is unavailable.");
+      const reasons = publicationReasons(previous?.dataset ?? null, dataset);
       const p = await buildPublication(
         dataset,
         d.summary,
@@ -614,13 +629,14 @@ async function api(
       );
       const serialized = await storePublication(p);
       const r = await env.DB.prepare(
-        "INSERT INTO publications(id,draft_id,snapshot,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM drafts WHERE id=? AND version=? AND status='review') AND EXISTS(SELECT 1 FROM current_publication WHERE publication_id IS ?)",
+        "INSERT INTO publications(id,draft_id,snapshot,created_at,change_reasons) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM drafts WHERE id=? AND version=? AND status='review') AND EXISTS(SELECT 1 FROM current_publication WHERE publication_id IS ?)",
       )
         .bind(
           p.id,
           d.id,
           serialized,
           p.createdAt,
+          JSON.stringify(reasons),
           d.id,
           d.version,
           p.previousId,

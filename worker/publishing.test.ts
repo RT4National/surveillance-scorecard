@@ -108,6 +108,7 @@ describe("D1 editorial workflow", () => {
           "0001_editorial.sql",
           "0002_draft_base.sql",
           "0003_staged_roster.sql",
+          "0004_publication_changelog.sql",
         ].map((file) =>
           readFile(new URL(`../migrations/${file}`, import.meta.url), "utf8"),
         ),
@@ -486,6 +487,11 @@ describe("D1 editorial workflow", () => {
     expect(published.status).toBe(201);
     const p = (await published.json()) as { id: string; digest: string };
     expect(p.digest).toMatch(/^[a-f0-9]{64}$/);
+    const changelog = await send("/publications");
+    expect(changelog.status).toBe(200);
+    expect(await changelog.json()).toMatchObject({
+      publications: [{ id: p.id, changeReasons: ["initial"] }],
+    });
     expect(
       (await send(`/staff/drafts/${d.id}/publish`, "POST", { version: 2 }))
         .status,

@@ -1,3 +1,4 @@
+import type { ChangelogReason } from "./changelog";
 import type { ReuseLicenceId } from "./dataExports";
 import type { Member, RecordEntry, Rubric, Vote, VoteSeries } from "./types";
 import { publicationNumberLabel } from "./copy";
@@ -60,6 +61,7 @@ export interface PublicationSummary {
   createdAt: string;
   summary: string;
   previousId: string | null;
+  changeReasons?: ChangelogReason[];
 }
 
 /**

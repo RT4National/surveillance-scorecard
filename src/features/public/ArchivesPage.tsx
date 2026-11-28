@@ -1,5 +1,11 @@
+import {
+  changeReasonLabels,
+  isChangelogReason,
+  publicationReasons,
+  type ChangelogReason,
+} from "../../core/changelog";
 import { useEffect, useRef, useState } from "react";
-import type { Publication } from "../../core/publication";
+import type { Publication, PublicationSummary } from "../../core/publication";
 import {
   loadArchivedPublication,
   publicationChanges,
@@ -15,9 +21,69 @@ const reasonLabels: Record<PublicationChangeReason, string> = {
   cutoff: "Evidence cutoff changed",
 };
 
-type Summary = Pick<Publication, "id" | "createdAt" | "summary">;
+function ChangeReasons({
+  entry,
+  loaded,
+}: {
+  entry: PublicationSummary;
+  loaded?: Publication;
+}) {
+  const [computed, setComputed] = useState<ChangelogReason[]>();
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const request = useRef<AbortController | null>(null);
+  useEffect(() => () => request.current?.abort(), []);
+  const reasons =
+    entry.changeReasons ?? (entry.previousId === null ? ["initial"] : computed);
+  if (reasons)
+    return reasons.length ? (
+      <ul aria-label="Changes from the previous publication">
+        {reasons.map((reason) => (
+          <li key={reason}>{changeReasonLabels[reason]}</li>
+        ))}
+      </ul>
+    ) : (
+      <p>No changes to recorded evidence, grading rules, or cutoff.</p>
+    );
+  if (!entry.previousId) return null;
+  const previousId = entry.previousId;
+  return (
+    <>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          const controller = new AbortController();
+          request.current = controller;
+          setBusy(true);
+          setStatus("");
+          try {
+            const read = (id: string) =>
+              id === loaded?.id
+                ? Promise.resolve(loaded)
+                : loadArchivedPublication(id, fetch, controller.signal);
+            const [before, after] = await Promise.all([
+              read(previousId),
+              read(entry.id),
+            ]);
+            if (!controller.signal.aborted)
+              setComputed(publicationReasons(before.dataset, after.dataset));
+          } catch {
+            if (!controller.signal.aborted)
+              setStatus("Change reasons are unavailable for this archive.");
+          } finally {
+            if (!controller.signal.aborted) setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Loading change reasons…" : "Show change reasons"}
+      </button>
+      {status && <p role="status">{status}</p>}
+    </>
+  );
+}
 export function ArchivesPage({ dataset, publication }: Props) {
-  const [list, setList] = useState<Summary[]>([]),
+  const [list, setList] = useState<PublicationSummary[]>([]),
     [status, setStatus] = useState("Loading publications…"),
     [before, setBefore] = useState<Publication | null>(null),
     [memberId, setMemberId] = useState(() => {
@@ -35,7 +101,7 @@ export function ArchivesPage({ dataset, publication }: Props) {
     fetch(`${base}/api/publications`, { signal: controller.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(`Archive unavailable (${r.status})`);
-        const body = (await r.json()) as { publications: Summary[] };
+        const body = (await r.json()) as { publications: PublicationSummary[] };
         if (
           !Array.isArray(body.publications) ||
           body.publications.some(
@@ -43,7 +109,10 @@ export function ArchivesPage({ dataset, publication }: Props) {
               !p ||
               typeof p.id !== "string" ||
               typeof p.createdAt !== "string" ||
-              typeof p.summary !== "string",
+              typeof p.summary !== "string" ||
+              (p.changeReasons !== undefined &&
+                (!Array.isArray(p.changeReasons) ||
+                  !p.changeReasons.every(isChangelogReason))),
           )
         )
           throw new Error("Invalid publication index");
@@ -91,6 +160,7 @@ export function ArchivesPage({ dataset, publication }: Props) {
             </a>
           </h2>
           <p>{p.summary}</p>
+          <ChangeReasons entry={p} loaded={publication} />
           <button
             disabled={!publication}
             onClick={async () => {
