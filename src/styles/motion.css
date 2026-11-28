@@ -48,6 +48,28 @@
   animation: motion-grow-x var(--motion-slow) var(--motion-ease);
 }
 
+/* Filtered results (finder delegation, directory table) when a filter changes: a quick fade and
+   shift so people see the list was replaced. Same two-name restart trick as above. Callers skip
+   it above about 100 rows. */
+@keyframes motion-filter-a {
+  from {
+    opacity: 0.4;
+    transform: translateY(4px);
+  }
+}
+@keyframes motion-filter-b {
+  from {
+    opacity: 0.4;
+    transform: translateY(4px);
+  }
+}
+.motion-filter-a {
+  animation: motion-filter-a var(--motion-fast) var(--motion-ease);
+}
+.motion-filter-b {
+  animation: motion-filter-b var(--motion-fast) var(--motion-ease);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

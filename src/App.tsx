@@ -15,6 +15,9 @@ import {
 import { useScorecard } from "./data/context";
 import { groupLabels, scoreMember } from "./core/scoring";
 import {
+  browseAllLabel,
+  countRowLabel,
+  groupCountLabel,
   hasCosponsorships,
   heroCopy,
   notGradedGroupLabel,
@@ -35,6 +38,7 @@ import { Profile } from "./features/public/Profile";
 import { Finder } from "./features/public/Finder";
 import { Freshness } from "./features/public/Freshness";
 import { Avatar, Grade } from "./features/public/member";
+import { useFilterClass } from "./features/public/motion";
 import {
   base,
   fictional,
@@ -65,6 +69,8 @@ const defaults = {
 };
 type Filters = typeof defaults;
 // `state` is read from the URL fragment (or an old ?state= link), never written to the query.
+const readBrowse = () => readFragment("browse") === "all";
+const groupOrder: Group[] = ["reformer", "mixed", "surveillance", "unproven"];
 const readFilters = (): Filters =>
   ({
     ...Object.fromEntries(
@@ -290,10 +296,15 @@ export default function App() {
   const route = matchRoute(window.location.pathname);
   const isFormer = route.name === "former";
   const [filters, setFilters] = useState<Filters>(readFilters);
+  // The home directory opens in place ("Browse all"); the open state lives in the fragment.
+  const [browse, setBrowse] = useState(readBrowse);
   const [notice, setNotice] = useState("");
   useEffect(() => {
     migrateLegacyFragment();
-    const listener = () => setFilters(readFilters());
+    const listener = () => {
+      setFilters(readFilters());
+      setBrowse(readBrowse());
+    };
     window.addEventListener("popstate", listener);
     window.addEventListener("hashchange", listener);
     return () => {
@@ -334,6 +345,10 @@ export default function App() {
       "",
       `${window.location.pathname}${params.size ? `?${params}` : ""}${window.location.hash}`,
     );
+  }
+  function openBrowse(open: boolean) {
+    setBrowse(open);
+    writeFragment("browse", open ? "all" : "");
   }
   function reset() {
     setFilters(defaults);
@@ -392,6 +407,7 @@ export default function App() {
         className="container scorecard-section"
         aria-label="Explore legislators"
       >
+        {isFormer && (
         <div className="section-heading">
           <div>
             <div className="eyebrow muted">
@@ -426,14 +442,34 @@ export default function App() {
             Build a research report <ArrowUpRight size={16} />
           </a>
         </div>
+        )}
         <Directory
           filters={effectiveFilters}
           setFilter={changeFilter}
           reset={reset}
           archive={isFormer}
           copy={copy}
+          open={isFormer || browse}
+          onBrowse={openBrowse}
+          links={
+            <>
+              <a
+                className="subtle-link"
+                href={publicationUrl(`${base}/former`, linkId)}
+              >
+                Former members <ArrowRight size={16} />
+              </a>
+              <a
+                className="subtle-link"
+                href={publicationUrl(`${base}/research`, linkId)}
+              >
+                Build a research report <ArrowUpRight size={16} />
+              </a>
+            </>
+          }
         />
       </section>
+      {isFormer && (
       <section className="container bottom-callout">
         <div>
           <span className="eyebrow">FOLLOW THE EVIDENCE</span>
@@ -450,6 +486,7 @@ export default function App() {
           Explore the methodology <ArrowRight size={16} />
         </a>
       </section>
+      )}
     </>
   );
   function routePage(): ReactNode {
@@ -621,12 +658,20 @@ function Directory({
   reset,
   archive,
   copy,
+  open,
+  onBrowse,
+  links,
 }: {
   filters: Filters;
   setFilter: (k: keyof Filters, v: string) => void;
   reset: () => void;
   archive: boolean;
   copy: (text: string) => Promise<void>;
+  /** False on the home page until "Browse all" (or a count link) opens the directory. */
+  open: boolean;
+  onBrowse: (open: boolean) => void;
+  /** Former-member and research links, shown beside "Browse all" on the home page. */
+  links: ReactNode;
 }) {
   const { score, dataset, members, publication, linkId } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
@@ -665,30 +710,34 @@ function Directory({
   ];
   const counts = (group: Group) =>
     source.filter((m) => score(m, date).group === group).length;
-  const groups: { key: Group; short: string; description: string }[] = [
-    {
-      key: "reformer",
-      short: "Consistent reformers",
-      description: "Support reform under presidents of both parties.",
-    },
-    {
-      key: "mixed",
-      short: "Mixed record",
-      description:
-        "Voted both ways, or differently depending on the president's party.",
-    },
-    {
-      key: "unproven",
-      short: "Not enough evidence",
-      description:
-        "Too few scored votes, or votes under only one party's president.",
-    },
-    {
-      key: "surveillance",
-      short: "Surveillance supporters",
-      description: "Support surveillance under presidents of both parties.",
-    },
-  ];
+  // Plan item 3.4: the result table fades in briefly when a filter changes (skipped above ~100 rows).
+  const resultsMotion = useFilterClass(
+    JSON.stringify([filters, status, date]),
+    filtered.length,
+  );
+  const countRow = (
+    <nav className="count-row" aria-label={countRowLabel}>
+      {groupOrder.map((g) => (
+        <a
+          key={g}
+          className={`count-link ${g}`}
+          href={publicationUrl(
+            `${base}/${archive ? "former" : ""}?group=${g}${archive ? "" : "#browse=all"}`,
+            linkId,
+          )}
+          aria-current={filters.group === g ? "true" : undefined}
+          onClick={(e) => {
+            e.preventDefault();
+            setFilter("group", filters.group === g ? "" : g);
+            if (!archive) onBrowse(true);
+          }}
+        >
+          <span className={`count-icon ${g}`} aria-hidden="true" />
+          {groupCountLabel(g, counts(g))}
+        </a>
+      ))}
+    </nav>
+  );
   function archiveParam(key: string, value: string) {
     const p = query();
     p.set(key, value);
@@ -737,34 +786,24 @@ function Directory({
           </Select>
         </div>
       )}
-      <div className="group-cards">
-        {groups.map((g) => (
+      {countRow}
+      {!archive && (
+        <div className="browse-bar">
           <button
-            key={g.key}
-            onClick={() =>
-              setFilter("group", filters.group === g.key ? "" : g.key)
-            }
-            className={`group-card ${g.key} ${filters.group === g.key ? "selected" : ""}`}
-            aria-pressed={filters.group === g.key}
+            type="button"
+            className="button"
+            aria-expanded={open}
+            aria-controls="directory-panel"
+            onClick={() => onBrowse(!open)}
           >
-            <div>
-              <span className="category-dot" />
-              <strong>{g.short}</strong>
-              <span className="group-count">{counts(g.key)}</span>
-            </div>
-            <p>{g.description}</p>
-            <span className="group-action">
-              Explore group <ArrowRight size={14} />
-            </span>
+            {browseAllLabel(source.length)}
+            <ChevronDown size={15} aria-hidden="true" />
           </button>
-        ))}
-      </div>
-      <div className="directory-panel">
-        <p>
-          Current party and chamber describe the roster in this publication,
-          including the last recorded affiliation for former members. Historical
-          date filters narrow vote evidence, not roster membership.
-        </p>
+          {links}
+        </div>
+      )}
+      {open && (
+      <div className="directory-panel" id="directory-panel">
         <div className="filter-bar">
           {archive && (
             <label className="search-box">
@@ -879,7 +918,9 @@ function Directory({
             </button>
           </div>
         </div>
-        <MemberTable list={filtered} asOf={date} />
+        <div className={`directory-results ${resultsMotion}`.trim()}>
+          <MemberTable list={filtered} asOf={date} />
+        </div>
         <div className="table-footer">
           <Info size={14} />
           <span>
@@ -898,6 +939,7 @@ function Directory({
           </span>
         </div>
       </div>
+      )}
     </>
   );
 }

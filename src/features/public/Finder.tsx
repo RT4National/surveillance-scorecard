@@ -10,6 +10,7 @@ import {
 import type { Member } from "../../core/types";
 import { Avatar, Grade } from "./member";
 import { base, delegation, fmt, normalize } from "./helpers";
+import { useFilterClass } from "./motion";
 
 const searchLimit = 10;
 
@@ -87,6 +88,11 @@ export function Finder({
         .sort((a, b) => a.name.localeCompare(b.name))
     : [];
   const Heading = level === 1 ? "h1" : "h2";
+  // Plan item 3.4: the results fade in briefly when the state or name changes.
+  const motion = useFilterClass(
+    `${chosen}|${name}`,
+    chosen ? list.length : Math.min(matches.length, searchLimit),
+  );
   return (
     <section className="finder" aria-labelledby={`${id}-title`}>
       <Heading id={`${id}-title`}>{finderCopy.title}</Heading>
@@ -118,6 +124,7 @@ export function Finder({
           {finderCopy.houseLink}
         </a>
       </p>
+      <div className={`finder-results ${motion}`.trim()}>
       {terms.length > 0 && !chosen && (
         <>
           <h3>
@@ -145,6 +152,7 @@ export function Finder({
           />
         </>
       )}
+      </div>
     </section>
   );
 }

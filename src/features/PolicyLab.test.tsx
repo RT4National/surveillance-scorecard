@@ -68,3 +68,9 @@ describe("Rubric lab", () => {
     expect(screen.getByRole("alert").textContent).toBe("");
   });
 });
+describe("methodology roster note", () => {
+  it("explains what current party and chamber describe (moved off the home page)", () => {
+    render(<PolicyLab dataset={fixture} />);
+    expect(screen.getByText(/Current party and chamber describe the roster/)).toBeTruthy();
+  });
+});

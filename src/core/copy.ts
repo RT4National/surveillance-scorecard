@@ -244,3 +244,25 @@ export const heroCopy = {
  * minimum, so rounding down keeps the shown number inside the shown band (89.6 is a B, shown as 89%).
  */
 export const percentLabel = (n: number) => `${Math.floor(n)}%`;
+
+/** Home count row: one compact filter link per category. */
+export const countRowLabel = "Filter by record";
+const groupCountWords: Record<
+  "reformer" | "mixed" | "surveillance" | "unproven",
+  [string, string]
+> = {
+  reformer: ["reformer", "reformers"],
+  mixed: ["mixed", "mixed"],
+  surveillance: ["surveillance supporter", "surveillance supporters"],
+  unproven: ["not enough evidence", "not enough evidence"],
+};
+/** "52 reformers", "1 mixed", "79 surveillance supporters", "234 not enough evidence". */
+export const groupCountLabel = (
+  group: keyof typeof groupCountWords,
+  n: number,
+) => `${n} ${groupCountWords[group][n === 1 ? 0 : 1]}`;
+/** The control that opens the full directory in place. */
+export const browseAllLabel = (n: number) => `Browse all ${n}`;
+/** What the directory's roster columns mean. Methodology page only. */
+export const rosterNote =
+  "Current party and chamber describe the roster in this publication, including the last recorded affiliation for former members. Historical date filters narrow vote evidence, not roster membership.";

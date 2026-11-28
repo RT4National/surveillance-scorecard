@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { createHash, webcrypto } from "node:crypto";
 import { DataProvider, demoDataset } from "./data/context";
 import App from "./App";
@@ -60,6 +66,7 @@ function expectPublicPins() {
 describe("archived public navigation", () => {
   it("pins brand, directory profiles, CTA and footer links while leaving staff current", async () => {
     await show("/scorecard/");
+    fireEvent.click(screen.getByRole("button", { name: /^Browse all/ }));
     expectPublicPins();
     const sources = new URL(
       screen

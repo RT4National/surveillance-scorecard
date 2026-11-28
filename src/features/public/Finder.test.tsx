@@ -56,6 +56,9 @@ const directoryNames = () =>
   [...document.querySelectorAll(".member-table .member-name strong")].map(
     (e) => e.textContent,
   );
+// The home directory is collapsed until "Browse all".
+const openDirectory = () =>
+  fireEvent.click(screen.getByRole("button", { name: /^Browse all/ }));
 const pick = (state: string) =>
   fireEvent.change(within(finder()).getByLabelText("State"), {
     target: { value: state },
@@ -84,6 +87,7 @@ describe("finder on the home page", () => {
   });
   it("filters the directory to the chosen state", () => {
     render(<App />);
+    openDirectory();
     pick("California");
     expect(directoryNames()).toContain(ca.name);
     expect(directoryNames()).not.toContain(tx.name);
@@ -119,6 +123,7 @@ describe("finder on the home page", () => {
   });
   it("filters the finder and the directory from one name search, in the fragment", () => {
     render(<App />);
+    openDirectory();
     fireEvent.change(within(finder()).getByLabelText("Name"), {
       target: { value: "senator one" },
     });
@@ -126,7 +131,7 @@ describe("finder on the home page", () => {
     expect(delegation()[0]).toContain("Yan Senator One");
     expect(directoryNames()).toEqual(["Yan Senator One"]);
     expect(window.location.search).toBe("");
-    expect(window.location.hash).toBe("#q=senator+one");
+    expect(window.location.hash).toBe("#browse=all&q=senator+one");
   });
   it("filters a chosen delegation by name", () => {
     render(<App />);
@@ -140,11 +145,11 @@ describe("finder on the home page", () => {
     expect(window.location.search).toBe("");
   });
   it("moves an old ?q= link to the fragment and still filters", () => {
-    window.history.replaceState(null, "", "/scorecard/?q=senator%20one&sort=name");
+    window.history.replaceState(null, "", "/scorecard/?q=senator%20one&sort=name#browse=all");
     render(<App />);
     expect(directoryNames()).toEqual(["Yan Senator One"]);
     expect(window.location.search).toBe("?sort=name");
-    expect(window.location.hash).toBe("#q=senator+one");
+    expect(window.location.hash).toBe("#browse=all&q=senator+one");
   });
   it("shows a one-line hero above the finder", () => {
     render(<App />);

@@ -29,7 +29,8 @@ export const normalize = (s: string) =>
  * logged by the Worker. Old `?state=` and `?q=` links are still read, then rewritten
  * by `migrateLegacyFragment`.
  */
-export type FragmentKey = "state" | "q";
+export type FragmentKey = "state" | "q" | "browse";
+/** Keys that older links carried in the query string. `browse` (the open directory) never did. */
 const fragmentKeys: FragmentKey[] = ["state", "q"];
 export const readFragment = (key: FragmentKey) =>
   new URLSearchParams(window.location.hash.slice(1)).get(key) ??
