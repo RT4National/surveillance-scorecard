@@ -2192,3 +2192,14 @@ input[type="date"] {
 .server-paint .state-target.server-chosen + .server-delegation {
   display: block;
 }
+
+.profile-share {
+  margin-bottom: 24px;
+}
+.profile-share summary {
+  cursor: pointer;
+  min-height: 24px;
+}
+.frozen-summary {
+  margin-top: 16px;
+}

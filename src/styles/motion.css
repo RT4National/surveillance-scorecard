@@ -13,6 +13,7 @@
   --motion-fast: 150ms;
   --motion-base: 200ms;
   --motion-slow: 300ms;
+  --motion-highlight: 1s;
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -68,6 +69,25 @@
 }
 .motion-filter-b {
   animation: motion-filter-b var(--motion-fast) var(--motion-ease);
+}
+
+/* A temporary cue alongside the archive's persistent Changed marker. */
+@keyframes motion-archive-change {
+  from {
+    opacity: 1;
+  }
+}
+.motion-archive-change {
+  position: relative;
+}
+.motion-archive-change::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+  opacity: 0;
+  animation: motion-archive-change var(--motion-highlight) var(--motion-ease);
 }
 
 @media (prefers-reduced-motion: reduce) {

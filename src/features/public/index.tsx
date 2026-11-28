@@ -1,46 +1,38 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { Dataset, Publication } from "../../core/publication";
-import type { Outcome, Party } from "../../core/types";
-import { splitDisplay, voteCount, type SplitInput } from "./split";
+import { useState } from "react";
+import type { Outcome } from "../../core/types";
 import { publicationUrl } from "../../core/navigation";
-import { evidenceLabel } from "../../core/evidence";
+import {
+  base,
+  pinnedId,
+  publicUrl,
+  Provenance,
+  Source,
+  type Props,
+} from "./pageShared";
+import { VoteList } from "./VoteList";
+import { VotePage } from "./VotePage";
+import { ScopeControls, useReport } from "./reportControls";
+export { ArchivesPage } from "./ArchivesPage";
+export { ComparePage } from "./ComparePage";
+export { Source } from "./pageShared";
 import {
   correctionCopy,
   hasCosponsorships,
   notGradedLabel,
   percentLabel,
   scoredActionCounts,
-  scoredLabel,
 } from "../../core/copy";
 import {
-  executeReport,
-  publicationChanges,
   reportCsv,
   reportSvg,
   reportTsv,
   decodeVoteId,
-  loadArchivedPublication,
   membershipSemantics,
   validateReportQuery,
   type ReportQuery,
 } from "../../core/reports";
-import { EvidenceRow } from "./EvidenceRow";
-import { Legend } from "./Legend";
 import "./public.css";
 
-type Props = { dataset: Dataset; publication?: Publication };
-const servingOutcomes: Outcome[] = ["Yes", "No", "Not voting"];
-const base = "/scorecard";
-/**
- * The publication links carry: the one named in the URL, if any. The latest publication is
- * never added to links (clean URLs); the loaded `publication.id` still goes into exports.
- */
-function pinnedId(_publication?: Publication) {
-  return new URLSearchParams(location.search).get("publication") ?? undefined;
-}
-function publicUrl(path: string, publication?: Publication) {
-  return publicationUrl(path, pinnedId(publication));
-}
 function save(name: string, text: string, type: string) {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement("a");
@@ -49,387 +41,34 @@ function save(name: string, text: string, type: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-function Provenance({ dataset, publication }: Props) {
-  return (
-    <aside className="public-provenance">
-      {dataset.demo && (
-        <strong>
-          Demo publication — scores and vote directions are unreviewed
-          placeholders, not Restore the Fourth's positions.{" "}
-        </strong>
-      )}
-      Dataset {dataset.id} · As of {dataset.asOf} · Rubric{" "}
-      {dataset.rubric.version} ·{" "}
-      {publication ? `Publication ${publication.id}` : "Unpublished preview"}
-      {dataset.coverage.map((c, i) => (
-        <p key={i}>{c}</p>
-      ))}
-    </aside>
-  );
-}
-export function Source({ url }: { url: string | null }) {
-  return url && /^https?:\/\//.test(url) ? (
-    <a href={url} target="_blank" rel="noreferrer">
-      Original source ↗
-    </a>
-  ) : (
-    <span>Source unavailable{url ? " (invalid URL)" : ""}</span>
-  );
-}
 export function LegislationPage({
   dataset,
   publication,
   voteId,
 }: Props & { voteId?: string }) {
-  const [topic, setTopic] = useState("");
-  const decodedVoteId = decodeVoteId(voteId);
-  const vote = dataset.votes.find((v) => v.id === decodedVoteId);
-  // Not eligible records have no party at the vote (the member was not serving),
-  // so they are counted once instead of being split by party.
-  const notServing = vote
-    ? dataset.records.filter(
-        (r) => r.voteId === vote.id && r.outcome === "Not eligible",
-      ).length
-    : 0;
-  if (voteId && !vote)
+  if (!voteId) return <VoteList dataset={dataset} publication={publication} />;
+  const vote = dataset.votes.find((item) => item.id === decodeVoteId(voteId));
+  if (!vote) {
     return (
       <section className="public-page">
         <h1>Vote not found</h1>
-        <a href={publicUrl(`${base}/legislation`, publication)}>
-          View legislation
-        </a>
+        <a href={publicUrl(`${base}/legislation`, publication)}>View votes</a>
       </section>
     );
+  }
   return (
-    <section className="public-page">
-      <h1>{vote ? vote.bill : "Legislation & votes"}</h1>
-      <Provenance dataset={dataset} publication={publication} />
-      {vote ? (
-        <>
-          <h2>{vote.title}</h2>
-          <p>
-            {vote.date} · {vote.chamber} · {vote.topic}
-          </p>
-          <p>
-            <strong>
-              Reform position: {vote.reformVote} · Weight: {vote.weight}
-            </strong>
-          </p>
-          <p>{vote.rationale}</p>
-          <Source url={vote.source} />
-          <h2>Party breakdown at the time of the vote</h2>
-          <div className="public-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Party</th>
-                  {servingOutcomes.map((o) => (
-                    <th key={o}>{o}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {["Democratic", "Republican", "Independent"].map((p) => (
-                  <tr key={p}>
-                    <th>{p}</th>
-                    {servingOutcomes.map((o) => (
-                      <td key={o}>
-                        {
-                          dataset.records.filter(
-                            (r) =>
-                              r.voteId === vote.id &&
-                              r.partyAtVote === p &&
-                              r.outcome === o,
-                          ).length
-                        }
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {notServing > 0 && (
-            <p>
-              {notServing} {notServing === 1 ? "member" : "members"} not
-              serving at the time
-            </p>
-          )}
-          <h2>Recorded roll call</h2>
-          <p>Missing records are unknown, not inferred absences.</p>
-          <div className="public-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Member</th>
-                  <th>Party at vote</th>
-                  <th>Outcome</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dataset.records
-                  .filter((r) => r.voteId === vote.id)
-                  .map((r) => (
-                    <tr key={r.memberId}>
-                      <td>
-                        <a
-                          href={publicUrl(
-                            `${base}/members/${encodeURIComponent(r.memberId)}`,
-                            publication,
-                          )}
-                        >
-                          {dataset.members.find((m) => m.id === r.memberId)
-                            ?.name ?? r.memberId}
-                        </a>
-                      </td>
-                      <td>
-                        {r.outcome === "Not eligible"
-                          ? "Not serving"
-                          : r.partyAtVote}
-                      </td>
-                      <td>{r.outcome}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-          <CorrectionForm
-            dataset={dataset}
-            publication={publication}
-            voteId={vote.id}
-          />
-        </>
-      ) : (
-        <>
-          <label>
-            Issue{" "}
-            <select value={topic} onChange={(e) => setTopic(e.target.value)}>
-              <option value="">All issues</option>
-              {[...new Set(dataset.votes.map((v) => v.topic))].map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-          </label>
-          <div className="public-grid">
-            {dataset.votes
-              .filter((v) => !topic || v.topic === topic)
-              .map((v) => (
-                <article key={v.id}>
-                  <small>
-                    {v.date} · {v.topic}
-                  </small>
-                  <h2>
-                    <a
-                      href={publicUrl(
-                        `${base}/legislation/${encodeURIComponent(v.id)}`,
-                        publication,
-                      )}
-                    >
-                      {v.bill}: {v.title}
-                    </a>
-                  </h2>
-                  <p>{v.rationale}</p>
-                  <p>Reform position: {v.reformVote}</p>
-                  <Source url={v.source} />
-                </article>
-              ))}
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-function ScopeControls({
-  dataset,
-  value,
-  onChange,
-}: {
-  dataset: Dataset;
-  value: ReportQuery;
-  onChange: (q: ReportQuery) => void;
-}) {
-  return (
-    <div className="public-controls">
-      <label>
-        Issue
-        <select
-          value={value.topic ?? ""}
-          onChange={(e) =>
-            onChange({ ...value, topic: e.target.value || undefined })
-          }
-        >
-          <option value="">All issues</option>
-          {[...new Set(dataset.votes.map((v) => v.topic))].map((t) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        From
-        <input
-          type="date"
-          value={value.from ?? ""}
-          onChange={(e) =>
-            onChange({ ...value, from: e.target.value || undefined })
-          }
-        />
-      </label>
-      <label>
-        Through
-        <input
-          type="date"
-          value={value.to ?? ""}
-          max={dataset.asOf}
-          onChange={(e) =>
-            onChange({ ...value, to: e.target.value || undefined })
-          }
-        />
-      </label>
-      <label>
-        Presidential party context
-        <select
-          value={value.context ?? ""}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              context: (e.target.value || undefined) as ReportQuery["context"],
-            })
-          }
-        >
-          <option value="">Both contexts</option>
-          <option value="same">Same as party at vote</option>
-          <option value="opposing">Different from party at vote</option>
-        </select>
-      </label>
-    </div>
-  );
-}
-function useReport(
-  dataset: Dataset,
-  query: ReportQuery,
-  includeUnrated = false,
-) {
-  return useMemo(() => {
-    try {
-      return {
-        result: executeReport(dataset, query, { includeUnrated }),
-        error: "",
-      };
-    } catch (e) {
-      return { result: null, error: String((e as Error).message) };
-    }
-  }, [dataset, query, includeUnrated]);
-}
-/** The own-party / other-party split on a compare card, gated by the scorer's verdict. */
-function SplitSummary({ score, party }: { score: SplitInput; party: Party }) {
-  const split = splitDisplay(score, party);
-  if (split.kind === "not-applicable") return <p>{split.message}</p>;
-  if (split.kind === "unproven")
-    return (
-      <>
-        <p>{split.counts}</p>
-        <p>{split.message}</p>
-      </>
-    );
-  return (
-    <>
-      <p>
-        Same party: {split.own.percent}% ({voteCount(split.own.count)})
-      </p>
-      <p>
-        Other party: {split.other.percent}% ({voteCount(split.other.count)})
-      </p>
-    </>
-  );
-}
-export function ComparePage({ dataset, publication }: Props) {
-  const [ids, setIds] = useState<string[]>(
-    dataset.members.slice(0, 2).map((m) => m.id),
-  );
-  const [q, setQ] = useState<ReportQuery>({ kind: "ranking" });
-  const { result, error } = useReport(
-    dataset,
-    {
-      ...q,
-      memberIds: ids.filter(Boolean),
-      status: "all",
-    },
-    true,
-  );
-  return (
-    <section className="public-page">
-      <h1>Compare reform records</h1>
-      <Provenance dataset={dataset} publication={publication} />
-      <p>
-        Comparison scores are recomputed from the selected evidence scope using
-        the publication rubric. These are research results, not frozen official
-        publication grades. {membershipSemantics}
-      </p>
-      <div className="public-controls">
-        {[0, 1, 2].map((i) => (
-          <label key={i}>
-            Member {i + 1}
-            <select
-              value={ids[i] ?? ""}
-              onChange={(e) =>
-                setIds((old) => {
-                  const next = [...old];
-                  next[i] = e.target.value;
-                  return next;
-                })
-              }
-            >
-              <option value="">Select a member</option>
-              {dataset.members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        ))}
-      </div>
-      <ScopeControls dataset={dataset} value={q} onChange={setQ} />
-      {error && <p role="alert">{error}</p>}
-      <p>
-        Unequal voting opportunities and different issue mixes can affect
-        comparisons. Missing evidence never counts as opposition. Select one
-        issue to make administration comparisons more meaningful.
-      </p>
-      <div className="public-grid">
-        {result?.rows.map(({ member, score }) => (
-          <article key={member.id}>
-            <h2>{member.name}</h2>
-            <p>
-              Current party: {member.party} · {member.state}
-            </p>
-            <strong className="public-score">
-              {score.value === null
-                ? notGradedLabel(dataset.rubric.minVotes)
-                : `${score.grade} · ${percentLabel(score.value)}`}
-            </strong>
-            <p>
-              {scoredLabel(score, dataset.votes)} · minimum{" "}
-              {dataset.rubric.minVotes}
-            </p>
-            <p>{score.reason}</p>
-            {score.topicCoverageWarning && <p>{score.topicCoverageWarning}</p>}
-            <SplitSummary score={score} party={member.party} />
-            <details>
-              <summary>Inspect evidence</summary>
-              {score.evidence.map((e) => (
-                <EvidenceRow
-                  key={e.voteId}
-                  entry={e}
-                  publicationId={pinnedId(publication)}
-                />
-              ))}
-              <Legend />
-            </details>
-          </article>
-        ))}
-      </div>
-    </section>
+    <VotePage
+      key={vote.id}
+      dataset={dataset}
+      publication={publication}
+      vote={vote}
+    >
+      <CorrectionForm
+        dataset={dataset}
+        publication={publication}
+        voteId={vote.id}
+      />
+    </VotePage>
   );
 }
 export function CorrectionForm({
@@ -971,160 +610,6 @@ export function ReportsPage({ dataset, publication }: Props) {
             </ul>
           </div>
         </>
-      )}
-    </section>
-  );
-}
-type Summary = Pick<Publication, "id" | "createdAt" | "summary">;
-export function ArchivesPage({ dataset, publication }: Props) {
-  const [list, setList] = useState<Summary[]>([]),
-    [status, setStatus] = useState("Loading publications…"),
-    [before, setBefore] = useState<Publication | null>(null),
-    [memberId, setMemberId] = useState(dataset.members[0]?.id ?? "");
-  const comparisonRequest = useRef<AbortController | null>(null);
-  useEffect(() => () => comparisonRequest.current?.abort(), []);
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(`${base}/api/publications`, { signal: controller.signal })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`Archive unavailable (${r.status})`);
-        const body = (await r.json()) as { publications: Summary[] };
-        if (
-          !Array.isArray(body.publications) ||
-          body.publications.some(
-            (p) =>
-              !p ||
-              typeof p.id !== "string" ||
-              typeof p.createdAt !== "string" ||
-              typeof p.summary !== "string",
-          )
-        )
-          throw new Error("Invalid publication index");
-        setList(body.publications);
-        setStatus(body.publications.length ? "" : "No publications yet.");
-      })
-      .catch((e) => {
-        if (e.name !== "AbortError") setStatus(e.message);
-      });
-    return () => controller.abort();
-  }, []);
-  const change =
-    before && publication
-      ? publicationChanges(before, publication, memberId)
-      : null;
-  return (
-    <section className="public-page">
-      <h1>Published archives</h1>
-      <Provenance dataset={dataset} publication={publication} />
-      <p>
-        Each archive preserves its evidence, date cutoff, and scoring rubric.
-      </p>
-      <p>
-        Archives with a scoring snapshot show frozen published grades. Legacy
-        archives without a snapshot show an explicitly labeled recalculation
-        using the current scoring engine.
-      </p>
-      <p role="status">{status}</p>
-      {list.map((p) => (
-        <article key={p.id}>
-          <h2>
-            <a href={`${base}/?publication=${encodeURIComponent(p.id)}`}>
-              {p.id}
-            </a>
-          </h2>
-          <p>
-            {p.createdAt} · {p.summary}
-          </p>
-          <button
-            disabled={!publication}
-            onClick={async () => {
-              comparisonRequest.current?.abort();
-              const controller = new AbortController();
-              comparisonRequest.current = controller;
-              setBefore(null);
-              setStatus(`Loading ${p.id}…`);
-              try {
-                const archived = await loadArchivedPublication(
-                  p.id,
-                  fetch,
-                  controller.signal,
-                );
-                if (controller.signal.aborted) return;
-                setBefore(archived);
-                setStatus("");
-              } catch (e) {
-                if (!controller.signal.aborted) setStatus((e as Error).message);
-              }
-            }}
-          >
-            Compare with loaded publication
-          </button>
-        </article>
-      ))}
-      {change && (
-        <section>
-          <h2>Why did the grade change?</h2>
-          <label>
-            Member
-            <select
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
-            >
-              {[
-                ...new Map(
-                  [...dataset.members, ...(before?.dataset.members ?? [])].map(
-                    (m) => [m.id, m],
-                  ),
-                ).values(),
-              ].map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p>
-            {before!.id} → {publication!.id}
-          </p>
-          <p>
-            Grade {change.before?.grade ?? "Absent"} →{" "}
-            {change.after?.grade ?? "Absent"}
-          </p>
-          <p>{change.explanation}</p>
-          <p>
-            Counted evidence: {change.before?.counted ?? 0} →{" "}
-            {change.after?.counted ?? 0} votes.
-          </p>
-          <div className="public-grid">
-            {[before!, publication!].map((frame, index) => (
-              <article key={`${index}-${frame.id}`}>
-                <h3>
-                  {index === 0 ? "Selected archive" : "Loaded publication"}:{" "}
-                  {frame.id}
-                </h3>
-                <p>
-                  {frame.scoring
-                    ? "Frozen published score"
-                    : "Legacy archive — current-engine recalculation"}
-                </p>
-                <Provenance dataset={frame.dataset} publication={frame} />
-                <details>
-                  <summary>Evidence in this publication</summary>
-                  {(index === 0 ? change.before : change.after)?.evidence.map(
-                    (e) => (
-                      <EvidenceRow
-                        key={e.voteId}
-                        entry={e}
-                        publicationId={frame.id}
-                      />
-                    ),
-                  ) ?? <p>Member absent from this publication.</p>}
-                  <Legend />
-                </details>
-              </article>
-            ))}
-          </div>
-        </section>
       )}
     </section>
   );

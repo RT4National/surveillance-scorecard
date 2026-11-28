@@ -1,3 +1,4 @@
+import { memberShareMeta } from "./meta";
 import type { Dataset, Publication } from "../src/core/publication";
 import { authenticate, HttpError, type Actor } from "./auth";
 import { digest, validateDataset } from "./validation";
@@ -689,15 +690,15 @@ async function renderPage(
     publication: p ?? undefined,
     linkId: requested && p ? p.id : undefined,
   };
+  let share: ReturnType<typeof memberShareMeta>;
   let root: { kind: string; render: () => string } | undefined;
   if (route.name === "home")
     root = { kind: "home", render: () => renderHome(data) };
   if (route.name === "member") {
     const m = data.dataset.members.find((m) => m.id === route.id);
     if (!m) return notFound(request, env, url);
-    // TODO(phase 6, items 6.1-6.2): grade in the title and og tags and a per-member og:image,
-    // only for non-demo publications with frozen scoring. Not before.
-    title = `${m.name} — Surveillance reform scorecard`;
+    share = memberShareMeta(p, m, url);
+    title = share?.title ?? `${m.name} — Surveillance reform scorecard`;
     description = `Explore ${m.name}’s surveillance reform record and the evidence behind the grade.`;
     root = { kind: "member", render: () => renderMember(data, m) };
   } else if (route.name === "legislation" && route.voteId !== undefined) {
@@ -729,6 +730,7 @@ async function renderPage(
     noindex: demo || route.name === "editor",
     canonical: canonical.href,
     root: rootHtml,
+    share,
     publication: p ? { id: p.id, digest: p.digest } : undefined,
   });
 }
@@ -750,6 +752,7 @@ async function shell(
     description: string;
     noindex: boolean;
     canonical?: string;
+    share?: ReturnType<typeof memberShareMeta>;
     status?: number;
     /** Escaped markup for #root (worker/render.ts) and the page kind for data-server. */
     root?: { kind: string; html: string };
@@ -760,7 +763,7 @@ async function shell(
     publication?: { id: string; digest: string };
   },
 ): Promise<Response> {
-  const { title, description, noindex, canonical } = meta;
+  const { title, description, noindex, canonical, share } = meta;
   const index = new URL(url);
   index.pathname = "/index.html";
   index.search = "";
@@ -787,7 +790,12 @@ async function shell(
     (canonical
       ? `<meta property="og:url" content="${escape(canonical)}">`
       : "") +
-    `<meta property="og:type" content="website">`;
+    `<meta property="og:type" content="website">` +
+    (share
+      ? `<meta property="og:image" content="${escape(share.image)}">` +
+        `<meta property="og:image:alt" content="${escape(share.imageAlt)}">` +
+        '<meta name="twitter:card" content="summary_large_image">'
+      : "");
   return new HTMLRewriter()
     .on("title", {
       element(e) {

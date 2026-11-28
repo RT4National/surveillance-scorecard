@@ -144,3 +144,15 @@
     display: block;
   }
 }
+
+.vote-tally-track {
+  height: 0.25rem;
+  margin-top: 0.25rem;
+  background: currentColor;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.vote-tally-track .motion-fill {
+  height: 100%;
+  background: currentColor;
+}

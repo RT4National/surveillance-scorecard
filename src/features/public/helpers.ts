@@ -117,12 +117,4 @@ export function gradeTone(
  */
 export const avatarSrc = (url: string, large: boolean) =>
   large || !/\.(jpe?g|png|webp)$/i.test(url) ? url : thumbnailName(url);
-/**
- * Demo datasets without sources are the fictional preview; others hold real records with placeholder
- * scoring. Slim views (the publication index) carry `sourceCount` instead of the source captures.
- */
-export const fictional = (dataset: {
-  demo: boolean;
-  sources: unknown[];
-  sourceCount?: number;
-}) => dataset.demo && !(dataset.sourceCount ?? dataset.sources.length);
+export { fictional } from "../../core/copy";

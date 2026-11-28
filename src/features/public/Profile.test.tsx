@@ -476,7 +476,7 @@ function withOldEvidence(published: boolean) {
       dataset: ds,
       ...ds,
       publication: published
-        ? { id: "pub-1", scoring: { version: "scorer-test" } }
+        ? { id: "pub-1", dataset: ds, scoring: { version: "scorer-test", scores: {} } }
         : undefined,
       score: (m: any, asOf = ds.asOf) =>
         scoreMember(m, ds.votes, ds.records, ds.rubric, asOf),

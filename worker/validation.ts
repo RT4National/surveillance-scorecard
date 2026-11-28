@@ -136,6 +136,7 @@ function checkDataset(value: unknown): string[] {
       !m.committees.every(nonempty) ||
       !m.caucuses.every(nonempty) ||
       !Number.isInteger(m.since) ||
+      (m.contactUrl !== undefined && !https(m.contactUrl)) ||
       (m.district !== undefined &&
         (!Number.isInteger(m.district) || m.district < 0)) ||
       (m.portrait !== undefined &&
@@ -159,6 +160,7 @@ function checkDataset(value: unknown): string[] {
       !["Democratic", "Republican", "Independent"].includes(v.presidentParty) ||
       typeof v.date !== "string" ||
       !Number.isFinite(Date.parse(v.date)) ||
+      (v.commonName !== undefined && !nonempty(v.commonName)) ||
       !["Yes", "No"].includes(v.reformVote) ||
       !Number.isFinite(v.weight) ||
       v.weight <= 0 ||

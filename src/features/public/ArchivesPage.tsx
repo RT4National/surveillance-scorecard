@@ -1,0 +1,211 @@
+import { useEffect, useRef, useState } from "react";
+import type { Publication } from "../../core/publication";
+import {
+  loadArchivedPublication,
+  publicationChanges,
+  type PublicationChangeReason,
+} from "../../core/reports";
+import { base, Provenance, type Props } from "./pageShared";
+import { EvidenceRow } from "./EvidenceRow";
+import { Legend } from "./Legend";
+
+const reasonLabels: Record<PublicationChangeReason, string> = {
+  rubric: "Grading rules changed",
+  evidence: "Vote evidence changed",
+  cutoff: "Evidence cutoff changed",
+};
+
+type Summary = Pick<Publication, "id" | "createdAt" | "summary">;
+export function ArchivesPage({ dataset, publication }: Props) {
+  const [list, setList] = useState<Summary[]>([]),
+    [status, setStatus] = useState("Loading publications…"),
+    [before, setBefore] = useState<Publication | null>(null),
+    [memberId, setMemberId] = useState(() => {
+      const requested = new URLSearchParams(location.search).get("m");
+      return (
+        dataset.members.find((member) => member.id === requested)?.id ??
+        dataset.members[0]?.id ??
+        ""
+      );
+    });
+  const comparisonRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => comparisonRequest.current?.abort(), []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${base}/api/publications`, { signal: controller.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Archive unavailable (${r.status})`);
+        const body = (await r.json()) as { publications: Summary[] };
+        if (
+          !Array.isArray(body.publications) ||
+          body.publications.some(
+            (p) =>
+              !p ||
+              typeof p.id !== "string" ||
+              typeof p.createdAt !== "string" ||
+              typeof p.summary !== "string",
+          )
+        )
+          throw new Error("Invalid publication index");
+        setList(body.publications);
+        setStatus(body.publications.length ? "" : "No publications yet.");
+      })
+      .catch((e) => {
+        if (e.name !== "AbortError") setStatus(e.message);
+      });
+    return () => controller.abort();
+  }, []);
+  useEffect(() => {
+    if (!location.hash.startsWith("#publication-")) return;
+    const publication = list.find(
+      ({ id }) => location.hash === `#publication-${encodeURIComponent(id)}`,
+    );
+    if (publication)
+      document
+        .getElementById(`publication-${publication.id}`)
+        ?.scrollIntoView?.();
+  }, [list]);
+  const change =
+    before && publication
+      ? publicationChanges(before, publication, memberId)
+      : null;
+  const changedVotes = new Set(change?.changedVoteIds);
+  return (
+    <section className="public-page">
+      <h1>Published archives</h1>
+      <Provenance dataset={dataset} publication={publication} />
+      <p>
+        Each archive preserves its evidence, date cutoff, and scoring rubric.
+      </p>
+      <p>
+        Archives with a scoring snapshot show frozen published grades. Legacy
+        archives without a snapshot show an explicitly labeled recalculation
+        using the current scoring engine.
+      </p>
+      <p role="status">{status}</p>
+      {list.map((p) => (
+        <article key={p.id} id={`publication-${p.id}`}>
+          <h2>
+            <a href={`${base}/?publication=${encodeURIComponent(p.id)}`}>
+              {p.createdAt.slice(0, 10)} · {p.id}
+            </a>
+          </h2>
+          <p>{p.summary}</p>
+          <button
+            disabled={!publication}
+            onClick={async () => {
+              comparisonRequest.current?.abort();
+              const controller = new AbortController();
+              comparisonRequest.current = controller;
+              setBefore(null);
+              setStatus(`Loading ${p.id}…`);
+              try {
+                const archived = await loadArchivedPublication(
+                  p.id,
+                  fetch,
+                  controller.signal,
+                );
+                if (controller.signal.aborted) return;
+                setBefore(archived);
+                setStatus("");
+              } catch (e) {
+                if (!controller.signal.aborted) setStatus((e as Error).message);
+              }
+            }}
+          >
+            Compare with loaded publication
+          </button>
+        </article>
+      ))}
+      {change && (
+        <section>
+          <h2>Why did the grade change?</h2>
+          <label>
+            Member
+            <select
+              value={memberId}
+              onChange={(e) => setMemberId(e.target.value)}
+            >
+              {[
+                ...new Map(
+                  [...dataset.members, ...(before?.dataset.members ?? [])].map(
+                    (m) => [m.id, m],
+                  ),
+                ).values(),
+              ].map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p>
+            {before!.id} → {publication!.id}
+          </p>
+          <p
+            className={
+              change.gradeChanged ? "motion-archive-change" : undefined
+            }
+            key={`${before!.id}/${publication!.id}/${memberId}`}
+          >
+            Grade {change.before?.grade ?? "Absent"} →{" "}
+            {change.after?.grade ?? "Absent"}
+            {change.gradeChanged && (
+              <>
+                {" "}
+                · <strong>Changed</strong>
+              </>
+            )}
+          </p>
+          {change.reasons.length > 0 && (
+            <ul aria-label="Publication changes">
+              {change.reasons.map((reason) => (
+                <li key={reason}>{reasonLabels[reason]}</li>
+              ))}
+            </ul>
+          )}
+          <p>{change.explanation}</p>
+          <p>
+            Counted evidence: {change.before?.counted ?? 0} →{" "}
+            {change.after?.counted ?? 0} votes.
+          </p>
+          <div className="public-grid">
+            {[before!, publication!].map((frame, index) => (
+              <article key={`${index}-${frame.id}`}>
+                <h3>
+                  {index === 0 ? "Selected archive" : "Loaded publication"}:{" "}
+                  {frame.id}
+                </h3>
+                <p>
+                  {frame.scoring
+                    ? "Frozen published score"
+                    : "Legacy archive — current-engine recalculation"}
+                </p>
+                <Provenance dataset={frame.dataset} publication={frame} />
+                <details>
+                  <summary>Evidence in this publication</summary>
+                  {(index === 0 ? change.before : change.after)?.evidence.map(
+                    (e) => (
+                      <div
+                        className={
+                          changedVotes.has(e.voteId)
+                            ? "motion-archive-change"
+                            : undefined
+                        }
+                        key={`${memberId}/${e.voteId}`}
+                      >
+                        {changedVotes.has(e.voteId) && <strong>Changed</strong>}
+                        <EvidenceRow entry={e} publicationId={frame.id} />
+                      </div>
+                    ),
+                  ) ?? <p>Member absent from this publication.</p>}
+                  <Legend />
+                </details>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+    </section>
+  );
+}

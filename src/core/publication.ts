@@ -90,3 +90,19 @@ export function newerPublication(
   const index = list ? list.findIndex((p) => p.id === id) : -1;
   return list && index > 0 ? list[0] : null;
 }
+
+/** Shareable claims require a reviewed publication and a captured score for this member. */
+export function frozenShareScore(
+  publication: Publication | null | undefined,
+  memberId: string,
+) {
+  if (
+    !publication?.scoring ||
+    publication.dataset.demo ||
+    /^placeholder-/i.test(publication.dataset.id) ||
+    /^placeholder-/i.test(publication.id) ||
+    !Object.hasOwn(publication.scoring.scores, memberId)
+  )
+    return undefined;
+  return publication.scoring.scores[memberId];
+}

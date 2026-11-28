@@ -14,7 +14,7 @@ import {
   weightLabel,
 } from "../../core/copy";
 import { publicationUrl } from "../../core/navigation";
-import { Source } from ".";
+import { Source } from "./pageShared";
 import { base } from "./helpers";
 
 export type EvidenceEntry = ReturnType<typeof scoreMember>["evidence"][number];

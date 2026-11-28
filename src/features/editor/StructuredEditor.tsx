@@ -147,6 +147,13 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
               />
             </label>
             <label>
+              Common name (optional)
+              <input
+                value={v.commonName ?? ""}
+                onChange={(e) => vote({ commonName: e.target.value || undefined })}
+              />
+            </label>
+            <label>
               Date of the vote
               <input
                 type="date"

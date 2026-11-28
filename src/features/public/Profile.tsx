@@ -2,6 +2,8 @@ import { Fragment, useState } from "react";
 import { ArrowLeft, Copy, History, Info, ShieldCheck } from "lucide-react";
 import { useScorecard } from "../../data/context";
 import { defaultGradeBands, groupLabels } from "../../core/scoring";
+import { frozenShareScore } from "../../core/publication";
+import { GradeChange } from "./GradeChange";
 import { bandRange, profileSummary } from "../../core/summary";
 import {
   bandLine,
@@ -15,7 +17,7 @@ import {
   scoredNoun,
   splitCopy,
 } from "../../core/copy";
-import { publicationUrl } from "../../core/navigation";
+import { compareMemberUrl, publicationUrl } from "../../core/navigation";
 import type { Member } from "../../core/types";
 import { CorrectionForm } from ".";
 import { base, fictional, fmt, query, readAsOf } from "./helpers";
@@ -23,6 +25,7 @@ import { Avatar, Grade } from "./member";
 import { splitDisplay } from "./split";
 import { EvidenceRow, type EvidenceEntry } from "./EvidenceRow";
 import { Legend } from "./Legend";
+import { SharePanel } from "./SharePanel";
 import { useChangeClass, useSeenOnce } from "./motion";
 
 const newestFirst = (list: EvidenceEntry[]) =>
@@ -42,7 +45,8 @@ export function Profile({
   /** The Worker already painted the split bars at full width: do not grow them again. */
   serverPainted?: boolean;
 }) {
-  const { score, dataset, rubric, publication, linkId } = useScorecard();
+  const { score, dataset, rubric, publication, publications, linkId } =
+    useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
   // Motion (src/styles/motion.css): the grade and evidence restart a short change animation on each
   // timeline date change, and the split bars grow once on first view. Values are final either way.
@@ -80,6 +84,7 @@ export function Profile({
   // Only the publication's own as-of date carries the frozen published grade.
   const frozen = (d: string) =>
     Boolean(publication?.scoring) && d === dataset.asOf;
+  const frozenGrade = frozenShareScore(publication, member.id)?.grade;
   const noun = scoredNoun(hasCosponsorships(dataset.votes));
   const count = (n: number) => `${n} ${n === 1 ? noun.slice(0, -1) : noun}`;
   // Evidence filter from the split chips. A side shows only items scored on that side.
@@ -146,6 +151,9 @@ export function Profile({
               : ""}
           </p>
         </div>
+        <a className="button" href={compareMemberUrl(member.id, linkId)}>
+          {profileCopy.compare}
+        </a>
         <button
           className="button"
           onClick={() => void copy(window.location.href)}
@@ -153,6 +161,12 @@ export function Profile({
           <Copy size={15} /> {profileCopy.copyLink}
         </button>
       </div>
+      <SharePanel
+        member={member}
+        publication={publication}
+        publications={publications}
+        copy={copy}
+      />
       <div className="profile-layout">
         <aside className="profile-sidebar">
           <div className={`profile-grade ${changeClass}`.trim()}>
@@ -163,6 +177,15 @@ export function Profile({
                 : profileCopy.alignment(fmt(s.value))}
             </h2>
           </div>
+          {publication?.previousId && frozenGrade && asOf === dataset.asOf && (
+            <GradeChange
+              key={`${publication.id}/${member.id}`}
+              memberId={member.id}
+              grade={frozenGrade}
+              publicationId={publication.id}
+              previousId={publication.previousId}
+            />
+          )}
           <ul className="headline-lines">
             <li>
               {headlineCopy.aligned(

@@ -20,3 +20,10 @@ export function publicationUrl(
   }
   return url.pathname + url.search + url.hash;
 }
+
+export function compareMemberUrl(memberId: string, publicationId?: string) {
+  return publicationUrl(
+    `/scorecard/compare?${new URLSearchParams({ m: memberId })}`,
+    publicationId,
+  );
+}

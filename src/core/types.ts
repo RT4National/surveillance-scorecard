@@ -13,6 +13,7 @@ export interface Member {
   committees: string[];
   caucuses: string[];
   since: number;
+  contactUrl?: string;
   portrait?: {
     url: string;
     attribution: string;
@@ -25,6 +26,7 @@ export interface Vote {
   id: string;
   bill: string;
   title: string;
+  commonName?: string;
   date: string;
   administration: string;
   presidentParty: Party;
