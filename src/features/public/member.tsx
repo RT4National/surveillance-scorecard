@@ -4,7 +4,8 @@ import { useScorecard } from "../../data/context";
 import { defaultGradeBands } from "../../core/scoring";
 import type { Member } from "../../core/types";
 import { notGradedLabel } from "../../core/copy";
-import { gradeTone } from "./helpers";
+import { avatarSrc, gradeTone } from "./helpers";
+import { avatarSize } from "../../core/thumbnails";
 export function Avatar({
   member,
   large = false,
@@ -20,10 +21,18 @@ export function Avatar({
     return (
       <img
         className={`avatar ${large ? "large" : ""}`}
-        src={member.portrait.url}
+        // Lists use the small thumbnail; the large profile portrait uses the original.
+        src={avatarSrc(member.portrait.url, large)}
         alt=""
         loading="lazy"
+        decoding="async"
+        {...avatarSize[large ? "large" : "small"]}
         title={member.portrait.attribution}
+        // A deploy without the thumbnail still shows the portrait.
+        onError={(e) => {
+          if (e.currentTarget.getAttribute("src") !== member.portrait!.url)
+            e.currentTarget.src = member.portrait!.url;
+        }}
       />
     );
   return (
@@ -45,9 +54,7 @@ export function Grade({ member, asOf }: { member: Member; asOf?: string }) {
     <span
       className={`grade ${gradeTone(s.grade, s.value, rubric.gradeBands ?? defaultGradeBands)}`}
       aria-label={
-        s.value === null
-          ? notGradedLabel(rubric.minVotes)
-          : `Grade ${s.grade}`
+        s.value === null ? notGradedLabel(rubric.minVotes) : `Grade ${s.grade}`
       }
     >
       {s.grade}

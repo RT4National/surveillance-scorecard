@@ -41,6 +41,7 @@ import {
   updatedLabel,
 } from "../src/core/copy";
 import {
+  avatarSrc,
   delegation,
   fictional,
   fmt,
@@ -48,6 +49,7 @@ import {
 } from "../src/features/public/helpers";
 import { stateAbbreviation, stateFragment } from "../src/core/states";
 import { splitDisplay } from "../src/features/public/split";
+import { avatarSize } from "../src/core/thumbnails";
 
 export const escapeHtml = (value: string) =>
   value
@@ -264,10 +266,13 @@ function avatar(m: Member, large = true): string {
     m.portrait?.url.startsWith("/scorecard/portraits/") &&
     m.portrait.reviewedBy &&
     m.portrait.attribution
-  )
-    return `<img class="avatar ${large ? "large" : ""}" src="${e(m.portrait.url)}" alt="" loading="lazy" title="${e(
+  ) {
+    // Same choice as the app's Avatar: the thumbnail in lists, the original on the profile.
+    const size = avatarSize[large ? "large" : "small"];
+    return `<img class="avatar ${large ? "large" : ""}" src="${e(avatarSrc(m.portrait.url, large))}" alt="" loading="lazy" decoding="async" width="${size.width}" height="${size.height}" title="${e(
       m.portrait.attribution,
     )}">`;
+  }
   const initials = m.name
     .split(" ")
     .map((n) => n[0])
