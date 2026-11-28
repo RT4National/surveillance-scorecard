@@ -10,6 +10,9 @@ import {
 import { createHash, webcrypto } from "node:crypto";
 import { DataProvider, demoDataset } from "./data/context";
 import { appPaths } from "./core/routes";
+import { fakeApi } from "./test/fake-api";
+import type { Publication } from "./core/publication";
+import { createPublicationScoring } from "./core/publication-scores";
 import App from "./App";
 afterEach(() => {
   cleanup();
@@ -22,18 +25,21 @@ async function show(path: string) {
   vi.stubGlobal("crypto", webcrypto);
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue(
-      Response.json({
-        id: "archive-1",
-        createdAt: "2026-09-07",
-        publishedBy: "fixture",
-        previousId: null,
-        summary: "Test archive",
-        dataset: demoDataset,
-        digest: createHash("sha256")
-          .update(JSON.stringify(demoDataset))
-          .digest("hex"),
-      }),
+    vi.fn(
+      fakeApi([
+        {
+          id: "archive-1",
+          createdAt: "2026-09-07",
+          publishedBy: "fixture",
+          previousId: null,
+          summary: "Test archive",
+          dataset: demoDataset,
+          digest: createHash("sha256")
+            .update(JSON.stringify(demoDataset))
+            .digest("hex"),
+          scoring: await createPublicationScoring(demoDataset),
+        } as Publication,
+      ]),
     ),
   );
   render(
@@ -93,6 +99,47 @@ describe("app routing", () => {
         .getByRole("link", { name: "Back to the directory" })
         .getAttribute("href"),
     ).toBe("/scorecard/?publication=archive-1");
+  });
+  it("shows a profile's frozen grade from its evidence slice and tags other dates as recalculated", async () => {
+    const m = demoDataset.members.find(
+      (m) =>
+        m.status === "active" &&
+        new Set(
+          demoDataset.records
+            .filter((r) => r.memberId === m.id)
+            .map((r) =>
+              demoDataset.votes
+                .find((v) => v.id === r.voteId)!
+                .date.slice(0, 4),
+            ),
+        ).size > 1,
+    )!;
+    await show(`/scorecard/members/${m.id}`);
+    await waitFor(() =>
+      expect(document.querySelector(".timeline")).toBeTruthy(),
+    );
+    expect(screen.getByText(/Frozen published grade/)).toBeTruthy();
+    const buttons = [...document.querySelectorAll(".timeline button")];
+    expect(buttons.length).toBeGreaterThan(1);
+    expect(buttons.at(-1)!.textContent).not.toContain("Recalculated");
+    for (const b of buttons.slice(0, -1))
+      expect(b.textContent).toContain("Recalculated");
+    fireEvent.click(buttons[0]);
+    expect(
+      screen.getByText(
+        /Recalculated with rubric .* and the current scoring engine/,
+      ),
+    ).toBeTruthy();
+    // Only the slim views were requested, never the full publication.
+    const paths = vi
+      .mocked(fetch)
+      .mock.calls.map(
+        (c) => new URL(String(c[0]), "https://x.example").pathname,
+      );
+    expect(paths).toContain(
+      `/scorecard/api/publications/archive-1/members/${m.id}`,
+    );
+    expect(paths).not.toContain("/scorecard/api/publications/archive-1");
   });
   it("says Page not found for an unknown member", async () => {
     await show("/scorecard/members/no-such-member");

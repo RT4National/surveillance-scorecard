@@ -14,10 +14,12 @@ import { createHash, webcrypto } from "node:crypto";
 import { DataProvider, demoDataset } from "./data/context";
 import { renderHome, renderMember } from "../worker/render";
 import App from "./App";
+import { fakeApi } from "./test/fake-api";
+import { createPublicationScoring } from "./core/publication-scores";
+import type { Publication } from "./core/publication";
 import { scoreMember } from "./core/scoring";
 import { splitDisplay } from "./features/public/split";
 
-let resolve: (r: Response) => void = () => undefined;
 const publication = {
   id: "pub-1",
   createdAt: "2026-09-07",
@@ -28,18 +30,17 @@ const publication = {
   digest: createHash("sha256")
     .update(JSON.stringify(demoDataset))
     .digest("hex"),
-};
+  scoring: await createPublicationScoring(demoDataset),
+} as Publication;
+let api = fakeApi([publication]);
 beforeEach(() => {
   localStorage.clear();
   vi.stubGlobal("crypto", webcrypto);
-  vi.stubGlobal(
-    "fetch",
-    vi.fn((url: string) =>
-      url.endsWith("/latest")
-        ? new Promise<Response>((r) => (resolve = r))
-        : Promise.resolve(Response.json({ publications: [] })),
-    ),
-  );
+  // Publication requests wait until `finish`; the list answers at once.
+  api = fakeApi([publication], {
+    hold: (path) => path !== "/scorecard/api/publications",
+  });
+  vi.stubGlobal("fetch", vi.fn(api));
 });
 afterEach(() => {
   cleanup();
@@ -55,7 +56,7 @@ function mount(path: string, html: string | undefined) {
   );
 }
 const finish = async () => {
-  await act(async () => resolve(Response.json(publication)));
+  await act(async () => api.release());
   await waitFor(() =>
     expect(document.querySelector(".server-paint")).toBeNull(),
   );
@@ -175,7 +176,7 @@ describe("server first paint", () => {
   it("still shows the loading state on pages without server content", async () => {
     mount("/scorecard/methodology", undefined);
     expect(screen.getByText(/Loading the published scorecard/)).toBeTruthy();
-    await act(async () => resolve(Response.json(publication)));
+    await act(async () => api.release());
   });
 });
 

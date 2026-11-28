@@ -68,6 +68,13 @@ Deploys use Wrangler; account and D1 operations use the Cloudflare CLI ([`cf`](h
 
 6. **Deploy to staging.** First deployed October 14, 2026 (UTC) to the personal `zaki@iqlusion.io` Cloudflare account, which does not hold `restorethe4th.com`: <https://restore-the-fourth-scorecard-staging.zaki-0c1.workers.dev/scorecard/>, D1 `1eeaa6f2-983e-4cc5-8fc7-27449033b022`. Production must be created in the account that holds `restorethe4th.com`; Workers and D1 databases cannot be moved between accounts. The staging Worker is `restore-the-fourth-scorecard-staging` on its `workers.dev` URL; no route on the main site is touched.
 
+   The deploy must include the portrait thumbnails (`NAME.w96.jpg` beside every cached original in `public/scorecard/portraits/`, gitignored): list avatars load them, and a missing one falls back to the 69 KB original. Before `npm run build`, confirm none is missing (any platform; exits 1 if one is), and make any that are on a Mac:
+
+   ```sh
+   node --import tsx scripts/ingestion/portrait-thumbnails.mjs public/scorecard/portraits --check
+   node --import tsx scripts/ingestion/portrait-thumbnails.mjs public/scorecard/portraits
+   ```
+
    ```sh
    npx wrangler deploy --dry-run --env staging
    npx wrangler deploy --env staging
@@ -82,7 +89,7 @@ This is the critical path. Commands are in [DATA-PIPELINE](DATA-PIPELINE.md).
 3. **Historical House terms.** Get exact-day terms for the 14 current senators who have House ballots in the evidence. Resolve the 314 historical ballot identities that are not in the current directories.
 4. **Legacy sheet.** Get the Google Sheets `newsb` values export and run `import.mjs legacy`.
 5. **Editorial inputs.** Apply the step 0 per-roll-call placeholders through `reviewRollcall`. Leave Senate 115-2-12 out.
-6. **Portraits and affiliations.** Run `cache-portraits.mjs` on a rights-reviewed manifest, then `import.mjs affiliations`.
+6. **Portraits and affiliations.** Run `cache-portraits.mjs` on a rights-reviewed manifest (on macOS: it also makes the `.w96.jpg` thumbnails), copy the originals and thumbnails into `public/scorecard/portraits/`, then `import.mjs affiliations`.
 7. **Durable storage.** Copy every staging directory with its source captures to durable storage. GitHub artifacts expire after 14 days.
 
 ## 4. Editorial dry run on staging
@@ -112,6 +119,8 @@ This is the critical path. Commands are in [DATA-PIPELINE](DATA-PIPELINE.md).
    ```
 
 3. **Deploy production.** Set production `ACCESS_*` and `STAFF_ROLES` with real identities.
+
+   Check the portrait thumbnails first, as for staging (`portrait-thumbnails.mjs public/scorecard/portraits --check`).
 
    ```sh
    npx wrangler deploy --dry-run --env production

@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useScorecard } from "./data/context";
-import { groupLabels, scoreMember } from "./core/scoring";
+import { groupLabels } from "./core/scoring";
 import {
   bannerCopy,
   browseAllLabel,
@@ -35,7 +35,6 @@ import {
   scoredLabel,
 } from "./core/copy";
 import type { Dataset, Publication } from "./core/publication";
-import { publishedScore } from "./core/publication-scores";
 import { publicationUrl } from "./core/navigation";
 import { matchRoute } from "./core/routes";
 import { stateFragment } from "./core/states";
@@ -104,14 +103,14 @@ function saveFile(name: string, value: string, type: string) {
 function exportRows(
   list: Member[],
   dataset: Dataset,
+  score: (
+    m: Member,
+    asOf?: string,
+  ) => { grade: string; value: number | null; group: Group; reason: string },
   asOf?: string,
   publication?: Publication,
 ) {
   const rubric = dataset.rubric;
-  const score = (m: Member, date = dataset.asOf) =>
-    publication
-      ? publishedScore(publication, m, date)
-      : scoreMember(m, dataset.votes, dataset.records, rubric, date);
   return [
     [
       dataset.demo
@@ -982,7 +981,9 @@ function Directory({
                     dataset.demo
                       ? "scorecard-demo.csv"
                       : "surveillance-scorecard.csv",
-                    toCsv(exportRows(filtered, dataset, date, publication)),
+                    toCsv(
+                      exportRows(filtered, dataset, score, date, publication),
+                    ),
                     "text/csv;charset=utf-8",
                   )
                 }

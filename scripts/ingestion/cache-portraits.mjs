@@ -2,6 +2,7 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { cachePortrait } from '../../src/ingestion/portraits.ts';
+import { describeReport, makeThumbnails, requireMacos } from '../../src/ingestion/thumbnails.ts';
 
 try {
   const [input, destination] = process.argv.slice(2);
@@ -9,6 +10,8 @@ try {
   const manifests = JSON.parse(await readFile(input, 'utf8'));
   if (!Array.isArray(manifests) || !manifests.length || manifests.length > 1200) throw new Error('Expected 1 to 1200 reviewed portrait entries');
   if (new Set(manifests.map(m => m.memberId)).size !== manifests.length) throw new Error('Duplicate portrait member IDs');
+  // Thumbnails (NAME.w96.jpg, for list avatars) are made with macOS sips: fail before downloading.
+  requireMacos();
   // Hosts such as Wikimedia rate-limit bulk downloads: pace requests and honor Retry-After.
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const politeFetch = async (url, init) => {
@@ -30,8 +33,9 @@ try {
   await mkdir(output, { recursive: false });
   await mkdir(resolve(output, 'portraits'));
   for (const result of results) await writeFile(resolve(output, 'portraits', result.filename), result.bytes, { flag: 'wx' });
+  console.log(`Thumbnails: ${describeReport(await makeThumbnails(resolve(output, 'portraits')))}`);
   await writeFile(resolve(output, 'staging.json'), JSON.stringify({ requiresReview: true, images: results.map(({ bytes, ...metadata }) => metadata) }, null, 2), { flag: 'wx' });
-  console.log(`Staged ${results.length} reviewed portrait assets. Copy approved portraits to public/scorecard/portraits and apply metadata through editorial review; nothing published.`);
+  console.log(`Staged ${results.length} reviewed portrait assets. Copy approved portraits and their .w96.jpg thumbnails to public/scorecard/portraits and apply metadata through editorial review; nothing published.`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'Portrait staging failed');
   process.exitCode = 1;

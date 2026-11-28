@@ -2,7 +2,15 @@ import type { Dataset, Publication } from "../src/core/publication";
 import { authenticate, HttpError, type Actor } from "./auth";
 import { digest, validateDataset } from "./validation";
 import { research } from "./ai";
-import { createPublicationScoring } from "../src/core/publication-scores";
+import {
+  createPublicationScoring,
+  verifyPublicationScoring,
+} from "../src/core/publication-scores";
+import {
+  buildMemberSlice,
+  buildPublicationIndex,
+  groupByMember,
+} from "../src/core/publication-index";
 import { demoDataset } from "../src/data/demo-dataset";
 import { renderHome, renderMember, type PageData } from "./render";
 import {
@@ -11,13 +19,27 @@ import {
   MAX_STORED_BYTES,
 } from "./storage";
 import { matchRoute, redirectFor } from "../src/core/routes";
+import {
+  cachedResponse,
+  currentPublicationId,
+  derive,
+  etagFor,
+  IMMUTABLE,
+  memoHtml,
+  memoPublication,
+  NO_STORE,
+  SHORT,
+  storeHtml,
+  type HtmlEntry,
+  type Memo,
+} from "./cache";
 
 const prefix = "/scorecard/api";
 const json = (data: unknown, status = 200) =>
   Response.json(data, {
     status,
     headers: {
-      "Cache-Control": "no-store",
+      "Cache-Control": NO_STORE,
       "X-Content-Type-Options": "nosniff",
     },
   });
@@ -104,15 +126,56 @@ function storePublication(p: Publication) {
     datasetId: p.dataset.id,
   });
 }
+/** Resolves "latest" (or no ID) through the current pointer, then loads the memoized publication. */
+async function loadPublication(
+  env: Env,
+  id?: string,
+): Promise<{ memo: Memo | null; hit: boolean }> {
+  const resolved = id ?? (await currentPublicationId(env));
+  if (!resolved) return { memo: null, hit: false };
+  return memoPublication(env, resolved);
+}
 async function publication(env: Env, id?: string): Promise<Publication | null> {
-  const row = await env.DB.prepare(
-    id
-      ? "SELECT snapshot FROM publications WHERE id=?"
-      : "SELECT snapshot FROM publications JOIN current_publication ON publications.id=current_publication.publication_id",
-  )
-    .bind(...(id ? [id] : []))
-    .first<{ snapshot: string }>();
-  return row ? decodeStoredJson<Publication>(row.snapshot) : null;
+  return (await loadPublication(env, id)).memo?.publication ?? null;
+}
+/**
+ * Slim views are derived on the server, so the server checks the publication first: the same
+ * dataset digest and frozen-scoring verification the browser runs on the full publication. Once
+ * per publication per isolate. A failure is a 503 and nothing is derived.
+ */
+async function verified(memo: Memo): Promise<void> {
+  try {
+    await derive(memo, "verified", async () => {
+      const p = memo.publication;
+      if ((await digest(p.dataset)) !== p.digest)
+        throw new Error("Dataset digest mismatch");
+      await verifyPublicationScoring(p);
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "publication-verification-failed",
+        error: error instanceof Error ? error.name : "unknown",
+      }),
+    );
+    throw new HttpError(503, "Publication integrity check failed");
+  }
+}
+/** The complete publication, byte for byte what `Response.json(publication)` produced before. */
+async function fullPublication(
+  request: Request,
+  memo: Memo,
+  hit: boolean,
+  latest: boolean,
+) {
+  const body = derive(memo, "full", () => JSON.stringify(memo.publication));
+  const etag = await derive(memo, "full-etag", () => etagFor(body));
+  return cachedResponse(request, body, {
+    etag,
+    cacheControl: latest ? SHORT : IMMUTABLE,
+    contentType: "application/json",
+    hit,
+  });
 }
 async function api(
   request: Request,
@@ -135,11 +198,56 @@ async function api(
       publications: rows.results,
     });
   }
+  const slim =
+    method === "GET"
+      ? path.match(/^\/publications\/([^/]+)\/(?:(index)|members\/([^/]+))$/)
+      : null;
+  if (slim) {
+    const latest = slim[1] === "latest";
+    const { memo, hit } = await loadPublication(
+      env,
+      latest ? undefined : slim[1],
+    );
+    if (!memo) throw new HttpError(404, "No publication yet");
+    await verified(memo);
+    const p = memo.publication;
+    let body: string;
+    let etag: string;
+    if (slim[2]) {
+      body = derive(memo, "index", () =>
+        JSON.stringify(buildPublicationIndex(p)),
+      );
+      etag = await derive(memo, "index-etag", () => etagFor(body));
+    } else {
+      let memberId: string;
+      try {
+        memberId = decodeURIComponent(slim[3]);
+      } catch {
+        throw new HttpError(404, "Member not found in this publication");
+      }
+      const slice = buildMemberSlice(
+        p,
+        memberId,
+        derive(memo, "groups", () => groupByMember(p.dataset)),
+      );
+      if (!slice)
+        throw new HttpError(404, "Member not found in this publication");
+      body = JSON.stringify(slice);
+      etag = await etagFor(body);
+    }
+    return cachedResponse(request, body, {
+      etag,
+      cacheControl: latest ? SHORT : IMMUTABLE,
+      contentType: "application/json",
+      hit,
+    });
+  }
   if (method === "GET" && path.startsWith("/publications/")) {
     const id = path.slice("/publications/".length);
-    const p = await publication(env, id === "latest" ? undefined : id);
-    if (!p) throw new HttpError(404, "No publication yet");
-    return json(p);
+    const latest = id === "latest";
+    const { memo, hit } = await loadPublication(env, latest ? undefined : id);
+    if (!memo) throw new HttpError(404, "No publication yet");
+    return fullPublication(request, memo, hit, latest);
   }
   if (method === "POST" && path === "/corrections") {
     const b = await body(request, 20_000);
@@ -492,21 +600,89 @@ async function api(
   }
   throw new HttpError(404, "API route not found");
 }
+/** Built files whose names change with their content: Vite's hashed assets and portraits. */
+const contentAddressed = (pathname: string) =>
+  pathname.startsWith("/scorecard/assets/") ||
+  pathname.startsWith("/scorecard/portraits/");
 async function page(request: Request, env: Env, url: URL): Promise<Response> {
-  let title = "Surveillance reform scorecard";
-  let description =
-    "Evidence, methodology, and voting records behind surveillance reform grades.";
   const route = matchRoute(url.pathname);
   if (route.name === "notFound") {
     // Built files (scripts, styles, portraits) also live under /scorecard/.
     const asset = await env.ASSETS.fetch(request);
-    if (asset.status !== 404) return asset;
-    return notFound(request, env, url);
+    if (asset.status === 404) return noStore(await notFound(request, env, url));
+    if (!contentAddressed(url.pathname) || asset.status >= 400) return asset;
+    const immutable = new Response(asset.body, asset);
+    immutable.headers.set("Cache-Control", IMMUTABLE);
+    return immutable;
   }
   const requested = url.searchParams.get("publication");
-  const p = await publication(env, requested ?? undefined);
+  const { memo, hit } = await loadPublication(env, requested ?? undefined);
+  const p = memo?.publication ?? null;
   if (requested && !p)
-    return new Response("Publication not found", { status: 404 });
+    return new Response("Publication not found", {
+      status: 404,
+      headers: { "Cache-Control": NO_STORE },
+    });
+  // Public HTML depends only on the publication, origin, path and pin: never on identity.
+  // The editor shell is never cached; neither is anything but a 200.
+  if (route.name === "editor")
+    return noStore(await renderPage(request, env, url, route, p));
+  const key = `${p?.id ?? "demo"}|${url.origin}|${url.pathname}|${requested ?? ""}`;
+  const cached = memoHtml(key);
+  if (cached) return htmlResponse(request, cached, true);
+  const response = await renderPage(request, env, url, route, p);
+  if (response.status !== 200) return noStore(response);
+  const body = await response.text();
+  // Keep the shell's own headers (the static _headers rules: CSP, frame and referrer policy,
+  // and the page's X-Robots-Tag); caching, validators and lengths are set per response.
+  const dropped = new Set([
+    "etag",
+    "cache-control",
+    "content-length",
+    "content-encoding",
+    "content-type",
+    "last-modified",
+    "server-timing",
+    "x-content-type-options",
+  ]);
+  const entry: HtmlEntry = {
+    body,
+    etag: await etagFor(body),
+    headers: Object.fromEntries(
+      [...response.headers].filter(([k]) => !dropped.has(k.toLowerCase())),
+    ),
+  };
+  storeHtml(key, entry);
+  return htmlResponse(request, entry, hit);
+}
+function noStore(response: Response): Response {
+  response.headers.set("Cache-Control", NO_STORE);
+  return response;
+}
+function htmlResponse(
+  request: Request,
+  entry: HtmlEntry,
+  hit: boolean,
+): Response {
+  return cachedResponse(request, entry.body, {
+    etag: entry.etag,
+    cacheControl: SHORT,
+    contentType: "text/html; charset=utf-8",
+    hit,
+    headers: entry.headers,
+  });
+}
+async function renderPage(
+  request: Request,
+  env: Env,
+  url: URL,
+  route: ReturnType<typeof matchRoute>,
+  p: Publication | null,
+): Promise<Response> {
+  let title = "Surveillance reform scorecard";
+  let description =
+    "Evidence, methodology, and voting records behind surveillance reform grades.";
+  const requested = url.searchParams.get("publication");
   const demo = p?.dataset.demo ?? true;
   const data: PageData = {
     dataset: p?.dataset ?? demoDataset,
@@ -553,6 +729,7 @@ async function page(request: Request, env: Env, url: URL): Promise<Response> {
     noindex: demo || route.name === "editor",
     canonical: canonical.href,
     root: rootHtml,
+    publication: p ? { id: p.id, digest: p.digest } : undefined,
   });
 }
 /** The app shell with a 404 status. The app itself renders "Page not found". */
@@ -576,13 +753,19 @@ async function shell(
     status?: number;
     /** Escaped markup for #root (worker/render.ts) and the page kind for data-server. */
     root?: { kind: string; html: string };
+    /**
+     * The publication this page shows. The app loads its slim index by this ID and checks the
+     * digest matches (src/data/context.tsx), so the page and its data cannot silently diverge.
+     */
+    publication?: { id: string; digest: string };
   },
 ): Promise<Response> {
   const { title, description, noindex, canonical } = meta;
   const index = new URL(url);
   index.pathname = "/index.html";
   index.search = "";
-  const asset = await env.ASSETS.fetch(new Request(index, request));
+  // A fresh request: the visitor's conditional headers must not turn the shell into a 304.
+  const asset = await env.ASSETS.fetch(new Request(index));
   const response = new Response(asset.body, {
     status: meta.status ?? asset.status,
     headers: asset.headers,
@@ -591,7 +774,7 @@ async function shell(
     "X-Robots-Tag",
     noindex ? "noindex, nofollow" : "index, follow",
   );
-  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Cache-Control", NO_STORE);
   const escape = (s: string) =>
     s
       .replace(/&/g, "&amp;")
@@ -636,6 +819,10 @@ async function shell(
     })
     .on("div#root", {
       element(e) {
+        if (meta.publication) {
+          e.setAttribute("data-publication", meta.publication.id);
+          e.setAttribute("data-digest", meta.publication.digest);
+        }
         if (!meta.root) return;
         e.setAttribute("data-server", meta.root.kind);
         e.setInnerContent(meta.root.html, { html: true });
@@ -643,12 +830,60 @@ async function shell(
     })
     .transform(response);
 }
+/**
+ * Responses for one publication ID are also kept in the edge cache, where it exists (a zone
+ * route; caches.default does nothing on *.workers.dev). Only immutable 200s are stored, so
+ * "latest", staff, corrections and 404s never are.
+ */
+async function edgeCached(
+  request: Request,
+  url: URL,
+  ctx: ExecutionContext | undefined,
+  build: () => Promise<Response>,
+): Promise<Response> {
+  const edge =
+    request.method === "GET" &&
+    /^\/scorecard\/api\/publications\/(?!latest(?:\/|$))[^/]+(?:\/|$)/.test(
+      url.pathname,
+    ) &&
+    typeof caches !== "undefined"
+      ? (caches as unknown as { default: Cache }).default
+      : undefined;
+  if (edge) {
+    const hit = await edge.match(request).catch(() => undefined);
+    if (hit) {
+      const served = new Response(hit.body, hit);
+      served.headers.set("Server-Timing", 'edge;desc="hit"');
+      return served;
+    }
+  }
+  const response = await build();
+  if (
+    edge &&
+    ctx &&
+    response.status === 200 &&
+    response.headers.get("Cache-Control") === IMMUTABLE
+  )
+    ctx.waitUntil(edge.put(request, response.clone()).catch(() => undefined));
+  return response;
+}
 export default {
-  async fetch(request: Request, env: Env) {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext) {
     try {
       const url = new URL(request.url);
-      if (url.pathname.startsWith(prefix + "/"))
-        return await api(request, env, url.pathname.slice(prefix.length));
+      if (url.pathname.startsWith(prefix + "/")) {
+        // HEAD reads answer like GET without a body, so monitors and link checkers see the real status.
+        const read =
+          request.method === "HEAD"
+            ? new Request(request, { method: "GET" })
+            : request;
+        const response = await edgeCached(read, url, ctx, () =>
+          api(read, env, url.pathname.slice(prefix.length)),
+        );
+        return request.method === "HEAD"
+          ? new Response(null, response)
+          : response;
+      }
       if (url.pathname === "/scorecard")
         return Response.redirect(`${url.origin}/scorecard/${url.search}`, 308);
       const moved = redirectFor(url.pathname);

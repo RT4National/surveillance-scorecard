@@ -38,13 +38,20 @@ export function scoredActionCounts(
   return counts;
 }
 
-/** Count label for one score against the dataset's items. */
+/**
+ * Count label for one score against the dataset's items. A headline score from the slim
+ * publication index carries its counts as `actions` (computed with scoredActionCounts on the
+ * server) instead of evidence rows.
+ */
 export const scoredLabel = (
-  score: { evidence: { voteId: string; scored: boolean }[] },
+  score: {
+    evidence: { voteId: string; scored: boolean }[];
+    actions?: ActionCounts;
+  },
   votes: Pick<Vote, "id" | "kind">[],
 ) =>
   scoredActionsLabel(
-    scoredActionCounts(score, votes),
+    score.actions ?? scoredActionCounts(score, votes),
     hasCosponsorships(votes),
   );
 

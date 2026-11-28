@@ -4,7 +4,7 @@ import type {
   PublicationScore,
   PublicationScoring,
 } from "./publication";
-import type { Member } from "./types";
+import type { Member, RecordEntry, Vote } from "./types";
 import { scoreMember } from "./scoring";
 
 type Score = ReturnType<typeof scoreMember>;
@@ -63,6 +63,36 @@ function scoreShape(v: unknown, memberId: string): v is PublicationScore {
       finite(e.effectiveWeight),
   );
 }
+/**
+ * Lookups over one dataset, built once and reused: members and votes by ID, records by member.
+ * Published datasets are immutable once loaded, so a WeakMap on the dataset object is safe. The
+ * grouping keeps record order, so every result is the same as scanning the arrays.
+ */
+interface Lookup {
+  members: Map<string, Member>;
+  votes: Map<string, Vote>;
+  records: Map<string, RecordEntry[]>;
+}
+const lookups = new WeakMap<Dataset, Lookup>();
+function lookup(dataset: Dataset): Lookup {
+  let l = lookups.get(dataset);
+  if (l) return l;
+  const members = new Map<string, Member>();
+  for (const m of dataset.members) if (!members.has(m.id)) members.set(m.id, m);
+  const records = new Map<string, RecordEntry[]>();
+  for (const r of dataset.records) {
+    const list = records.get(r.memberId);
+    if (list) list.push(r);
+    else records.set(r.memberId, [r]);
+  }
+  l = {
+    members,
+    votes: new Map(dataset.votes.map((v) => [v.id, v])),
+    records,
+  };
+  lookups.set(dataset, l);
+  return l;
+}
 /** Version 1 freezes the entire published result, including explanation and weighted evidence. */
 export async function createPublicationScoring(
   dataset: Dataset,
@@ -108,6 +138,13 @@ export async function verifyPublicationScoring(
   )
     throw new Error("Published scores must cover every member exactly once");
   const votes = new Map(publication.dataset.votes.map((v) => [v.id, v]));
+  // Records grouped by member once (same order as the array), not filtered per member.
+  const byMember = new Map<string, RecordEntry[]>();
+  for (const r of publication.dataset.records) {
+    const list = byMember.get(r.memberId);
+    if (list) list.push(r);
+    else byMember.set(r.memberId, [r]);
+  }
   for (const id of ids) {
     const score = snapshot.scores[id];
     if (
@@ -116,10 +153,8 @@ export async function verifyPublicationScoring(
       score.version !== publication.dataset.rubric.version
     )
       throw new Error(`Invalid published score for ${id}`);
-    const expected = publication.dataset.records.filter(
-      (r) =>
-        r.memberId === id &&
-        (votes.get(r.voteId)?.date ?? "9999") <= publication.dataset.asOf,
+    const expected = (byMember.get(id) ?? []).filter(
+      (r) => (votes.get(r.voteId)?.date ?? "9999") <= publication.dataset.asOf,
     );
     const seen = new Set<string>();
     for (const e of score.evidence) {
@@ -150,9 +185,8 @@ export function publishedScore(
   member: Member,
   asOf = publication.dataset.asOf,
 ): Score {
-  const capturedMember = publication.dataset.members.find(
-    (m) => m.id === member.id,
-  );
+  const known = lookup(publication.dataset);
+  const capturedMember = known.members.get(member.id);
   if (!capturedMember) throw new Error("Member is not in this publication");
   if (publication.scoring !== undefined && asOf === publication.dataset.asOf) {
     const snapshot = publication.scoring;
@@ -164,7 +198,7 @@ export function publishedScore(
     )
       throw new Error("Invalid published scoring snapshot");
     const stored = snapshot.scores[member.id];
-    const votes = new Map(publication.dataset.votes.map((v) => [v.id, v]));
+    const votes = known.votes;
     // Older publications froze one "conditional" group; their reason tells the two apart.
     const group =
       (stored.group as string) === "conditional"
@@ -183,10 +217,11 @@ export function publishedScore(
       }),
     };
   }
+  // scoreMember keeps only this member's records, so passing just those gives the same result.
   return scoreMember(
     capturedMember,
     publication.dataset.votes,
-    publication.dataset.records,
+    known.records.get(capturedMember.id) ?? [],
     publication.dataset.rubric,
     asOf,
   );

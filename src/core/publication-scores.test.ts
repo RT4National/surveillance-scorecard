@@ -116,4 +116,35 @@ describe("Immutable published scores", () => {
       "every member",
     );
   });
+  it("refuses evidence that belongs to another member's records", async () => {
+    const p = await publication();
+    const [a, b] = members.filter(
+      (m) => p.scoring!.scores[m.id].evidence.length > 0,
+    );
+    const theirs = p.scoring!.scores[b.id].evidence.find(
+      (e) =>
+        !p.scoring!.scores[a.id].evidence.some((x) => x.voteId === e.voteId),
+    );
+    expect(theirs).toBeTruthy();
+    p.scoring!.scores[a.id].evidence.push({ ...theirs!, memberId: a.id });
+    await expect(verifyPublicationScoring(p)).rejects.toThrow("does not match");
+  });
+  it("returns the same frozen and recalculated scores as scanning the whole dataset", async () => {
+    const p = await publication();
+    for (const m of members) {
+      const all = (asOf: string) =>
+        scorer.scoreMember(m, votes, records, scorer.rubric, asOf);
+      expect(publishedScore(p, m, "2024-12-31")).toEqual(all("2024-12-31"));
+      const frozen = publishedScore(p, m);
+      expect(frozen.grade).toBe(p.scoring!.scores[m.id].grade);
+      expect(frozen.evidence.map((e) => e.vote)).toEqual(
+        p.scoring!.scores[m.id].evidence.map((e) =>
+          votes.find((v) => v.id === e.voteId)!,
+        ),
+      );
+    }
+    expect(() =>
+      publishedScore(p, { ...members[0], id: "not-in-publication" }),
+    ).toThrow("not in this publication");
+  });
 });

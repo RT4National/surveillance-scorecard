@@ -1,3 +1,4 @@
+import { thumbnailName } from "../../core/thumbnails";
 import { percentLabel } from "../../core/copy";
 // Plain (non-component) helpers shared by the scorecard directory (App.tsx) and the member profile.
 // Kept out of member.tsx so that module exports only components and Vite Fast Refresh can hot-swap it.
@@ -110,6 +111,18 @@ export function gradeTone(
   if (bands.length > 1 && index === bands.length - 1) return "poor";
   return index < Math.floor(bands.length / 2) ? "good" : "mixed";
 }
-/** Demo datasets without sources are the fictional preview; others hold real records with placeholder scoring. */
-export const fictional = (dataset: { demo: boolean; sources: unknown[] }) =>
-  dataset.demo && !dataset.sources.length;
+/**
+ * Image source for a reviewed cached portrait: the small thumbnail for list avatars, the original
+ * for the large profile portrait. Callers check the portrait is reviewed and cached first.
+ */
+export const avatarSrc = (url: string, large: boolean) =>
+  large || !/\.(jpe?g|png|webp)$/i.test(url) ? url : thumbnailName(url);
+/**
+ * Demo datasets without sources are the fictional preview; others hold real records with placeholder
+ * scoring. Slim views (the publication index) carry `sourceCount` instead of the source captures.
+ */
+export const fictional = (dataset: {
+  demo: boolean;
+  sources: unknown[];
+  sourceCount?: number;
+}) => dataset.demo && !(dataset.sourceCount ?? dataset.sources.length);
