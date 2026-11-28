@@ -18,6 +18,7 @@ import {
 import "./public.css";
 
 type Props = { dataset: Dataset; publication?: Publication };
+const servingOutcomes: Outcome[] = ["Yes", "No", "Not voting"];
 const base = "/scorecard";
 function publicUrl(path: string, publication?: Publication) {
   const id =
@@ -64,6 +65,13 @@ export function LegislationPage({
   const [topic, setTopic] = useState("");
   const decodedVoteId = decodeVoteId(voteId);
   const vote = dataset.votes.find((v) => v.id === decodedVoteId);
+  // Not eligible records have no party at the vote (the member was not serving),
+  // so they are counted once instead of being split by party.
+  const notServing = vote
+    ? dataset.records.filter(
+        (r) => r.voteId === vote.id && r.outcome === "Not eligible",
+      ).length
+    : 0;
   if (voteId && !vote)
     return (
       <section className="public-page">
@@ -96,7 +104,7 @@ export function LegislationPage({
               <thead>
                 <tr>
                   <th>Party</th>
-                  {["Yes", "No", "Not voting", "Not eligible"].map((o) => (
+                  {servingOutcomes.map((o) => (
                     <th key={o}>{o}</th>
                   ))}
                 </tr>
@@ -105,7 +113,7 @@ export function LegislationPage({
                 {["Democratic", "Republican", "Independent"].map((p) => (
                   <tr key={p}>
                     <th>{p}</th>
-                    {["Yes", "No", "Not voting", "Not eligible"].map((o) => (
+                    {servingOutcomes.map((o) => (
                       <td key={o}>
                         {
                           dataset.records.filter(
@@ -122,6 +130,12 @@ export function LegislationPage({
               </tbody>
             </table>
           </div>
+          {notServing > 0 && (
+            <p>
+              {notServing} {notServing === 1 ? "member" : "members"} not
+              serving at the time
+            </p>
+          )}
           <h2>Recorded roll call</h2>
           <p>Missing records are unknown, not inferred absences.</p>
           <div className="public-table">
@@ -149,7 +163,11 @@ export function LegislationPage({
                             ?.name ?? r.memberId}
                         </a>
                       </td>
-                      <td>{r.partyAtVote}</td>
+                      <td>
+                        {r.outcome === "Not eligible"
+                          ? "Not serving"
+                          : r.partyAtVote}
+                      </td>
                       <td>{r.outcome}</td>
                     </tr>
                   ))}

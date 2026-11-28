@@ -20,7 +20,7 @@ export interface ReportQuery {
 }
 const outcomes = ["Yes", "No", "Not voting", "Not eligible"];
 export const membershipSemantics =
-  "Current party, current chamber, and member status describe the roster as of the selected publication, including the last recorded affiliation for former members. Date filters narrow votes, not roster membership. Presidential party context uses party at the time of each vote.";
+  "Current party, current chamber, and member status describe the roster as of the selected publication, including the last recorded affiliation for former members. Date filters narrow votes, not roster membership. Presidential party context uses party at the time of each vote; Not eligible records have no party at the time (the member was not serving), so they are excluded when a presidential context is set.";
 export function validateReportQuery(
   input: unknown,
   data: Dataset,
@@ -133,7 +133,10 @@ export function executeReport(
     return (
       vote &&
       (!query.context ||
-        (r.partyAtVote === vote.presidentParty) === (query.context === "same"))
+        // Not eligible: no service on this date, so no party to compare with the president's.
+        (r.outcome !== "Not eligible" &&
+          (r.partyAtVote === vote.presidentParty) ===
+            (query.context === "same")))
     );
   });
   const ranked = data.members
