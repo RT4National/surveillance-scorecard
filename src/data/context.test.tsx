@@ -13,6 +13,7 @@ function Probe() {
       <span data-testid="state">{data.state}</span>
       <span>{data.error}</span>
       <span>{data.publication?.id}</span>
+      <span data-testid="link-id">{data.linkId ?? ""}</span>
     </div>
   );
 }
@@ -47,12 +48,24 @@ function respond(response: Response) {
   );
 }
 describe("Publication loading boundary", () => {
-  it("verifies a frozen publication and pins navigation to its identity", async () => {
+  it("verifies the latest publication and leaves the URL clean", async () => {
+    window.history.replaceState(null, "", "/scorecard/#state=Ohio");
+    respond(Response.json(await fixture()));
+    await waitFor(() =>
+      expect(screen.getByTestId("state").textContent).toBe("published"),
+    );
+    expect(window.location.search).toBe("");
+    expect(window.location.hash).toBe("#state=Ohio");
+    expect(screen.getByTestId("link-id").textContent).toBe("");
+  });
+  it("keeps a pinned older publication in the URL and in links", async () => {
+    window.history.replaceState(null, "", "/scorecard/?publication=pub-1");
     respond(Response.json(await fixture()));
     await waitFor(() =>
       expect(screen.getByTestId("state").textContent).toBe("published"),
     );
     expect(window.location.search).toBe("?publication=pub-1");
+    expect(screen.getByTestId("link-id").textContent).toBe("pub-1");
   });
   it("uses explicitly marked demo only when there is no latest publication", async () => {
     respond(new Response("", { status: 404 }));

@@ -31,13 +31,12 @@ import "./public.css";
 type Props = { dataset: Dataset; publication?: Publication };
 const servingOutcomes: Outcome[] = ["Yes", "No", "Not voting"];
 const base = "/scorecard";
-/** The publication a page is pinned to: the loaded one, else the one named in the URL. */
-function pinnedId(publication?: Publication) {
-  return (
-    publication?.id ??
-    new URLSearchParams(location.search).get("publication") ??
-    undefined
-  );
+/**
+ * The publication links carry: the one named in the URL, if any. The latest publication is
+ * never added to links (clean URLs); the loaded `publication.id` still goes into exports.
+ */
+function pinnedId(_publication?: Publication) {
+  return new URLSearchParams(location.search).get("publication") ?? undefined;
 }
 function publicUrl(path: string, publication?: Publication) {
   return publicationUrl(path, pinnedId(publication));

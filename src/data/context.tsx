@@ -36,6 +36,11 @@ type LoadState = {
   error?: string;
 };
 type DataState = LoadState & {
+  /**
+   * Publication to carry in links: set only when the visitor arrived pinned to one with
+   * ?publication=. Exports and reports record `publication.id` instead, pinned or not.
+   */
+  linkId?: string;
   /** Newest first. Null until loaded, and if the list request fails. */
   publications: PublicationSummary[] | null;
 };
@@ -109,15 +114,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           );
         await verifyPublicationScoring(publication);
         if (controller.signal.aborted) return;
-        if (!pinned) {
-          const url = new URL(window.location.href);
-          url.searchParams.set("publication", publication.id);
-          window.history.replaceState(
-            null,
-            "",
-            url.pathname + url.search + url.hash,
-          );
-        }
+        // The latest publication leaves the address clean; only a pinned visit keeps ?publication=.
         setState({
           dataset: publication.dataset,
           publication,
@@ -154,7 +151,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
     return () => controller.abort();
   }, []);
-  return <DataContext.Provider value={{ ...state, publications }}>{children}</DataContext.Provider>;
+  const linkId =
+    state.publication &&
+    new URLSearchParams(window.location.search).get("publication") ===
+      state.publication.id
+      ? state.publication.id
+      : undefined;
+  return (
+    <DataContext.Provider value={{ ...state, publications, linkId }}>
+      {children}
+    </DataContext.Provider>
+  );
 }
 export function useScorecard() {
   const state = useContext(DataContext);

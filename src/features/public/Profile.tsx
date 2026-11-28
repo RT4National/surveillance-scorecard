@@ -38,7 +38,7 @@ export function Profile({
   member: Member;
   copy: (text: string) => Promise<void>;
 }) {
-  const { score, dataset, rubric, publication } = useScorecard();
+  const { score, dataset, rubric, publication, linkId } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
   // Motion (src/styles/motion.css): the grade and evidence restart a short change animation on each
   // timeline date change, and the split bars grow once on first view. Values are final either way.
@@ -88,7 +88,7 @@ export function Profile({
     <Fragment key={e.voteId}>
       <EvidenceRow
         entry={e}
-        publicationId={publication?.id}
+        publicationId={linkId}
         actions={
           <button
             type="button"
@@ -118,7 +118,7 @@ export function Profile({
     <section className="container inner-page">
       <a
         className="back-link"
-        href={publicationUrl(`${base}/`, publication?.id)}
+        href={publicationUrl(`${base}/`, linkId)}
       >
         <ArrowLeft size={16} /> All legislators
       </a>
@@ -299,7 +299,7 @@ export function Profile({
               {frozen(asOf)
                 ? `Frozen published grade · scorer ${publication?.scoring?.version} · rubric ${rubric.version}.`
                 : `Recalculated with rubric ${rubric.version} and the current scoring engine.`}{" "}
-              <a href={publicationUrl(`${base}/archive`, publication?.id)}>
+              <a href={publicationUrl(`${base}/archive`, linkId)}>
                 View immutable published versions
               </a>{" "}
               to see what was actually published at the time.

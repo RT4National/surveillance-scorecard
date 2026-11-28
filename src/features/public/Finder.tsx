@@ -14,13 +14,13 @@ import { base, delegation, fmt, normalize } from "./helpers";
 const searchLimit = 10;
 
 function Row({ member }: { member: Member }) {
-  const { score, publication } = useScorecard();
+  const { score, linkId } = useScorecard();
   const s = score(member);
   return (
     <li>
       <a
         className="finder-row"
-        href={publicationUrl(`${base}/members/${member.id}`, publication?.id)}
+        href={publicationUrl(`${base}/members/${member.id}`, linkId)}
       >
         <Grade member={member} />
         <Avatar member={member} />

@@ -8,8 +8,12 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-async function show(path: string) {
-  window.history.replaceState(null, "", `${path}?publication=archive-1`);
+async function show(path: string, pinned = true) {
+  window.history.replaceState(
+    null,
+    "",
+    pinned ? `${path}?publication=archive-1` : path,
+  );
   vi.stubGlobal("crypto", webcrypto);
   vi.stubGlobal(
     "fetch",
@@ -34,9 +38,11 @@ async function show(path: string) {
   );
   await waitFor(() =>
     expect(document.querySelector(".brand")?.getAttribute("href")).toBe(
-      "/scorecard/?publication=archive-1",
+      pinned ? "/scorecard/?publication=archive-1" : "/scorecard/",
     ),
   );
+  if (!pinned)
+    await waitFor(() => expect(document.querySelector("main .finder, main .profile-heading")).toBeTruthy());
 }
 function expectPublicPins() {
   const anchors = [
@@ -74,5 +80,22 @@ describe("archived public navigation", () => {
         .getByRole("link", { name: "All legislators" })
         .getAttribute("href"),
     ).toBe("/scorecard/?publication=archive-1");
+  });
+});
+describe("latest publication navigation", () => {
+  const anchors = () =>
+    [...document.querySelectorAll<HTMLAnchorElement>('a[href^="/scorecard"]')];
+  it("adds no publication to the address or to links on the home page", async () => {
+    await show("/scorecard/", false);
+    expect(window.location.search).toBe("");
+    expect(anchors().length).toBeGreaterThan(5);
+    for (const a of anchors())
+      expect(new URL(a.href).searchParams.get("publication"), a.textContent ?? "").toBeNull();
+  });
+  it("keeps profile and vote links clean on a member page", async () => {
+    await show(`/scorecard/members/${demoDataset.members[0].id}`, false);
+    expect(window.location.search).toBe("");
+    for (const a of anchors())
+      expect(new URL(a.href).searchParams.get("publication"), a.textContent ?? "").toBeNull();
   });
 });

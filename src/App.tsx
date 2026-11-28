@@ -154,7 +154,7 @@ function Select({
   );
 }
 function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
-  const { score, publication, dataset } = useScorecard();
+  const { score, publication, dataset, linkId } = useScorecard();
   const notGraded = notGradedLabel(dataset.rubric.minVotes);
   // The directory sorts not-graded members last; the first one opens their labelled group.
   const firstUngraded = list.findIndex((m) => score(m, asOf).value === null);
@@ -192,7 +192,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                     className="member-name"
                     href={publicationUrl(
                       `${base}/members/${m.id}`,
-                      publication?.id,
+                      linkId,
                       asOf,
                     )}
                   >
@@ -253,7 +253,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                     className="icon-link"
                     href={publicationUrl(
                       `${base}/members/${m.id}`,
-                      publication?.id,
+                      linkId,
                       asOf,
                     )}
                     aria-label={`View ${m.name}'s profile`}
@@ -282,6 +282,7 @@ export default function App() {
     dataset,
     members,
     publication,
+    linkId,
     state: dataState,
     error: dataError,
   } = useScorecard();
@@ -366,7 +367,7 @@ export default function App() {
   const notFoundPage = (
     <section className="container empty">
       <h1>Page not found</h1>
-      <a href={publicationUrl(`${base}/`, publication?.id)}>
+      <a href={publicationUrl(`${base}/`, linkId)}>
         Back to the directory
       </a>
     </section>
@@ -412,7 +413,7 @@ export default function App() {
             className="subtle-link"
             href={publicationUrl(
               isFormer ? `${base}/` : `${base}/former`,
-              publication?.id,
+              linkId,
             )}
           >
             {isFormer ? "Current members" : "Former members"}{" "}
@@ -420,7 +421,7 @@ export default function App() {
           </a>
           <a
             className="subtle-link"
-            href={publicationUrl(`${base}/research`, publication?.id)}
+            href={publicationUrl(`${base}/research`, linkId)}
           >
             Build a research report <ArrowUpRight size={16} />
           </a>
@@ -444,7 +445,7 @@ export default function App() {
         </div>
         <a
           className="button dark"
-          href={publicationUrl(`${base}/methodology`, publication?.id)}
+          href={publicationUrl(`${base}/methodology`, linkId)}
         >
           Explore the methodology <ArrowRight size={16} />
         </a>
@@ -520,7 +521,7 @@ export default function App() {
         <div className="header-inner">
           <a
             className="brand"
-            href={publicationUrl(`${base}/`, publication?.id)}
+            href={publicationUrl(`${base}/`, linkId)}
           >
             <span className="brand-symbol">
               IV
@@ -536,7 +537,7 @@ export default function App() {
             {nav.map((n) => (
               <a
                 key={n.href}
-                href={publicationUrl(n.href, publication?.id)}
+                href={publicationUrl(n.href, linkId)}
                 className={
                   n.href.replace(/\/$/, "") === path ||
                   (n.title === "Scorecard" && (!!member || isFormer))
@@ -584,7 +585,7 @@ export default function App() {
           <a
             href={publicationUrl(
               `${base}/methodology#sources`,
-              publication?.id,
+              linkId,
             )}
           >
             Sources & reuse
@@ -600,7 +601,7 @@ export default function App() {
           </span>
           <br />
           <a href={`${base}/editor`}>Staff workspace</a> ·{" "}
-          <a href={publicationUrl(`${base}/find`, publication?.id)}>
+          <a href={publicationUrl(`${base}/find`, linkId)}>
             Find my representatives
           </a>
         </div>
@@ -627,7 +628,7 @@ function Directory({
   archive: boolean;
   copy: (text: string) => Promise<void>;
 }) {
-  const { score, dataset, members, publication } = useScorecard();
+  const { score, dataset, members, publication, linkId } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
   const [status, setStatus] = useState(query().get("status") || "all");
   const source = members.filter((m) =>
@@ -884,7 +885,7 @@ function Directory({
           <span>
             Grades reflect reform-aligned votes. Consistency is evaluated
             separately.{" "}
-            <a href={publicationUrl(`${base}/methodology`, publication?.id)}>
+            <a href={publicationUrl(`${base}/methodology`, linkId)}>
               How scoring works
             </a>
           </span>
