@@ -62,14 +62,10 @@ export interface PublicationSummary {
   summary: string;
   previousId: string | null;
   changeReasons?: ChangelogReason[];
+  sequence?: number;
 }
 
-/**
- * Human label for a publication: its 1-based position in the chain of `previousId`
- * links, e.g. "Publication 12". Stable for a given list and unchanged when newer
- * publications are added. Null when the list is missing or the chain does not reach
- * its first publication (unknown id, list cut off), so callers fall back to the date.
- */
+/** Stable publication ordinal. Legacy lists fall back to the parent chain. */
 export function publicationLabel(
   list: PublicationSummary[] | null | undefined,
   id: string,
@@ -78,6 +74,12 @@ export function publicationLabel(
   const byId = new Map(list.map((p) => [p.id, p]));
   let current = byId.get(id);
   if (!current) return null;
+  if (
+    typeof current.sequence === "number" &&
+    Number.isSafeInteger(current.sequence) &&
+    current.sequence > 0
+  )
+    return publicationNumberLabel(current.sequence);
   let position = 1;
   while (current.previousId !== null) {
     current = byId.get(current.previousId);
@@ -85,15 +87,6 @@ export function publicationLabel(
     position++;
   }
   return publicationNumberLabel(position);
-}
-
-/** The latest publication when `id` is an older one in the list, else null. */
-export function newerPublication(
-  list: PublicationSummary[] | null | undefined,
-  id: string,
-): PublicationSummary | null {
-  const index = list ? list.findIndex((p) => p.id === id) : -1;
-  return list && index > 0 ? list[0] : null;
 }
 
 export const isPreviewDataset = (dataset: Pick<Dataset, "id" | "demo">) =>

@@ -680,6 +680,23 @@ describe("D1 editorial workflow", () => {
     expect(rebased?.dataset).toBe(JSON.stringify(fixture));
     expect(rebased?.reviewer).toBeNull();
     expect(rebased?.base_publication_id).toBe(current.id);
+    const pointer = await env.DB.prepare(
+      "SELECT revision FROM current_publication WHERE singleton=1",
+    ).first<{ revision: number }>();
+    const rollback = await send("/staff/rollback", "POST", {
+      publicationId: base.id,
+      revision: pointer!.revision,
+      reason: "Verify the archive follows the live pointer",
+    });
+    expect(rollback.status).toBe(200);
+    const archive = await send("/publications");
+    expect(await archive.json()).toMatchObject({
+      currentId: base.id,
+      publications: [
+        { id: current.id, sequence: 2 },
+        { id: base.id, sequence: 1 },
+      ],
+    });
     identity.mockRestore();
   });
   it("bounds UTF8 uploads and publishes compressible snapshots beyond the old raw-row limit", async () => {

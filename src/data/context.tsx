@@ -70,6 +70,7 @@ type DataState = LoadState & {
   linkId?: string;
   /** Newest first. Null until loaded, and if the list request fails. */
   publications: PublicationSummary[] | null;
+  currentPublicationId?: string;
   score: (member: Member, asOf?: string) => ViewScore;
 };
 const demoScore = (member: Member, asOf = demoDataset.asOf) =>
@@ -324,6 +325,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [publications, setPublications] = useState<PublicationSummary[] | null>(
     null,
   );
+  const [currentPublicationId, setCurrentPublicationId] = useState<string>();
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
@@ -399,10 +401,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
         void fetch("/scorecard/api/publications", { signal })
           .then(async (r) => (r.ok ? ((await r.json()) as unknown) : null))
           .then((body) => {
-            const rows = (body as { publications?: unknown } | null)
-              ?.publications;
-            if (!signal.aborted && Array.isArray(rows) && rows.every(isSummary))
+            const list = body as {
+              publications?: unknown;
+              currentId?: unknown;
+            } | null;
+            const rows = list?.publications;
+            if (
+              !signal.aborted &&
+              Array.isArray(rows) &&
+              rows.every(isSummary)
+            ) {
               setPublications(rows);
+              setCurrentPublicationId(
+                typeof list?.currentId === "string"
+                  ? list.currentId
+                  : undefined,
+              );
+            }
           })
           .catch(() => undefined);
       })
@@ -427,7 +442,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       : undefined;
   const score = useMemo(() => makeScorer(state), [state]);
   return (
-    <DataContext.Provider value={{ ...state, publications, linkId, score }}>
+    <DataContext.Provider
+      value={{ ...state, publications, currentPublicationId, linkId, score }}
+    >
       {children}
     </DataContext.Provider>
   );

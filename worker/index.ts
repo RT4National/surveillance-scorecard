@@ -216,18 +216,30 @@ async function api(
   if (method === "POST" && path === "/research") return research(request, env);
   if (method === "GET" && path === "/publications") {
     const rows = await env.DB.prepare(
-      "SELECT id,json_extract(snapshot,'$.createdAt') AS createdAt,json_extract(snapshot,'$.summary') AS summary,json_extract(snapshot,'$.digest') AS digest,COALESCE(json_extract(snapshot,'$.datasetId'),json_extract(snapshot,'$.dataset.id')) AS datasetId,json_extract(snapshot,'$.previousId') AS previousId,change_reasons FROM publications ORDER BY created_at DESC LIMIT 200",
+      `WITH recent AS (
+        SELECT id,ROW_NUMBER() OVER (ORDER BY rowid) AS sequence
+        FROM publications ORDER BY sequence DESC LIMIT 200
+      )
+      SELECT publications.id,json_extract(snapshot,'$.createdAt') AS createdAt,
+        json_extract(snapshot,'$.summary') AS summary,json_extract(snapshot,'$.digest') AS digest,
+        COALESCE(json_extract(snapshot,'$.datasetId'),json_extract(snapshot,'$.dataset.id')) AS datasetId,
+        json_extract(snapshot,'$.previousId') AS previousId,change_reasons,sequence,
+        (SELECT publication_id FROM current_publication WHERE singleton=1) AS currentId
+      FROM recent JOIN publications ON publications.id=recent.id ORDER BY sequence DESC`,
     ).all();
     return json({
-      publications: rows.results.map(({ change_reasons, ...row }) => {
-        const reasons: unknown =
-          typeof change_reasons === "string"
-            ? JSON.parse(change_reasons)
-            : null;
-        return Array.isArray(reasons) && reasons.every(isChangelogReason)
-          ? { ...row, changeReasons: reasons }
-          : row;
-      }),
+      currentId: rows.results[0]?.currentId ?? null,
+      publications: rows.results.map(
+        ({ currentId: _currentId, change_reasons, ...row }) => {
+          const reasons: unknown =
+            typeof change_reasons === "string"
+              ? JSON.parse(change_reasons)
+              : null;
+          return Array.isArray(reasons) && reasons.every(isChangelogReason)
+            ? { ...row, changeReasons: reasons }
+            : row;
+        },
+      ),
     });
   }
   const slim =

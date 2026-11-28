@@ -14,7 +14,7 @@ Restore the Fourth's positions.
 
 | Request | Returns |
 | --- | --- |
-| `GET /scorecard/api/publications` | Up to 200 publications, newest first: `id`, `createdAt`, `summary`, `digest`, `datasetId`, `previousId` |
+| `GET /scorecard/api/publications` | Live `currentId` and up to 200 publications in descending publication sequence, each with `id`, `sequence`, `createdAt`, `summary`, `digest`, `datasetId`, `previousId`, and optional `changeReasons` |
 | `GET /scorecard/api/publications/latest` | The current publication (about 6 MB of JSON) |
 | `GET /scorecard/api/publications/<id>` | A specific historical publication; publications never change once published |
 
