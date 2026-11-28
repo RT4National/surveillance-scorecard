@@ -9,6 +9,7 @@ export function publicationUrl(
   if (url.pathname !== "/scorecard" && !url.pathname.startsWith("/scorecard/"))
     return path;
   if (
+    url.pathname === "/scorecard/staff" ||
     url.pathname === "/scorecard/editor" ||
     url.pathname.startsWith("/scorecard/editor/")
   ) {

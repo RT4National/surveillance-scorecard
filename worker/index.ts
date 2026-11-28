@@ -1,3 +1,4 @@
+import { stageOfficialRollcall } from "./rollcall-intake";
 import { memberShareMeta } from "./meta";
 import type { Dataset, Publication } from "../src/core/publication";
 import { authenticate, HttpError, type Actor } from "./auth";
@@ -313,6 +314,15 @@ async function api(
     throw new HttpError(404, "API route not found");
   const actor = await authenticate(request, env);
   if (path === "/staff/session" && method === "GET") return json(actor);
+  if (path === "/staff/stage/rollcall" && method === "POST") {
+    if (actor.open)
+      throw new HttpError(403, "Official imports require a staff sign-in.");
+    const input = await body(request, 4096);
+    const { SENATE_LIS_CROSSWALK } = env as Env & {
+      SENATE_LIS_CROSSWALK?: string;
+    };
+    return json(await stageOfficialRollcall(input.url, SENATE_LIS_CROSSWALK));
+  }
   if (path === "/staff/status" && method === "GET") {
     const p = await publication(env);
     const pointer = await env.DB.prepare(

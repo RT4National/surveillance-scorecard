@@ -35,6 +35,7 @@ const staticRoutes: Record<string, StaticRouteName> = {
   archive: "archive",
   archives: "archive",
   editor: "editor",
+  staff: "editor",
 };
 
 /** Retired paths and where they now live. Served as permanent redirects by the Worker. */

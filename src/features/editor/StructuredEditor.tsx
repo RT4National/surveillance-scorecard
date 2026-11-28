@@ -2,11 +2,14 @@ import { useId, useState } from "react";
 import type { Dataset } from "../../core/publication";
 import type { Member, Outcome, Party, Rubric, Vote } from "../../core/types";
 import { ChoiceButtons, GradingRulesControls } from "../GradingRules";
+import { RollcallIntake } from "./RollcallIntake";
+import type { RollcallStage } from "../../ingestion/rollcalls";
 import { importanceLabel, importanceOptions } from "./plain";
 
 type PanelProps = {
   dataset: Dataset;
   onChange: (d: Dataset) => void;
+  stageRollcall?: (url: string) => Promise<RollcallStage>;
 };
 
 const partyOptions = (
@@ -18,7 +21,11 @@ const partyOptions = (
 );
 
 /** Tab 1: which votes we score, which side is pro-privacy, and how much each counts. */
-export function VotesPanel({ dataset: d, onChange }: PanelProps) {
+export function VotesPanel({
+  dataset: d,
+  onChange,
+  stageRollcall,
+}: PanelProps) {
   const [voteId, setVoteId] = useState("");
   const [recordMember, setRecordMember] = useState("");
   const [outcome, setOutcome] = useState<Outcome>("Yes");
@@ -38,6 +45,16 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
         Pick a vote to review. For each one, say which side protects privacy and
         how much it should count toward grades.
       </p>
+      {stageRollcall && (
+        <RollcallIntake
+          dataset={d}
+          stageRollcall={stageRollcall}
+          onAdd={(draft, id) => {
+            onChange(draft);
+            setVoteId(id);
+          }}
+        />
+      )}
       <div className="editor-row">
         <label>
           Choose a vote

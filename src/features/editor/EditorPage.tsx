@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import type { RollcallStage } from "../../ingestion/rollcalls";
 import type { Dataset, Publication } from "../../core/publication";
 import { defaultGradeBands, scoreMember } from "../../core/scoring";
 import { publishedScore } from "../../core/publication-scores";
@@ -365,7 +366,16 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
             new draft to make further changes.
           </p>
         )}
-        <Panel dataset={preview} onChange={setDataset} />
+        <Panel
+          key={active?.id}
+          dataset={preview}
+          onChange={setDataset}
+          stageRollcall={
+            session?.open
+              ? undefined
+              : (url) => call<RollcallStage>("stage/rollcall", "POST", { url })
+          }
+        />
       </fieldset>
     );
 

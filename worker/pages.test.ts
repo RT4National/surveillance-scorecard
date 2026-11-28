@@ -177,6 +177,20 @@ describe("public page routing in the Worker", () => {
     expect(text, path).toContain('<div id="root">');
     expect(r.headers.get("x-robots-tag"), path).toBe("noindex, nofollow");
   }
+  it("requires staff authentication before requesting roll-call sources", async () => {
+    const response = await mf.dispatchFetch(
+      "https://scorecard.example/scorecard/api/staff/stage/rollcall",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: "https://clerk.house.gov/evs/2025/roll002.xml",
+        }),
+      },
+    );
+    expect(response.status).toBe(401);
+    await response.text();
+  });
   it("serves a valid member profile with 200 and its meta", async () => {
     const r = await get(`/scorecard/members/${members[0].id}`);
     expect(r.status).toBe(200);
