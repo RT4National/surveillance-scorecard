@@ -26,14 +26,8 @@ import {
   RepresentativeFinder,
 } from "./features/public";
 import { Profile } from "./features/public/Profile";
-import {
-  Avatar,
-  base,
-  fmt,
-  Grade,
-  query,
-  readAsOf,
-} from "./features/public/member";
+import { Avatar, Grade } from "./features/public/member";
+import { base, fmt, query, readAsOf } from "./features/public/helpers";
 import { EditorPage } from "./features/editor/EditorPage";
 import { PolicyLab } from "./features/PolicyLab";
 import { toCsv } from "./core/research";

@@ -5,7 +5,8 @@ import { groupLabels } from "../../core/scoring";
 import { publicationUrl } from "../../core/navigation";
 import type { Member, Party } from "../../core/types";
 import { CorrectionForm, Source } from ".";
-import { Avatar, base, fmt, Grade, query, readAsOf } from "./member";
+import { base, fmt, query, readAsOf } from "./helpers";
+import { Avatar, Grade } from "./member";
 
 /** How a member of each party is named in running text ("a Democrat at the time"). */
 const partyMember: Record<Party, string> = {

@@ -1,22 +1,7 @@
-// Helpers and components shared by the scorecard directory (App.tsx) and the member profile.
+// Components shared by the scorecard directory (App.tsx) and the member profile.
+// Plain helpers live in helpers.ts so this module exports only components (Vite Fast Refresh).
 import { useScorecard } from "../../data/context";
-import type { Dataset } from "../../core/publication";
 import type { Member } from "../../core/types";
-
-export const base = "/scorecard";
-export const query = () => new URLSearchParams(window.location.search);
-export const readAsOf = (dataset: Dataset) => {
-  const date = query().get("asOf");
-  return date &&
-    /^\d{4}-\d{2}-\d{2}$/.test(date) &&
-    Number.isFinite(Date.parse(date)) &&
-    new Date(date).toISOString().slice(0, 10) === date &&
-    date <= dataset.asOf
-    ? date
-    : dataset.asOf;
-};
-export const fmt = (n: number | null) =>
-  n === null ? "Not yet rated" : `${Math.round(n)}%`;
 export function Avatar({
   member,
   large = false,
