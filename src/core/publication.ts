@@ -1,3 +1,4 @@
+import type { ReuseLicenceId } from "./dataExports";
 import type { Member, RecordEntry, Rubric, Vote, VoteSeries } from "./types";
 import { publicationNumberLabel } from "./copy";
 import type { scoreMember } from "./scoring";
@@ -27,6 +28,7 @@ export interface Dataset {
   members: Member[];
   votes: Vote[];
   voteSeries?: VoteSeries[];
+  reuseLicence?: ReuseLicenceId;
   records: RecordEntry[];
   rubric: Rubric;
   sources: SourceCapture[];

@@ -39,6 +39,7 @@ export interface PublicationIndex {
   dataset: Pick<Dataset, "id" | "asOf" | "demo" | "rubric" | "coverage"> & {
     votes: Vote[];
     voteSeries?: Dataset["voteSeries"];
+    reuseLicence?: Dataset["reuseLicence"];
     seriesTrends?: SeriesTrend[];
     /** Number of source captures. A demo dataset without any is the fictional preview. */
     sourceCount: number;
@@ -98,6 +99,7 @@ export function buildPublicationIndex(p: Publication): PublicationIndex {
       coverage: dataset.coverage,
       votes: dataset.votes,
       voteSeries: dataset.voteSeries,
+      reuseLicence: dataset.reuseLicence,
       ...(seriesTrends.length ? { seriesTrends } : {}),
       sourceCount: dataset.sources.length,
     },

@@ -130,3 +130,5 @@ This is the critical path. Commands are in [DATA-PIPELINE](DATA-PIPELINE.md).
 4. **Route.** Route only `restorethe4th.com/scorecard` and `restorethe4th.com/scorecard/*` to the Worker.
 5. **Publish.** Publish the first reviewed publication through the editor, then rerun the step 5 API checks against production.
 6. **Back up.** Take a post-launch D1 export to a protected operator location.
+
+After staff confirm the data reuse licence, record it in the reviewed draft’s `reuseLicence` field. Supported values are `CC-BY-4.0`, `CC0-1.0`, and `ODbL-1.0`. Publishing that draft enables the new vote and publication downloads. Confirm the text and portrait reuse terms separately.

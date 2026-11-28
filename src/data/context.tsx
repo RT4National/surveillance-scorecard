@@ -229,6 +229,7 @@ export function slimView(
     coverage: index.dataset.coverage,
     votes: index.dataset.votes,
     voteSeries: index.dataset.voteSeries,
+    reuseLicence: index.dataset.reuseLicence,
     seriesTrends: index.dataset.seriesTrends,
     members: [...index.members, ...extra],
     records: slice?.records ?? [],

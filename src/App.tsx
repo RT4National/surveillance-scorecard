@@ -1,3 +1,4 @@
+import { exportAttribution } from "./core/dataExports";
 import { SeriesTrends } from "./features/public/SeriesTrends";
 import { canShowPublicationTrends } from "./core/seriesTrends";
 import {
@@ -113,6 +114,13 @@ function exportRows(
   asOf?: string,
   publication?: Publication,
 ) {
+  const attribution = exportAttribution(
+    dataset,
+    publication?.id,
+    location.origin,
+    "/scorecard/",
+    publication?.createdAt,
+  );
   const rubric = dataset.rubric;
   return [
     [
@@ -124,6 +132,8 @@ function exportRows(
     ],
     ["Dataset", dataset.id],
     ["Publication", publication?.id ?? "unpublished"],
+    ["Licence", attribution.licence, attribution.licenceUrl ?? ""],
+    ["Citation", attribution.citation],
     ["Scorer", publication?.scoring?.version ?? "legacy/recalculated"],
     ["Rubric", rubric.version],
     ["As of", asOf ?? dataset.asOf],

@@ -1,3 +1,9 @@
+import {
+  canDownloadPublication,
+  recordCsv,
+  recordExport,
+} from "../../core/dataExports";
+import { save } from "./download";
 import { useId, useState, type ReactNode } from "react";
 import { servingOutcomes, tallyRollCall } from "../../core/tally";
 import type { Vote } from "../../core/types";
@@ -200,6 +206,38 @@ export function VotePage({
           </tbody>
         </table>
       </div>
+      {canDownloadPublication(publication) && (
+        <div className="public-actions" aria-label="Download this vote">
+          <button
+            type="button"
+            onClick={() =>
+              save(
+                `${vote.id}.csv`,
+                recordCsv(recordExport(publication, location.origin, vote)),
+                "text/csv;charset=utf-8",
+              )
+            }
+          >
+            Download vote CSV
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              save(
+                `${vote.id}.json`,
+                JSON.stringify(
+                  recordExport(publication, location.origin, vote),
+                  null,
+                  2,
+                ),
+                "application/json",
+              )
+            }
+          >
+            Download vote JSON
+          </button>
+        </div>
+      )}
       {children}
     </section>
   );

@@ -1,3 +1,4 @@
+import { reuseLicences } from "../src/core/dataExports";
 import { validateVoteSeries } from "../src/core/voteSeries";
 import type { Dataset } from "../src/core/publication";
 import { validateRubric } from "../src/core/scoring";
@@ -62,6 +63,12 @@ function checkDataset(value: unknown): string[] {
   const members = new Map(d.members.map((m) => [m.id, m]));
   const votes = new Map(d.votes.map((v) => [v.id, v]));
   errors.push(...validateVoteSeries(d.voteSeries, votes));
+  if (
+    d.reuseLicence !== undefined &&
+    (typeof d.reuseLicence !== "string" ||
+      !Object.hasOwn(reuseLicences, d.reuseLicence))
+  )
+    errors.push("Unknown data reuse licence.");
   const dateBoundary = (v: unknown, precision: string) =>
     typeof v === "string" &&
     (precision === "year"

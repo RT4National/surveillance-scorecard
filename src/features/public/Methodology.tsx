@@ -1,3 +1,4 @@
+import { dataLicence } from "../../core/dataExports";
 import { useEffect } from "react";
 import { correctionCopy, headerCopy } from "../../core/copy";
 import { defaultGradeBands } from "../../core/scoring";
@@ -6,6 +7,7 @@ import { Legend } from "./Legend";
 
 export function Methodology({ dataset, publication }: Props) {
   const { rubric } = dataset;
+  const licence = dataLicence(dataset);
   const bands = rubric.gradeBands ?? defaultGradeBands;
   useEffect(() => {
     if (location.hash === "#sources")
@@ -113,8 +115,14 @@ export function Methodology({ dataset, publication }: Props) {
         </ul>
       )}
       <p>
-        Restore the Fourth is still confirming the reuse licence for the
-        scorecard text and data.
+        {licence ? (
+          <>
+            The scorecard data is available under{" "}
+            <a href={licence.url}>{licence.name}</a>.
+          </>
+        ) : (
+          "Restore the Fourth is still confirming the reuse licence for the scorecard text and data."
+        )}
       </p>
 
       <h2>Contact staff about a record</h2>

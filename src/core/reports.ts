@@ -1,3 +1,4 @@
+import { exportAttribution } from "./dataExports";
 import { fictional, percentLabel } from "./copy";
 import type { Dataset, Publication } from "./publication";
 import type { Outcome, Party, Status, Member } from "./types";
@@ -209,7 +210,13 @@ export function executeReport(
     ],
   };
 }
-function reportRows(data: Dataset, input: unknown, publicationId?: string) {
+function reportRows(
+  data: Dataset,
+  input: unknown,
+  publicationId?: string,
+  origin?: string,
+) {
+  const attribution = exportAttribution(data, publicationId, origin);
   const result = executeReport(data, input);
   return [
     [
@@ -229,6 +236,8 @@ function reportRows(data: Dataset, input: unknown, publicationId?: string) {
       "Rubric",
       data.rubric.version,
     ],
+    ["Licence", attribution.licence, attribution.licenceUrl ?? ""],
+    ["Citation", attribution.citation],
     ["Query", JSON.stringify(result.query)],
     ["Effective cutoff", result.cutoff],
     ["Coverage", data.coverage.join("; ")],
@@ -266,15 +275,17 @@ export function reportCsv(
   data: Dataset,
   input: unknown,
   publicationId?: string,
+  origin?: string,
 ) {
-  return toCsv(reportRows(data, input, publicationId));
+  return toCsv(reportRows(data, input, publicationId, origin));
 }
 export function reportTsv(
   data: Dataset,
   input: unknown,
   publicationId?: string,
+  origin?: string,
 ) {
-  return reportRows(data, input, publicationId)
+  return reportRows(data, input, publicationId, origin)
     .map((row) =>
       row
         .map((value) => {
@@ -356,10 +367,12 @@ export function reportSvg(
   data: Dataset,
   query: ReportQuery,
   publicationId?: string,
+  origin?: string,
 ) {
   const result = executeReport(data, query);
   const rows = result.rows.slice(0, 30);
   const metadata = {
+    ...exportAttribution(data, publicationId, origin),
     datasetId: data.id,
     publicationId: publicationId ?? null,
     demo: data.demo,
