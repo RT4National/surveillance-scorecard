@@ -180,34 +180,50 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
   const firstUngraded = list.findIndex((m) => score(m, asOf).value === null);
   const ungradedCount = firstUngraded < 0 ? 0 : list.length - firstUngraded;
   return (
-    <div className="table-scroll">
-      <table className="member-table">
-        <thead>
-          <tr>
-            <th>Legislator</th>
-            <th>Current party / chamber</th>
-            <th>Grade</th>
-            <th>Reform alignment</th>
-            <th>Across administrations</th>
-            <th>
+    <div
+      className="table-scroll directory-table"
+      role="region"
+      aria-label="Legislator directory"
+      tabIndex={0}
+    >
+      <table className="member-table" role="table">
+        <caption className="sr-only">Legislator directory</caption>
+        <thead role="rowgroup">
+          <tr role="row">
+            <th scope="col" role="columnheader">
+              Legislator
+            </th>
+            <th scope="col" role="columnheader">
+              Current party / chamber
+            </th>
+            <th scope="col" role="columnheader">
+              Grade
+            </th>
+            <th scope="col" role="columnheader">
+              Reform alignment
+            </th>
+            <th scope="col" role="columnheader">
+              Across administrations
+            </th>
+            <th scope="col" role="columnheader">
               <span className="sr-only">Profile</span>
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {list.map((m, i) => {
             const s = score(m, asOf);
             return (
               <Fragment key={m.id}>
                 {i === firstUngraded && (
-                  <tr className="not-graded-group">
-                    <th scope="rowgroup" colSpan={6}>
+                  <tr className="not-graded-group" role="row">
+                    <th role="rowheader" scope="rowgroup" colSpan={6}>
                       {notGradedGroupLabel(ungradedCount)}
                     </th>
                   </tr>
                 )}
-                <tr>
-                  <td>
+                <tr role="row">
+                  <td role="cell">
                     <a
                       className="member-name"
                       href={publicationUrl(
@@ -228,15 +244,15 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                       </span>
                     </a>
                   </td>
-                  <td>
+                  <td role="cell">
                     <span className={`party-dot ${m.party.toLowerCase()}`} />
                     {m.party}
                     <small>{m.chamber}</small>
                   </td>
-                  <td>
+                  <td role="cell">
                     <Grade member={m} asOf={asOf} />
                   </td>
-                  <td>
+                  <td role="cell">
                     {s.value === null ? (
                       <span className="alignment-text not-graded">
                         {notGraded}
@@ -250,7 +266,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                       </>
                     )}
                   </td>
-                  <td>
+                  <td role="cell">
                     <span className={`category ${s.group}`}>
                       <span />
                       {s.group === "reformer"
@@ -268,7 +284,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                         : "Both contexts reviewed"}
                     </small>
                   </td>
-                  <td>
+                  <td role="cell">
                     <a
                       className="icon-link"
                       href={publicationUrl(

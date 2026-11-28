@@ -150,7 +150,9 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
               Common name (optional)
               <input
                 value={v.commonName ?? ""}
-                onChange={(e) => vote({ commonName: e.target.value || undefined })}
+                onChange={(e) =>
+                  vote({ commonName: e.target.value || undefined })
+                }
               />
             </label>
             <label>
@@ -297,14 +299,20 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
             >
               Save this legislator's vote
             </button>
-            <div className="editor-scroll">
-              <table aria-label="Recorded votes">
+            <div
+              className="editor-scroll"
+              role="region"
+              aria-label="Recorded votes"
+              tabIndex={0}
+            >
+              <table>
+                <caption>Recorded votes</caption>
                 <thead>
                   <tr>
-                    <th>Legislator</th>
-                    <th>Vote</th>
-                    <th>Party then</th>
-                    <th>
+                    <th scope="col">Legislator</th>
+                    <th scope="col">Vote</th>
+                    <th scope="col">Party then</th>
+                    <th scope="col">
                       <span className="sr-only">Actions</span>
                     </th>
                   </tr>

@@ -69,6 +69,17 @@ describe("profile", () => {
 });
 
 describe("directory", () => {
+  it("names the directory table and its keyboard scroll region", () => {
+    const { container } = directory("score");
+    const table = container.querySelector("table.member-table")!;
+    expect(table.querySelector("caption")?.textContent).toBe("Legislator directory");
+    expect(table.parentElement?.getAttribute("aria-label")).toBe("Legislator directory");
+    expect(table.parentElement?.tabIndex).toBe(0);
+    expect([...table.querySelectorAll("thead th")].every((header) =>
+      header.getAttribute("scope") === "col",
+    )).toBe(true);
+  });
+
   function directory(sort: string) {
     // The home directory is collapsed until "Browse all"; open it from the fragment.
     window.history.replaceState(null, "", `/scorecard/?sort=${sort}#browse=all`);

@@ -540,16 +540,22 @@ export function ReportsPage({ dataset, publication }: Props) {
             in scope. Unrated members have insufficient evidence, not a zero
             score.
           </p>
-          <div className="public-table">
+          <div
+            className="public-table"
+            role="region"
+            aria-label="Research report results"
+            tabIndex={0}
+          >
             <table>
+              <caption>Research report results</caption>
               <thead>
                 <tr>
-                  <th>Member</th>
-                  <th>Current party</th>
-                  <th>Current chamber</th>
-                  <th>Grade</th>
-                  <th>Alignment</th>
-                  <th>
+                  <th scope="col">Member</th>
+                  <th scope="col">Current party</th>
+                  <th scope="col">Current chamber</th>
+                  <th scope="col">Grade</th>
+                  <th scope="col">Alignment</th>
+                  <th scope="col">
                     {hasCosponsorships(dataset.votes)
                       ? "Scored actions (votes, cosponsorships)"
                       : "Scored votes"}

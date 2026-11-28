@@ -32,3 +32,14 @@ See [real-data staging](REAL-DATA-STAGING.md) for captured official roll calls, 
 ## External gates
 
 No Congress API credential was present in the local environment or the repository secret-name listing. Cloudflare authentication was checked through Wrangler: its saved login expired and could not refresh. No cloud resources, identities or public publications were created. Full Access sign-in, live AI qualification, edge load testing, operator recovery and final editorial approval remain launch gates.
+
+## UX rebuild table checks — November 27, 2026
+
+Local Chrome used the production build and a loopback-only synthetic publication fixture.
+
+- At 390, 768 and 1280 px, the directory, methodology, rubric lab, vote detail and comparison pages fit the viewport. Their tables had captions, scoped column headings and named, keyboard-focusable regions.
+- The 768 px check exposed page-wide overflow in the rubric lab. Allowing the grid columns to shrink kept overflow in the table region. All three widths passed after the fix.
+- The directory column heading measured 5.70:1 against its table header background. This is one measured color pair.
+- Earlier 390 px checks also verified reduced-motion vote bars and a 1200 × 630 profile card downloaded by the browser.
+
+The launch qualification still needs a screen-reader pass, broader contrast measurements, and a complete walkthrough of the six journeys with the launch candidate publication.
