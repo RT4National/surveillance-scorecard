@@ -3,6 +3,7 @@
 import { useScorecard } from "../../data/context";
 import { defaultGradeBands } from "../../core/scoring";
 import type { Member } from "../../core/types";
+import { notGradedLabel } from "../../core/copy";
 import { gradeTone } from "./helpers";
 export function Avatar({
   member,
@@ -43,7 +44,11 @@ export function Grade({ member, asOf }: { member: Member; asOf?: string }) {
   return (
     <span
       className={`grade ${gradeTone(s.grade, s.value, rubric.gradeBands ?? defaultGradeBands)}`}
-      aria-label={`Grade ${s.grade === "—" ? "not yet rated" : s.grade}`}
+      aria-label={
+        s.value === null
+          ? notGradedLabel(rubric.minVotes)
+          : `Grade ${s.grade}`
+      }
     >
       {s.grade}
     </span>

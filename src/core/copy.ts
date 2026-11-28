@@ -54,3 +54,14 @@ export function scoredActionsLabel(
   if (!cosponsorships) return votes;
   return `${votes} · ${plural(counts.cosponsorships, "cosponsorship", "cosponsorships")}`;
 }
+
+/**
+ * Label for a member with no grade because of insufficient evidence. The threshold is the active rubric's
+ * `minVotes`, passed in by the caller; whether the member is graded is the scorer's call (`value === null`).
+ */
+export const notGradedLabel = (minVotes: number) =>
+  `Not graded: fewer than ${minVotes} votes`;
+
+/** Heading for the last directory group. Wording follows decision D5, not yet confirmed by staff. */
+export const notGradedGroupLabel = (count: number) =>
+  `Not graded (${count})`;

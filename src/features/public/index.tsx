@@ -5,6 +5,7 @@ import { publicationUrl } from "../../core/navigation";
 import { evidenceLabel } from "../../core/evidence";
 import {
   hasCosponsorships,
+  notGradedLabel,
   scoredActionCounts,
   scoredLabel,
 } from "../../core/copy";
@@ -373,7 +374,7 @@ export function ComparePage({ dataset, publication }: Props) {
             </p>
             <strong className="public-score">
               {score.value === null
-                ? "Insufficient evidence"
+                ? notGradedLabel(dataset.rubric.minVotes)
                 : `${score.grade} · ${Math.round(score.value)}%`}
             </strong>
             <p>
@@ -952,7 +953,7 @@ export function ReportsPage({ dataset, publication }: Props) {
                     <td>{score.grade}</td>
                     <td>
                       {score.value === null
-                        ? "Insufficient evidence"
+                        ? notGradedLabel(dataset.rubric.minVotes)
                         : `${Math.round(score.value)}%`}
                     </td>
                     <td>
