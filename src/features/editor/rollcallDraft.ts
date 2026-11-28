@@ -1,9 +1,12 @@
+import type { BillSupportStage } from "../../ingestion/cosponsors";
 import type { Dataset } from "../../core/publication";
 import { reviewRollcall, type RollcallStage } from "../../ingestion/rollcalls";
 
+export type EvidenceStage = RollcallStage | BillSupportStage;
+
 export function unmatchedRollcallMembers(
   dataset: Dataset,
-  stage: RollcallStage,
+  stage: EvidenceStage,
 ) {
   const members = new Set(dataset.members.map(({ id }) => id));
   return [...new Set(stage.records.map(({ memberId }) => memberId))].filter(
@@ -13,11 +16,11 @@ export function unmatchedRollcallMembers(
 
 export function addReviewedRollcall(
   dataset: Dataset,
-  stage: RollcallStage,
+  stage: EvidenceStage,
   editorial: Parameters<typeof reviewRollcall>[1],
 ): Dataset {
   if (dataset.votes.some(({ id }) => id === stage.id))
-    throw new Error("This roll call is already in the draft.");
+    throw new Error("This item is already in the draft.");
   const missing = unmatchedRollcallMembers(dataset, stage);
   if (missing.length)
     throw new Error(
@@ -28,7 +31,12 @@ export function addReviewedRollcall(
   const { vote, records } = reviewRollcall(stage, editorial);
   return {
     ...dataset,
-    votes: [...dataset.votes, vote],
+    votes: [
+      ...dataset.votes,
+      "kind" in stage
+        ? { ...vote, kind: stage.kind, source: stage.source }
+        : vote,
+    ],
     records: [...dataset.records, ...records],
     sources: [...dataset.sources, ...stage.sources],
   };

@@ -105,7 +105,7 @@ export async function parseSenateRollcall(xml: string, sourceUrl: string, lisToB
 }
 
 /** Editorial direction and context are deliberately not inferred from bill title or sponsor party. */
-export function reviewRollcall(stage: RollcallStage, editorial: Pick<Vote,'title'|'administration'|'presidentParty'|'reformVote'|'weight'|'topic'|'rationale'>): { vote: Vote; records: RecordEntry[] } {
+export function reviewRollcall(stage: Pick<RollcallStage, 'id' | 'chamber' | 'date' | 'bill' | 'records' | 'sources'>, editorial: Pick<Vote,'title'|'administration'|'presidentParty'|'reformVote'|'weight'|'topic'|'rationale'>): { vote: Vote; records: RecordEntry[] } {
   if (!editorial.title.trim() || !editorial.administration.trim() || !editorial.topic.trim() || !editorial.rationale.trim() || !['Yes','No'].includes(editorial.reformVote) || !Number.isFinite(editorial.weight) || editorial.weight <= 0) throw new Error('Complete editorial review is required before scoring');
   party(editorial.presidentParty);
   return { vote: { ...editorial, id: stage.id, chamber: stage.chamber, date: stage.date, bill: stage.bill, source: stage.sources[0].url }, records: stage.records };

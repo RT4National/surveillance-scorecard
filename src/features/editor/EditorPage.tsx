@@ -1,3 +1,4 @@
+import type { BillSupportStage } from "../../ingestion/cosponsors";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { RollcallStage } from "../../ingestion/rollcalls";
 import type { Dataset, Publication } from "../../core/publication";
@@ -370,6 +371,15 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
           key={active?.id}
           dataset={preview}
           onChange={setDataset}
+          stageBillSupport={
+            session?.open
+              ? undefined
+              : (bill, congress) =>
+                  call<BillSupportStage>("stage/bill-support", "POST", {
+                    bill,
+                    congress,
+                  })
+          }
           stageRollcall={
             session?.open
               ? undefined

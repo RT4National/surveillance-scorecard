@@ -2,13 +2,18 @@ import { useId, useState } from "react";
 import type { Dataset } from "../../core/publication";
 import type { Member, Outcome, Party, Rubric, Vote } from "../../core/types";
 import { ChoiceButtons, GradingRulesControls } from "../GradingRules";
-import { RollcallIntake } from "./RollcallIntake";
+import { EvidenceIntake } from "./EvidenceIntake";
+import type { BillSupportStage } from "../../ingestion/cosponsors";
 import type { RollcallStage } from "../../ingestion/rollcalls";
 import { importanceLabel, importanceOptions } from "./plain";
 
 type PanelProps = {
   dataset: Dataset;
   onChange: (d: Dataset) => void;
+  stageBillSupport?: (
+    bill: string,
+    congress: number,
+  ) => Promise<BillSupportStage>;
   stageRollcall?: (url: string) => Promise<RollcallStage>;
 };
 
@@ -25,6 +30,7 @@ export function VotesPanel({
   dataset: d,
   onChange,
   stageRollcall,
+  stageBillSupport,
 }: PanelProps) {
   const [voteId, setVoteId] = useState("");
   const [recordMember, setRecordMember] = useState("");
@@ -37,6 +43,10 @@ export function VotesPanel({
       ...d,
       votes: d.votes.map((x) => (x.id === v?.id ? { ...x, ...patch } : x)),
     });
+  const addImported = (draft: Dataset, id: string) => {
+    onChange(draft);
+    setVoteId(id);
+  };
   const topics = [...new Set(d.votes.map((x) => x.topic).filter(Boolean))];
   const custom = v ? importanceLabel(v.weight) === null : false;
   return (
@@ -46,13 +56,19 @@ export function VotesPanel({
         how much it should count toward grades.
       </p>
       {stageRollcall && (
-        <RollcallIntake
+        <EvidenceIntake
+          mode="rollcall"
           dataset={d}
-          stageRollcall={stageRollcall}
-          onAdd={(draft, id) => {
-            onChange(draft);
-            setVoteId(id);
-          }}
+          load={stageRollcall}
+          onAdd={addImported}
+        />
+      )}
+      {stageBillSupport && (
+        <EvidenceIntake
+          mode="bill"
+          dataset={d}
+          load={stageBillSupport}
+          onAdd={addImported}
         />
       )}
       <div className="editor-row">
@@ -106,8 +122,16 @@ export function VotesPanel({
             {v.bill || "New vote"} – {v.title || "untitled"}
           </h2>
           <ChoiceButtons
-            label="Is a YES vote good for privacy?"
-            help="Members who vote this way are counted as voting for privacy."
+            label={
+              v.kind === "cosponsorship"
+                ? "Does supporting this bill count for reform?"
+                : "Is a YES vote good for privacy?"
+            }
+            help={
+              v.kind === "cosponsorship"
+                ? "Only sponsors and current cosponsors receive a record."
+                : "Members who vote this way are counted as voting for privacy."
+            }
             options={[
               { label: "Yes", value: "Yes" as const },
               { label: "No", value: "No" as const },

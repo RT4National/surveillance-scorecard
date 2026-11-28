@@ -1,3 +1,4 @@
+import { stageBillSupport } from "./bill-intake";
 import { stageOfficialRollcall } from "./rollcall-intake";
 import { memberShareMeta } from "./meta";
 import type { Dataset, Publication } from "../src/core/publication";
@@ -322,6 +323,13 @@ async function api(
       SENATE_LIS_CROSSWALK?: string;
     };
     return json(await stageOfficialRollcall(input.url, SENATE_LIS_CROSSWALK));
+  }
+  if (path === "/staff/stage/bill-support" && method === "POST") {
+    if (actor.open)
+      throw new HttpError(403, "Official imports require a staff sign-in.");
+    const input = await body(request, 4096);
+    const { CONGRESS_API_KEY } = env as Env & { CONGRESS_API_KEY?: string };
+    return json(await stageBillSupport(input, CONGRESS_API_KEY));
   }
   if (path === "/staff/status" && method === "GET") {
     const p = await publication(env);

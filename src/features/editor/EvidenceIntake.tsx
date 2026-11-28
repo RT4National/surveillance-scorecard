@@ -1,20 +1,27 @@
 import { useState, type FormEvent } from "react";
 import type { Dataset } from "../../core/publication";
 import type { Party, Vote } from "../../core/types";
-import type { RollcallStage } from "../../ingestion/rollcalls";
-import { addReviewedRollcall, unmatchedRollcallMembers } from "./rollcallDraft";
+import {
+  addReviewedRollcall,
+  unmatchedRollcallMembers,
+  type EvidenceStage,
+} from "./rollcallDraft";
 
-export function RollcallIntake({
+export function EvidenceIntake({
   dataset,
-  stageRollcall,
+  load,
+  mode,
   onAdd,
 }: {
   dataset: Dataset;
-  stageRollcall: (url: string) => Promise<RollcallStage>;
+  load: (value: string, congress: number) => Promise<EvidenceStage>;
+  mode: "rollcall" | "bill";
   onAdd: (draft: Dataset, voteId: string) => void;
 }) {
+  const isBill = mode === "bill";
+  const [congress, setCongress] = useState("");
   const [url, setUrl] = useState("");
-  const [stage, setStage] = useState<RollcallStage>();
+  const [stage, setStage] = useState<EvidenceStage>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const missing = stage ? unmatchedRollcallMembers(dataset, stage) : [];
@@ -25,7 +32,7 @@ export function RollcallIntake({
     setError("");
     setBusy(true);
     try {
-      setStage(await stageRollcall(url.trim()));
+      setStage(await load(url.trim(), Number(congress)));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -58,13 +65,36 @@ export function RollcallIntake({
 
   return (
     <details className="editor-details">
-      <summary>Add a roll call from an official source</summary>
+      <summary>
+        {isBill
+          ? "Add bill support from Congress.gov"
+          : "Add a roll call from an official source"}
+      </summary>
       <form className="editor-row" onSubmit={fetchStage}>
+        {isBill && (
+          <label>
+            Congress number
+            <input
+              required
+              type="number"
+              min="93"
+              value={congress}
+              disabled={busy}
+              onChange={(event) => {
+                setCongress(event.target.value);
+                setStage(undefined);
+                setError("");
+              }}
+            />
+          </label>
+        )}
         <label>
-          Official roll-call URL
+          {isBill
+            ? "Bill number (for example H.R. 2)"
+            : "Official roll-call URL"}
           <input
             required
-            type="url"
+            type={isBill ? "text" : "url"}
             value={url}
             disabled={busy}
             onChange={(event) => {
@@ -75,15 +105,21 @@ export function RollcallIntake({
           />
         </label>
         <button disabled={busy}>
-          {busy ? "Reading roll call…" : "Read roll call"}
+          {busy
+            ? "Reading official source…"
+            : isBill
+              ? "Read bill support"
+              : "Read roll call"}
         </button>
       </form>
       {error && <p role="alert">{error}</p>}
       {stage && (
         <>
           <p>
-            {stage.bill} · {stage.question} · {stage.chamber} · {stage.date} ·{" "}
-            {stage.records.length} recorded ballots
+            {stage.bill} ·{" "}
+            {"question" in stage ? stage.question : stage.officialTitle} ·{" "}
+            {stage.chamber} · {stage.date} · {stage.records.length}{" "}
+            {isBill ? "recorded supporters" : "recorded ballots"}
           </p>
           {stage.warnings.map((warning) => (
             <p key={warning}>{warning}</p>
@@ -94,19 +130,23 @@ export function RollcallIntake({
               {missing.join(", ")}.
             </p>
           )}
-          {duplicate && (
-            <p role="alert">This roll call is already in the draft.</p>
-          )}
+          {duplicate && <p role="alert">This item is already in the draft.</p>}
           {stage.date > dataset.asOf && (
             <p>
-              The vote is after this draft’s evidence cutoff. Update the cutoff
+              The item is after this draft’s evidence cutoff. Update the cutoff
               to include it in grades.
             </p>
           )}
           <form className="editor-grid" key={stage.id} onSubmit={add}>
             <label>
               Short title
-              <input name="title" required />
+              <input
+                name="title"
+                required
+                defaultValue={
+                  "officialTitle" in stage ? stage.officialTitle : ""
+                }
+              />
             </label>
             <label>
               President at the time
@@ -124,7 +164,9 @@ export function RollcallIntake({
               </select>
             </label>
             <label>
-              Pro-reform vote
+              {isBill
+                ? "Does sponsoring this bill count for reform? (Yes or No)"
+                : "Pro-reform vote"}
               <select name="reformVote" defaultValue="" required>
                 <option value="" disabled>
                   Choose the reform position
@@ -150,11 +192,13 @@ export function RollcallIntake({
               <input name="topic" required />
             </label>
             <label>
-              Why this vote matters
+              Why this item matters
               <textarea name="rationale" required />
             </label>
             <button disabled={missing.length > 0 || duplicate}>
-              Add reviewed roll call to draft
+              {isBill
+                ? "Add reviewed bill support to draft"
+                : "Add reviewed roll call to draft"}
             </button>
           </form>
         </>

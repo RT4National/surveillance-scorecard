@@ -54,3 +54,20 @@ it("does not drop unknown legislators and saves the capture with the reviewed it
   expect(draft.votes.at(-1)?.reformVote).toBe("No");
   expect(() => addReviewedRollcall(draft, stage, editorial)).toThrow("already");
 });
+
+it("keeps bill support one-sided and uses the public bill page", () => {
+  const bill = {
+    ...stage,
+    kind: "cosponsorship" as const,
+    officialTitle: "Example bill",
+    source: "https://www.congress.gov/bill/119th-congress/house-bill/2",
+  };
+  const draft = addReviewedRollcall(demoDataset, bill, editorial);
+  expect(draft.votes.at(-1)).toMatchObject({
+    kind: "cosponsorship",
+    source: bill.source,
+    reformVote: "No",
+  });
+  expect(draft.records.at(-1)?.outcome).toBe("Yes");
+  expect(draft.sources.at(-1)).toEqual(bill.sources[0]);
+});
