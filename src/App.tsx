@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useScorecard } from "./data/context";
 import { groupLabels, scoreMember } from "./core/scoring";
+import { scoredLabel } from "./core/copy";
 import type { Dataset, Publication } from "./core/publication";
 import { publishedScore } from "./core/publication-scores";
 import { publicationUrl } from "./core/navigation";
@@ -134,7 +135,7 @@ function Select({
   );
 }
 function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
-  const { score, publication } = useScorecard();
+  const { score, publication, dataset } = useScorecard();
   return (
     <div className="table-scroll">
       <table className="member-table">
@@ -202,7 +203,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                           : "Not enough evidence"}
                   </span>
                   <small>
-                    {s.counted} scored votes ·{" "}
+                    {scoredLabel(s, dataset.votes)} ·{" "}
                     {s.reason.startsWith("Unproven")
                       ? "More evidence needed"
                       : "Both contexts reviewed"}

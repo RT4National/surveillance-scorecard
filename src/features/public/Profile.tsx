@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowLeft, Check, Copy, History, Info, ShieldCheck, X } from "lucide-react";
 import { useScorecard } from "../../data/context";
 import { groupLabels } from "../../core/scoring";
+import { hasCosponsorships, scoredLabel, scoredNoun } from "../../core/copy";
 import { publicationUrl } from "../../core/navigation";
 import type { Member, Party } from "../../core/types";
 import { CorrectionForm, Source } from ".";
@@ -28,6 +29,7 @@ export function Profile({
   const { score, dataset, rubric, publication } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
   const s = score(member, asOf);
+  const noun = scoredNoun(hasCosponsorships(dataset.votes));
   return (
     <section className="container inner-page">
       <a
@@ -73,7 +75,7 @@ export function Profile({
           <h2>{fmt(s.value)} reform alignment</h2>
           <p>
             {Number(s.earned.toFixed(2))} aligned weighted points out of{" "}
-            {Number(s.possible.toFixed(2))} possible · {s.counted} scored votes
+            {Number(s.possible.toFixed(2))} possible · {scoredLabel(s, dataset.votes)}
           </p>
           <span className={`category ${s.group}`}>{groupLabels[s.group]}</span>
           <p>{s.reason}</p>
@@ -104,12 +106,16 @@ export function Profile({
               <div>
                 <span>President of their own party</span>
                 <strong>{fmt(s.ownScore)}</strong>
-                <small>{s.ownCount} cast votes</small>
+                <small>
+                  {s.ownCount} {noun}
+                </small>
               </div>
               <div>
                 <span>President of another party</span>
                 <strong>{fmt(s.otherScore)}</strong>
-                <small>{s.otherCount} cast votes</small>
+                <small>
+                  {s.otherCount} {noun}
+                </small>
               </div>
             </div>
             {s.topicCoverageWarning && (
