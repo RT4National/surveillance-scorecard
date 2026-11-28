@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -15,7 +15,10 @@ import {
 import { useScorecard } from "./data/context";
 import { groupLabels, scoreMember } from "./core/scoring";
 import {
+  bannerCopy,
   browseAllLabel,
+  headerCopy,
+  navLinks,
   countRowLabel,
   groupCountLabel,
   hasCosponsorships,
@@ -185,89 +188,89 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
             const s = score(m, asOf);
             return (
               <Fragment key={m.id}>
-              {i === firstUngraded && (
-                <tr className="not-graded-group">
-                  <th scope="rowgroup" colSpan={6}>
-                    {notGradedGroupLabel(ungradedCount)}
-                  </th>
+                {i === firstUngraded && (
+                  <tr className="not-graded-group">
+                    <th scope="rowgroup" colSpan={6}>
+                      {notGradedGroupLabel(ungradedCount)}
+                    </th>
+                  </tr>
+                )}
+                <tr>
+                  <td>
+                    <a
+                      className="member-name"
+                      href={publicationUrl(
+                        `${base}/members/${m.id}`,
+                        linkId,
+                        asOf,
+                      )}
+                    >
+                      <Avatar member={m} />
+                      <span>
+                        <strong>{m.name}</strong>
+                        <small>
+                          {m.state}
+                          {m.district !== undefined
+                            ? ` · District ${m.district}`
+                            : ""}
+                        </small>
+                      </span>
+                    </a>
+                  </td>
+                  <td>
+                    <span className={`party-dot ${m.party.toLowerCase()}`} />
+                    {m.party}
+                    <small>{m.chamber}</small>
+                  </td>
+                  <td>
+                    <Grade member={m} asOf={asOf} />
+                  </td>
+                  <td>
+                    {s.value === null ? (
+                      <span className="alignment-text not-graded">
+                        {notGraded}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="alignment-text">{fmt(s.value)}</span>
+                        <div className="meter">
+                          <span style={{ width: `${s.value}%` }} />
+                        </div>
+                      </>
+                    )}
+                  </td>
+                  <td>
+                    <span className={`category ${s.group}`}>
+                      <span />
+                      {s.group === "reformer"
+                        ? "Consistent reformer"
+                        : s.group === "surveillance"
+                          ? "Surveillance supporter"
+                          : s.group === "mixed"
+                            ? "Mixed record"
+                            : "Not enough evidence"}
+                    </span>
+                    <small>
+                      {scoredLabel(s, dataset.votes)} ·{" "}
+                      {s.reason.startsWith("Unproven")
+                        ? "More evidence needed"
+                        : "Both contexts reviewed"}
+                    </small>
+                  </td>
+                  <td>
+                    <a
+                      className="icon-link"
+                      href={publicationUrl(
+                        `${base}/members/${m.id}`,
+                        linkId,
+                        asOf,
+                      )}
+                      aria-label={`View ${m.name}'s profile`}
+                    >
+                      <ArrowUpRight size={18} />
+                    </a>
+                  </td>
                 </tr>
-              )}
-              <tr>
-                <td>
-                  <a
-                    className="member-name"
-                    href={publicationUrl(
-                      `${base}/members/${m.id}`,
-                      linkId,
-                      asOf,
-                    )}
-                  >
-                    <Avatar member={m} />
-                    <span>
-                      <strong>{m.name}</strong>
-                      <small>
-                        {m.state}
-                        {m.district !== undefined
-                          ? ` · District ${m.district}`
-                          : ""}
-                      </small>
-                    </span>
-                  </a>
-                </td>
-                <td>
-                  <span className={`party-dot ${m.party.toLowerCase()}`} />
-                  {m.party}
-                  <small>{m.chamber}</small>
-                </td>
-                <td>
-                  <Grade member={m} asOf={asOf} />
-                </td>
-                <td>
-                  {s.value === null ? (
-                    <span className="alignment-text not-graded">
-                      {notGraded}
-                    </span>
-                  ) : (
-                    <>
-                      <span className="alignment-text">{fmt(s.value)}</span>
-                      <div className="meter">
-                        <span style={{ width: `${s.value}%` }} />
-                      </div>
-                    </>
-                  )}
-                </td>
-                <td>
-                  <span className={`category ${s.group}`}>
-                    <span />
-                    {s.group === "reformer"
-                      ? "Consistent reformer"
-                      : s.group === "surveillance"
-                        ? "Surveillance supporter"
-                        : s.group === "mixed"
-                          ? "Mixed record"
-                          : "Not enough evidence"}
-                  </span>
-                  <small>
-                    {scoredLabel(s, dataset.votes)} ·{" "}
-                    {s.reason.startsWith("Unproven")
-                      ? "More evidence needed"
-                      : "Both contexts reviewed"}
-                  </small>
-                </td>
-                <td>
-                  <a
-                    className="icon-link"
-                    href={publicationUrl(
-                      `${base}/members/${m.id}`,
-                      linkId,
-                      asOf,
-                    )}
-                    aria-label={`View ${m.name}'s profile`}
-                  >
-                    <ArrowUpRight size={18} />
-                  </a>
-                </td>
-              </tr>
               </Fragment>
             );
           })}
@@ -283,7 +286,48 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
     </div>
   );
 }
-export default function App() {
+/**
+ * Content the Worker rendered into #root for this page (home and member profiles), captured by
+ * main.tsx before React mounts. Shown unchanged while the publication loads, so the first paint
+ * never turns back into a blank loading state. Its state picker and name box already work.
+ */
+function ServerPaint({
+  html,
+  onState,
+  onName,
+}: {
+  html: string;
+  onState: (state: string) => void;
+  onName: (name: string) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const handlers = useRef({ onState, onName });
+  handlers.current = { onState, onName };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const listener = (event: Event) => {
+      const target = event.target as HTMLInputElement | HTMLSelectElement;
+      if (target.name === "state") handlers.current.onState(target.value);
+      else if (target.name === "q") handlers.current.onName(target.value);
+    };
+    el.addEventListener("change", listener);
+    el.addEventListener("input", listener);
+    return () => {
+      el.removeEventListener("change", listener);
+      el.removeEventListener("input", listener);
+    };
+  }, []);
+  // The markup is the Worker's own, built from escaped text (worker/render.ts).
+  return (
+    <div
+      ref={ref}
+      className="server-paint"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+export default function App({ serverHtml }: { serverHtml?: string } = {}) {
   const {
     dataset,
     members,
@@ -367,14 +411,6 @@ export default function App() {
     ? filters.state
     : "";
   const effectiveFilters = { ...filters, state: knownState };
-  const nav = [
-    { href: `${base}/`, title: "Scorecard" },
-    { href: `${base}/legislation`, title: "Legislation" },
-    { href: `${base}/compare`, title: "Compare" },
-    { href: `${base}/research`, title: "Research" },
-    { href: `${base}/methodology`, title: "Methodology" },
-    { href: `${base}/archive`, title: "Archive" },
-  ];
   const member =
     route.name === "member"
       ? members.find((m) => m.id === route.id)
@@ -382,9 +418,7 @@ export default function App() {
   const notFoundPage = (
     <section className="container empty">
       <h1>Page not found</h1>
-      <a href={publicationUrl(`${base}/`, linkId)}>
-        Back to the directory
-      </a>
+      <a href={publicationUrl(`${base}/`, linkId)}>Back to the directory</a>
     </section>
   );
   const directoryPage = (
@@ -408,40 +442,40 @@ export default function App() {
         aria-label="Explore legislators"
       >
         {isFormer && (
-        <div className="section-heading">
-          <div>
-            <div className="eyebrow muted">
-              {isFormer ? "HISTORICAL EXPLORER" : "EXPLORE THE RECORD"}
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow muted">
+                {isFormer ? "HISTORICAL EXPLORER" : "EXPLORE THE RECORD"}
+              </div>
+              <h2>
+                {isFormer ? "All former members" : "All members"}
+                <span className="count-pill">
+                  {
+                    members.filter((m) =>
+                      isFormer ? m.status !== "active" : m.status === "active",
+                    ).length
+                  }{" "}
+                  {fictional(dataset) ? "demo members" : "members"}
+                </span>
+              </h2>
             </div>
-            <h2>
-              {isFormer ? "All former members" : "All members"}
-              <span className="count-pill">
-                {
-                  members.filter((m) =>
-                    isFormer ? m.status !== "active" : m.status === "active",
-                  ).length
-                }{" "}
-                {fictional(dataset) ? "demo members" : "members"}
-              </span>
-            </h2>
+            <a
+              className="subtle-link"
+              href={publicationUrl(
+                isFormer ? `${base}/` : `${base}/former`,
+                linkId,
+              )}
+            >
+              {isFormer ? "Current members" : "Former members"}{" "}
+              <ArrowRight size={16} />
+            </a>
+            <a
+              className="subtle-link"
+              href={publicationUrl(`${base}/research`, linkId)}
+            >
+              Build a research report <ArrowUpRight size={16} />
+            </a>
           </div>
-          <a
-            className="subtle-link"
-            href={publicationUrl(
-              isFormer ? `${base}/` : `${base}/former`,
-              linkId,
-            )}
-          >
-            {isFormer ? "Current members" : "Former members"}{" "}
-            <ArrowRight size={16} />
-          </a>
-          <a
-            className="subtle-link"
-            href={publicationUrl(`${base}/research`, linkId)}
-          >
-            Build a research report <ArrowUpRight size={16} />
-          </a>
-        </div>
         )}
         <Directory
           filters={effectiveFilters}
@@ -457,35 +491,35 @@ export default function App() {
                 className="subtle-link"
                 href={publicationUrl(`${base}/former`, linkId)}
               >
-                Former members <ArrowRight size={16} />
+                {headerCopy.formerMembers} <ArrowRight size={16} />
               </a>
               <a
                 className="subtle-link"
                 href={publicationUrl(`${base}/research`, linkId)}
               >
-                Build a research report <ArrowUpRight size={16} />
+                {headerCopy.research} <ArrowUpRight size={16} />
               </a>
             </>
           }
         />
       </section>
       {isFormer && (
-      <section className="container bottom-callout">
-        <div>
-          <span className="eyebrow">FOLLOW THE EVIDENCE</span>
-          <h2>A score should start a conversation.</h2>
-          <p>
-            Open a profile to see the votes, the calculation, and what the
-            record can—and cannot—tell us.
-          </p>
-        </div>
-        <a
-          className="button dark"
-          href={publicationUrl(`${base}/methodology`, linkId)}
-        >
-          Explore the methodology <ArrowRight size={16} />
-        </a>
-      </section>
+        <section className="container bottom-callout">
+          <div>
+            <span className="eyebrow">FOLLOW THE EVIDENCE</span>
+            <h2>A score should start a conversation.</h2>
+            <p>
+              Open a profile to see the votes, the calculation, and what the
+              record can—and cannot—tell us.
+            </p>
+          </div>
+          <a
+            className="button dark"
+            href={publicationUrl(`${base}/methodology`, linkId)}
+          >
+            Explore the methodology <ArrowRight size={16} />
+          </a>
+        </section>
       )}
     </>
   );
@@ -534,32 +568,37 @@ export default function App() {
       }
     }
   }
+  if (dataState === "loading" && serverHtml && route.name !== "editor")
+    return (
+      <ServerPaint
+        html={serverHtml}
+        onState={(s) => changeFilter("state", s)}
+        onName={(q) => changeFilter("q", q)}
+      />
+    );
   return (
     <>
       <a className="skip-link" href="#main">
-        Skip to content
+        {headerCopy.skip}
       </a>
       <div className="preview-banner">
         <span className="preview-dot" />{" "}
         {dataState === "loading"
-          ? "LOADING SCORECARD"
+          ? bannerCopy.loading
           : dataset.demo
-            ? "DESIGN PREVIEW"
-            : "PUBLISHED SCORECARD"}{" "}
+            ? bannerCopy.preview
+            : bannerCopy.published}{" "}
         <span className="preview-copy">
           {dataset.demo
             ? fictional(dataset)
-              ? "Fictional members and votes. Explore the proposed experience."
-              : "Real congressional records. Scores use unreviewed placeholder vote directions, not Restore the Fourth's positions."
-            : `Evidence through ${dataset.asOf} · Publication ${publication?.id}`}
+              ? bannerCopy.fictional
+              : bannerCopy.placeholder
+            : bannerCopy.publishedLine(dataset.asOf, publication?.id ?? "")}
         </span>
       </div>
       <header className="site-header">
         <div className="header-inner">
-          <a
-            className="brand"
-            href={publicationUrl(`${base}/`, linkId)}
-          >
+          <a className="brand" href={publicationUrl(`${base}/`, linkId)}>
             <span className="brand-symbol">
               IV
               <span />
@@ -571,7 +610,7 @@ export default function App() {
             </span>
           </a>
           <nav aria-label="Main navigation">
-            {nav.map((n) => (
+            {navLinks.map((n) => (
               <a
                 key={n.href}
                 href={publicationUrl(n.href, linkId)}
@@ -586,8 +625,8 @@ export default function App() {
               </a>
             ))}
           </nav>
-          <a className="about-link" href="https://restorethe4th.com/">
-            Our mission <ArrowUpRight size={15} />
+          <a className="about-link" href={headerCopy.missionUrl}>
+            {headerCopy.mission} <ArrowUpRight size={15} />
           </a>
         </div>
       </header>
@@ -619,12 +658,7 @@ export default function App() {
         <div>
           Independent. Nonpartisan. Evidence-led.
           <br />
-          <a
-            href={publicationUrl(
-              `${base}/methodology#sources`,
-              linkId,
-            )}
-          >
+          <a href={publicationUrl(`${base}/methodology#sources`, linkId)}>
             Sources & reuse
           </a>
           <span>
@@ -803,142 +837,142 @@ function Directory({
         </div>
       )}
       {open && (
-      <div className="directory-panel" id="directory-panel">
-        <div className="filter-bar">
-          {archive && (
-            <label className="search-box">
-              <Search size={18} />
-              <span className="sr-only">Search legislators</span>
-              <input
-                type="search"
-                placeholder="Search by name or state…"
-                value={filters.q}
-                onChange={(e) => setFilter("q", e.target.value)}
-              />
-            </label>
-          )}
-          <Select
-            label="Current chamber"
-            value={filters.chamber}
-            onChange={(v) => setFilter("chamber", v)}
-          >
-            <option value="">All chambers</option>
-            <option>House</option>
-            <option>Senate</option>
-          </Select>
-          {archive && (
+        <div className="directory-panel" id="directory-panel">
+          <div className="filter-bar">
+            {archive && (
+              <label className="search-box">
+                <Search size={18} />
+                <span className="sr-only">Search legislators</span>
+                <input
+                  type="search"
+                  placeholder="Search by name or state…"
+                  value={filters.q}
+                  onChange={(e) => setFilter("q", e.target.value)}
+                />
+              </label>
+            )}
             <Select
-              label="State"
-              value={filters.state}
-              onChange={(v) => setFilter("state", v)}
+              label="Current chamber"
+              value={filters.chamber}
+              onChange={(v) => setFilter("chamber", v)}
             >
-              <option value="">All states</option>
-              {[...new Set(source.map((m) => m.state))].sort().map((s) => (
-                <option key={s}>{s}</option>
-              ))}
+              <option value="">All chambers</option>
+              <option>House</option>
+              <option>Senate</option>
             </Select>
-          )}
-          <Select
-            label="Current party"
-            value={filters.party}
-            onChange={(v) => setFilter("party", v)}
-          >
-            <option value="">All parties</option>
-            <option>Democratic</option>
-            <option>Republican</option>
-            <option>Independent</option>
-          </Select>
-          <Select
-            label="Committee / caucus"
-            value={filters.membership}
-            onChange={(v) => setFilter("membership", v)}
-          >
-            <option value="">All memberships</option>
-            {[
-              ...new Set(
-                source.flatMap((m) => [...m.committees, ...m.caucuses]),
-              ),
-            ]
-              .sort()
-              .map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-          </Select>
-        </div>
-        <div className="table-toolbar">
-          <div role="status">
-            <strong>{filtered.length}</strong> legislators
-            {filters.group && (
-              <span className="filter-chip">
-                {groupLabels[filters.group as Group] ?? filters.group}
-                <button
-                  aria-label="Clear group filter"
-                  onClick={() => setFilter("group", "")}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            )}
-            {Object.keys(filters).some(
-              (k) =>
-                filters[k as keyof Filters] !== defaults[k as keyof Filters],
-            ) && (
-              <button className="inline-button" onClick={reset}>
-                Clear filters
-              </button>
-            )}
-          </div>
-          <div className="toolbar-actions">
-            <label>
-              Sort by{" "}
-              <select
-                aria-label="Sort results"
-                value={filters.sort}
-                onChange={(e) => setFilter("sort", e.target.value)}
+            {archive && (
+              <Select
+                label="State"
+                value={filters.state}
+                onChange={(v) => setFilter("state", v)}
               >
-                <option value="score">Highest score</option>
-                <option value="name">Name A–Z</option>
-              </select>
-            </label>
-            <button onClick={() => void copy(window.location.href)}>
-              <Copy size={14} /> Share view
-            </button>
-            <button
-              onClick={() =>
-                saveFile(
-                  dataset.demo
-                    ? "scorecard-demo.csv"
-                    : "surveillance-scorecard.csv",
-                  toCsv(exportRows(filtered, dataset, date, publication)),
-                  "text/csv;charset=utf-8",
-                )
-              }
+                <option value="">All states</option>
+                {[...new Set(source.map((m) => m.state))].sort().map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </Select>
+            )}
+            <Select
+              label="Current party"
+              value={filters.party}
+              onChange={(v) => setFilter("party", v)}
             >
-              <ArrowDownToLine size={15} /> Export
-            </button>
+              <option value="">All parties</option>
+              <option>Democratic</option>
+              <option>Republican</option>
+              <option>Independent</option>
+            </Select>
+            <Select
+              label="Committee / caucus"
+              value={filters.membership}
+              onChange={(v) => setFilter("membership", v)}
+            >
+              <option value="">All memberships</option>
+              {[
+                ...new Set(
+                  source.flatMap((m) => [...m.committees, ...m.caucuses]),
+                ),
+              ]
+                .sort()
+                .map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+            </Select>
+          </div>
+          <div className="table-toolbar">
+            <div role="status">
+              <strong>{filtered.length}</strong> legislators
+              {filters.group && (
+                <span className="filter-chip">
+                  {groupLabels[filters.group as Group] ?? filters.group}
+                  <button
+                    aria-label="Clear group filter"
+                    onClick={() => setFilter("group", "")}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {Object.keys(filters).some(
+                (k) =>
+                  filters[k as keyof Filters] !== defaults[k as keyof Filters],
+              ) && (
+                <button className="inline-button" onClick={reset}>
+                  Clear filters
+                </button>
+              )}
+            </div>
+            <div className="toolbar-actions">
+              <label>
+                Sort by{" "}
+                <select
+                  aria-label="Sort results"
+                  value={filters.sort}
+                  onChange={(e) => setFilter("sort", e.target.value)}
+                >
+                  <option value="score">Highest score</option>
+                  <option value="name">Name A–Z</option>
+                </select>
+              </label>
+              <button onClick={() => void copy(window.location.href)}>
+                <Copy size={14} /> Share view
+              </button>
+              <button
+                onClick={() =>
+                  saveFile(
+                    dataset.demo
+                      ? "scorecard-demo.csv"
+                      : "surveillance-scorecard.csv",
+                    toCsv(exportRows(filtered, dataset, date, publication)),
+                    "text/csv;charset=utf-8",
+                  )
+                }
+              >
+                <ArrowDownToLine size={15} /> Export
+              </button>
+            </div>
+          </div>
+          <div className={`directory-results ${resultsMotion}`.trim()}>
+            <MemberTable list={filtered} asOf={date} />
+          </div>
+          <div className="table-footer">
+            <Info size={14} />
+            <span>
+              Grades reflect reform-aligned votes. Consistency is evaluated
+              separately.{" "}
+              <a href={publicationUrl(`${base}/methodology`, linkId)}>
+                How scoring works
+              </a>
+            </span>
+            <span className="demo-stamp">
+              {fictional(dataset)
+                ? "FICTIONAL DATA"
+                : dataset.demo
+                  ? "PLACEHOLDER SCORES"
+                  : dataset.asOf}
+            </span>
           </div>
         </div>
-        <div className={`directory-results ${resultsMotion}`.trim()}>
-          <MemberTable list={filtered} asOf={date} />
-        </div>
-        <div className="table-footer">
-          <Info size={14} />
-          <span>
-            Grades reflect reform-aligned votes. Consistency is evaluated
-            separately.{" "}
-            <a href={publicationUrl(`${base}/methodology`, linkId)}>
-              How scoring works
-            </a>
-          </span>
-          <span className="demo-stamp">
-            {fictional(dataset)
-              ? "FICTIONAL DATA"
-              : dataset.demo
-                ? "PLACEHOLDER SCORES"
-                : dataset.asOf}
-          </span>
-        </div>
-      </div>
       )}
     </>
   );

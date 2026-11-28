@@ -2132,3 +2132,8 @@ input[type="date"] {
 .browse-bar .button[aria-expanded="true"] svg {
   transform: rotate(180deg);
 }
+
+/* Wrapper around the Worker's first paint while the publication loads (App.tsx, ServerPaint). */
+.server-paint {
+  display: contents;
+}

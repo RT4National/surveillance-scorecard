@@ -10,6 +10,7 @@ import {
   headlineCopy,
   hasCosponsorships,
   notGradedLabel,
+  profileCopy,
   scoredLabel,
   scoredNoun,
   splitCopy,
@@ -116,11 +117,8 @@ export function Profile({
   );
   return (
     <section className="container inner-page">
-      <a
-        className="back-link"
-        href={publicationUrl(`${base}/`, linkId)}
-      >
-        <ArrowLeft size={16} /> All legislators
+      <a className="back-link" href={publicationUrl(`${base}/`, linkId)}>
+        <ArrowLeft size={16} /> {profileCopy.back}
       </a>
       <div className="profile-heading">
         <figure className="profile-portrait">
@@ -135,8 +133,7 @@ export function Profile({
         </figure>
         <div>
           <div className="eyebrow">
-            {fictional(dataset) ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} ·{" "}
-            {member.status.toUpperCase()}
+            {profileCopy.eyebrow(fictional(dataset), member.status)}
           </div>
           <h1>{member.name}</h1>
           <p>
@@ -160,7 +157,7 @@ export function Profile({
             <h2>
               {s.value === null
                 ? notGradedLabel(rubric.minVotes)
-                : `${fmt(s.value)} reform alignment`}
+                : profileCopy.alignment(fmt(s.value))}
             </h2>
           </div>
           <ul className="headline-lines">
@@ -203,7 +200,7 @@ export function Profile({
         <div className="profile-main">
           <div className="panel">
             <div className="section-heading">
-              <h2>Principles across presidencies</h2>
+              <h2>{profileCopy.splitHeading}</h2>
               <ShieldCheck size={20} />
             </div>
             <p className="muted">{splitCopy.meaning}</p>

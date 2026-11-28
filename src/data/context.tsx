@@ -5,8 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { dataset as demoMetadata, members, votes, records } from "./demo";
-import { rubric, scoreMember } from "../core/scoring";
+import { scoreMember } from "../core/scoring";
 import {
   publishedScore,
   verifyPublicationScoring,
@@ -17,18 +16,9 @@ import type {
   PublicationSummary,
 } from "../core/publication";
 import type { Member } from "../core/types";
+import { demoDataset } from "./demo-dataset";
 
-export const demoDataset: Dataset = {
-  ...demoMetadata,
-  members,
-  votes,
-  records,
-  rubric,
-  sources: [],
-  coverage: [
-    "Fictional demonstration records. Not an official congressional dataset.",
-  ],
-};
+export { demoDataset };
 type LoadState = {
   dataset: Dataset;
   publication?: Publication;
@@ -62,9 +52,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     dataset: demoDataset,
     state: "loading",
   });
-  const [publications, setPublications] = useState<
-    PublicationSummary[] | null
-  >(null);
+  const [publications, setPublications] = useState<PublicationSummary[] | null>(
+    null,
+  );
   useEffect(() => {
     const controller = new AbortController();
     const pinned = new URLSearchParams(window.location.search).get(

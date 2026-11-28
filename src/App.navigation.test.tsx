@@ -48,7 +48,11 @@ async function show(path: string, pinned = true) {
     ),
   );
   if (!pinned)
-    await waitFor(() => expect(document.querySelector("main .finder, main .profile-heading")).toBeTruthy());
+    await waitFor(() =>
+      expect(
+        document.querySelector("main .finder, main .profile-heading"),
+      ).toBeTruthy(),
+    );
 }
 function expectPublicPins() {
   const anchors = [
@@ -90,19 +94,26 @@ describe("archived public navigation", () => {
   });
 });
 describe("latest publication navigation", () => {
-  const anchors = () =>
-    [...document.querySelectorAll<HTMLAnchorElement>('a[href^="/scorecard"]')];
+  const anchors = () => [
+    ...document.querySelectorAll<HTMLAnchorElement>('a[href^="/scorecard"]'),
+  ];
   it("adds no publication to the address or to links on the home page", async () => {
     await show("/scorecard/", false);
     expect(window.location.search).toBe("");
     expect(anchors().length).toBeGreaterThan(5);
     for (const a of anchors())
-      expect(new URL(a.href).searchParams.get("publication"), a.textContent ?? "").toBeNull();
+      expect(
+        new URL(a.href).searchParams.get("publication"),
+        a.textContent ?? "",
+      ).toBeNull();
   });
   it("keeps profile and vote links clean on a member page", async () => {
     await show(`/scorecard/members/${demoDataset.members[0].id}`, false);
     expect(window.location.search).toBe("");
     for (const a of anchors())
-      expect(new URL(a.href).searchParams.get("publication"), a.textContent ?? "").toBeNull();
+      expect(
+        new URL(a.href).searchParams.get("publication"),
+        a.textContent ?? "",
+      ).toBeNull();
   });
 });

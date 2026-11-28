@@ -14,7 +14,10 @@ const prefersReducedMotion = () =>
  * is already visible animates without first flashing its final state, then by IntersectionObserver.
  * Without IntersectionObserver it stays false and nothing animates.
  */
-export function useSeenOnce<T extends Element>(): [RefObject<T | null>, boolean] {
+export function useSeenOnce<T extends Element>(): [
+  RefObject<T | null>,
+  boolean,
+] {
   const ref = useRef<T>(null);
   const [seen, setSeen] = useState(false);
   useLayoutEffect(() => {

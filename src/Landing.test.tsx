@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 // Home page landing pass: the finder is the page, one row of counts, the directory behind "Browse all".
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { members, records, votes, dataset as meta } from "./data/demo";
 import { scoreMember } from "./core/scoring";
 import type { Dataset } from "./core/publication";
@@ -22,7 +29,12 @@ const base: Dataset = {
   members,
   votes,
   records,
-  rubric: { version: "custom", minVotes: 5, minPerContext: 2, consistencyThreshold: 75 },
+  rubric: {
+    version: "custom",
+    minVotes: 5,
+    minPerContext: 2,
+    consistencyThreshold: 75,
+  },
   sources: [],
   coverage: [],
 };
@@ -47,7 +59,8 @@ const active = members.filter((m) => m.status === "active");
 const count = (g: Group) => active.filter((m) => score(m).group === g).length;
 const table = () => document.querySelector(".member-table");
 const browse = () => screen.getByRole("button", { name: /^Browse all/ });
-const countRow = () => screen.getByRole("navigation", { name: "Filter by record" });
+const countRow = () =>
+  screen.getByRole("navigation", { name: "Filter by record" });
 
 let reduced = false;
 beforeEach(() => {
@@ -74,23 +87,32 @@ describe("count row", () => {
     const links = within(countRow()).getAllByRole("link");
     expect(links).toHaveLength(4);
     const n = count("reformer");
-    expect(links[0].textContent).toBe(`${n} ${n === 1 ? "reformer" : "reformers"}`);
+    expect(links[0].textContent).toBe(
+      `${n} ${n === 1 ? "reformer" : "reformers"}`,
+    );
     expect(links[1].textContent).toBe(`${count("mixed")} mixed`);
-    expect(links[2].textContent).toBe(`${count("surveillance")} surveillance supporters`);
-    expect(links[3].textContent).toBe(`${count("unproven")} not enough evidence`);
+    expect(links[2].textContent).toBe(
+      `${count("surveillance")} surveillance supporters`,
+    );
+    expect(links[3].textContent).toBe(
+      `${count("unproven")} not enough evidence`,
+    );
     // Icon plus visible text: each link has an icon shape next to its words.
-    for (const l of links) expect(l.querySelector("[aria-hidden='true'].count-icon")).toBeTruthy();
+    for (const l of links)
+      expect(l.querySelector("[aria-hidden='true'].count-icon")).toBeTruthy();
   });
   it("filters by group and opens the directory", () => {
     render(<App />);
     const link = within(countRow()).getAllByRole("link")[0];
-    expect(link.getAttribute("href")).toBe("/scorecard/?group=reformer#browse=all");
+    expect(link.getAttribute("href")).toBe(
+      "/scorecard/?group=reformer#browse=all",
+    );
     fireEvent.click(link);
     expect(table()).toBeTruthy();
     expect(link.getAttribute("aria-current")).toBe("true");
-    const names = [...document.querySelectorAll(".member-table .member-name strong")].map(
-      (e) => e.textContent,
-    );
+    const names = [
+      ...document.querySelectorAll(".member-table .member-name strong"),
+    ].map((e) => e.textContent);
     expect(names).toHaveLength(count("reformer"));
     expect(window.location.search).toBe("?group=reformer");
     expect(window.location.hash).toBe("#browse=all");
@@ -102,7 +124,9 @@ describe("home page copy", () => {
     render(<App />);
     fireEvent.click(browse());
     expect(screen.queryByText(/describe the roster/)).toBeNull();
-    expect(screen.queryByText(/A score should start a conversation/)).toBeNull();
+    expect(
+      screen.queryByText(/A score should start a conversation/),
+    ).toBeNull();
   });
 });
 
@@ -114,9 +138,11 @@ describe("directory", () => {
     expect(browse().getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(browse());
     expect(table()).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Browse all/ }).getAttribute("aria-expanded")).toBe(
-      "true",
-    );
+    expect(
+      screen
+        .getByRole("button", { name: /^Browse all/ })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
     expect(window.location.hash).toBe("#browse=all");
     expect(window.location.search).toBe("");
   });
@@ -146,15 +172,21 @@ describe("filter motion (plan item 3.4)", () => {
     fireEvent.click(browse());
     const results = () => document.querySelector(".directory-results")!;
     expect(results().className).not.toMatch(/motion-filter/);
-    fireEvent.change(screen.getByLabelText("Current chamber"), { target: { value: "House" } });
+    fireEvent.change(screen.getByLabelText("Current chamber"), {
+      target: { value: "House" },
+    });
     const first = results().className.match(/motion-filter-[ab]/)?.[0];
     expect(first).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Current chamber"), { target: { value: "Senate" } });
+    fireEvent.change(screen.getByLabelText("Current chamber"), {
+      target: { value: "Senate" },
+    });
     const second = results().className.match(/motion-filter-[ab]/)?.[0];
     expect(second).toBeTruthy();
     expect(second).not.toBe(first);
     act(() => {
-      fireEvent.change(screen.getByLabelText("State"), { target: { value: "California" } });
+      fireEvent.change(screen.getByLabelText("State"), {
+        target: { value: "California" },
+      });
     });
     expect(finderList()?.className).toMatch(/motion-filter-[ab]/);
   });
@@ -162,18 +194,28 @@ describe("filter motion (plan item 3.4)", () => {
     reduced = true;
     render(<App />);
     fireEvent.click(browse());
-    fireEvent.change(screen.getByLabelText("Current chamber"), { target: { value: "House" } });
-    expect(document.querySelector(".directory-results")!.className).not.toMatch(/motion-filter/);
-    fireEvent.change(screen.getByLabelText("State"), { target: { value: "California" } });
+    fireEvent.change(screen.getByLabelText("Current chamber"), {
+      target: { value: "House" },
+    });
+    expect(document.querySelector(".directory-results")!.className).not.toMatch(
+      /motion-filter/,
+    );
+    fireEvent.change(screen.getByLabelText("State"), {
+      target: { value: "California" },
+    });
     expect(finderList()?.className).not.toMatch(/motion-filter/);
   });
   it("skips animation above about 100 rows, with the same results", () => {
     dataset = { ...base, members: [...members, ...crowd] };
     render(<App />);
     fireEvent.click(browse());
-    fireEvent.change(screen.getByLabelText("Current party"), { target: { value: "Democratic" } });
+    fireEvent.change(screen.getByLabelText("Current party"), {
+      target: { value: "Democratic" },
+    });
     const rows = document.querySelectorAll(".member-table .member-name").length;
     expect(rows).toBeGreaterThan(100);
-    expect(document.querySelector(".directory-results")!.className).not.toMatch(/motion-filter/);
+    expect(document.querySelector(".directory-results")!.className).not.toMatch(
+      /motion-filter/,
+    );
   });
 });
