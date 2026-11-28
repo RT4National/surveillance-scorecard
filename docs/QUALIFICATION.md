@@ -60,3 +60,9 @@ Chrome exercised the production build using loopback-only synthetic fixtures. Th
 Each view fit the 390 px viewport. Measured normal-text contrast was 4.70:1 for the finder label, 5.11:1 for the sampled evidence state, 14.24:1 for the vote breadcrumb and data download link, and 14.80:1 for the share button and correction label. These measurements cover those sampled pairs.
 
 Chrome’s accessibility tree verifies exposed names and roles. The launch candidate still needs an actual screen-reader walkthrough, broader contrast checks, and a repeat of these journeys with reviewed data.
+
+## Published profile first response and cache
+
+The local workerd/D1 capacity harness now seeds a separate fictional frozen snapshot to exercise the public profile read path. With 250 roll calls and 66,875 records, one local run returned 17,638 bytes of HTML including the frozen summary and source links. The first request took 109 ms and reported a memo miss. The repeat took 1 ms, reported a memo hit, and returned byte-identical HTML.
+
+These are local elapsed times from a synthetic fixture. The request harness does not expose isolate CPU time. Production CPU, edge latency, and the live share-unfurl and summary checks remain launch qualification items.

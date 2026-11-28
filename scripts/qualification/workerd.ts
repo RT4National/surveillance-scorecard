@@ -1,9 +1,14 @@
+import { encodeStoredJson } from "../../worker/storage";
+import { digest } from "../../worker/validation";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { build } from "esbuild";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { congressionalFixture } from "./fixtures";
-import { verifyPublicationScoring } from "../../src/core/publication-scores";
+import {
+  createPublicationScoring,
+  verifyPublicationScoring,
+} from "../../src/core/publication-scores";
 import type { Publication } from "../../src/core/publication";
 
 const bundle = await build({
@@ -47,6 +52,13 @@ const mf = new Miniflare(
       ACCESS_AUDIENCE: "workerd-capacity",
       STAFF_ROLES: JSON.stringify(roles),
       AI_MODEL: "",
+    },
+    serviceBindings: {
+      ASSETS: () =>
+        new Response(
+          '<!doctype html><html><head><title>Local fixture</title><meta name="description"></head><body><div id="root"></div></body></html>',
+          { headers: { "Content-Type": "text/html; charset=utf-8" } },
+        ),
     },
     outboundService: async (request) => {
       if (request.url !== `${issuer}/cdn-cgi/access/certs`)
@@ -185,6 +197,98 @@ try {
     );
     base = published.id;
   }
+  // Exercise the publishable profile path only inside this disposable workerd/D1
+  // instance. No real legislators or claims are involved.
+  const profileFixture = congressionalFixture(250);
+  profileFixture.id = "local-profile-capacity-fixture";
+  profileFixture.demo = false;
+  profileFixture.votes = profileFixture.votes.map((vote) => ({
+    ...vote,
+    source: `https://records.example.invalid/${encodeURIComponent(vote.id)}`,
+  }));
+  const profile: Publication = {
+    id: "local-frozen-profile-capacity",
+    createdAt: new Date().toISOString(),
+    previousId: base,
+    publishedBy: "fixture@example.invalid",
+    summary: "Fictional profile fixture, local capacity check only",
+    digest: await digest(profileFixture),
+    dataset: profileFixture,
+    scoring: await createPublicationScoring(profileFixture),
+  };
+  const { dataset: _dataset, scoring: _scoring, ...metadata } = profile;
+  const snapshot = await encodeStoredJson(profile, {
+    ...metadata,
+    datasetId: profileFixture.id,
+  });
+  // Seed the read-path fixture directly so the synthetic source never has to
+  // impersonate an official capture in the editorial validation workflow.
+  const storedDraft = await encodeStoredJson(profileFixture, {
+    id: profileFixture.id,
+    asOf: profileFixture.asOf,
+    demo: profileFixture.demo,
+  });
+  await db.batch([
+    db
+      .prepare(
+        "INSERT INTO drafts(id,dataset,summary,status,author,updated_at,base_publication_id) VALUES(?,?,?,'draft',?,?,?)",
+      )
+      .bind(
+        "local-profile-capacity-draft",
+        storedDraft,
+        profile.summary,
+        profile.publishedBy,
+        profile.createdAt,
+        base,
+      ),
+    db
+      .prepare(
+        "INSERT INTO publications(id,draft_id,snapshot,created_at) VALUES(?,?,?,?)",
+      )
+      .bind(
+        profile.id,
+        "local-profile-capacity-draft",
+        snapshot,
+        profile.createdAt,
+      ),
+  ]);
+  base = profile.id;
+  const profileUrl = `https://capacity.example/scorecard/members/${encodeURIComponent(profileFixture.members[0].id)}?publication=${encodeURIComponent(profile.id)}`;
+  const fetchProfile = async () => {
+    const start = performance.now();
+    const response = await mf.dispatchFetch(profileUrl);
+    const html = await response.text();
+    return { response, html, elapsed: Math.round(performance.now() - start) };
+  };
+  const cold = await fetchProfile();
+  assert.equal(cold.response.status, 200);
+  assert.match(cold.html, /data-frozen-summary/);
+  assert.match(cold.html, /https:\/\/records\.example\.invalid\//);
+  assert.match(
+    cold.response.headers.get("Server-Timing") ?? "",
+    /memo;desc="miss"/,
+  );
+  const warm = await fetchProfile();
+  assert.equal(warm.response.status, 200);
+  assert.equal(warm.html, cold.html);
+  assert.match(
+    warm.response.headers.get("Server-Timing") ?? "",
+    /memo;desc="hit"/,
+  );
+  console.log(
+    JSON.stringify({
+      environment: "local workerd + local D1; synthetic frozen profile",
+      fictional: true,
+      rollcalls: profileFixture.votes.length,
+      records: profileFixture.records.length,
+      profileHtmlBytes: Buffer.byteLength(cold.html),
+      coldProfileWallMs: cold.elapsed,
+      warmProfileWallMs: warm.elapsed,
+      coldMemo: cold.response.headers.get("Server-Timing"),
+      warmMemo: warm.response.headers.get("Server-Timing"),
+      cpuMeasurement: "not exposed by the local request harness",
+    }),
+  );
   const boundary = congressionalFixture(390);
   boundary.asOf = "2027-12-31";
   const staged = await send("/staff/drafts", "POST", {
