@@ -1016,55 +1016,82 @@ input[type="date"] {
   background: #fff;
 }
 .evidence-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 13px;
   border-top: 1px solid var(--line);
-  padding: 20px 0;
-}
-.evidence-row strong {
+  padding: 16px 0;
   font-size: 13px;
 }
 .evidence-row p {
-  font-size: 11px;
-  margin: 6px 0;
+  margin: 4px 0;
 }
-.evidence-row small {
-  font-size: 9px;
-  color: #778a90;
+.evidence-top,
+.evidence-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.evidence-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.evidence-status svg {
+  flex-shrink: 0;
+  align-self: center;
+}
+.evidence-status .evidence-state {
+  font-size: 13px;
+}
+.state-aligned {
+  color: var(--blue-text);
+}
+.state-not-aligned {
+  color: var(--orange-text);
+}
+.state-did-not-vote,
+.state-not-in-office,
+.state-outside-window {
+  color: var(--muted);
+}
+.evidence-weight,
+.evidence-title time {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.evidence-title {
+  margin-top: 6px;
+}
+.evidence-title strong {
+  font-size: 14px;
+}
+.evidence-action {
+  font-weight: 700;
 }
 .evidence-row .evidence-context {
   color: var(--muted);
+  font-size: 12px;
 }
-.evidence-context span {
-  display: block;
-}
-.vote-mark {
-  width: 29px;
-  height: 29px;
+.evidence-links {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #e7f0f3;
-  color: #507581;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--muted);
 }
-.vote-mark.no {
-  background: #f4e4df;
-  color: #a46b5b;
+.evidence-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
 }
-.vote-mark.neutral {
-  background: #e8eef0;
-  color: #799097;
-}
-.vote-result {
-  margin-left: auto;
-  flex-shrink: 0;
-  text-align: right;
-}
-.vote-result small {
-  display: block;
+.evidence-legend .evidence-state {
+  font-size: 12px;
+  font-weight: 500;
 }
 .footnote {
   font-size: 10px !important;
@@ -1657,23 +1684,9 @@ input[type="date"] {
   .timeline span:last-child {
     font-size: 8px;
   }
-  .evidence-row {
-    gap: 9px;
-  }
-  .evidence-row strong {
-    font-size: 12px;
-  }
-  .evidence-row p {
-    font-size: 10px;
-  }
-  .vote-result {
-    max-width: 55px;
-  }
-  .vote-result strong {
-    font-size: 10px;
-  }
-  .vote-result small {
-    font-size: 8px;
+  .evidence-top,
+  .evidence-title {
+    flex-wrap: wrap;
   }
   .research-question {
     padding: 18px;

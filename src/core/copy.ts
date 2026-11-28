@@ -1,4 +1,5 @@
-import type { Vote } from "./types";
+import type { Outcome, Vote } from "./types";
+import type { AlignmentState } from "./evidence";
 
 /**
  * User-facing wording about what a score counts. Kept in one place so it can change
@@ -65,3 +66,69 @@ export const notGradedLabel = (minVotes: number) =>
 /** Heading for the last directory group. Wording follows decision D5, not yet confirmed by staff. */
 export const notGradedGroupLabel = (count: number) =>
   `Not graded (${count})`;
+
+/** One word per evidence state. Each pairs with an icon shape in EvidenceRow, so colour is never the only signal. */
+export const alignmentLabels: Record<AlignmentState, string> = {
+  aligned: "Aligned",
+  "not-aligned": "Not aligned",
+  "did-not-vote": "Did not vote",
+  "not-in-office": "Not in office",
+  "outside-window": "Outside the scoring window",
+};
+
+/** "A YES vote was the pro-reform vote.", or the cosponsorship equivalent. */
+export const reformLine = (vote: Pick<Vote, "kind" | "reformVote">) =>
+  vote.kind === "cosponsorship"
+    ? `Cosponsoring was the ${vote.reformVote === "Yes" ? "pro" : "anti"}-reform action.`
+    : `A ${vote.reformVote.toUpperCase()} vote was the pro-reform vote.`;
+
+/** The member's own action, or null when nothing was cast (the state word already says so). */
+export const memberAction = (vote: Pick<Vote, "kind">, outcome: Outcome) =>
+  outcome === "Yes" || outcome === "No"
+    ? vote.kind === "cosponsorship"
+      ? "Cosponsored"
+      : `Voted ${outcome}`
+    : null;
+
+const points = (n: number) => Number(n.toFixed(2));
+/** "Weight 2 · 0 of 2" for a scored item, "Weight 2" otherwise. */
+export const weightLabel = (e: {
+  vote: Pick<Vote, "weight">;
+  scored: boolean;
+  aligned: boolean;
+  effectiveWeight: number;
+}) =>
+  e.scored
+    ? `Weight ${points(e.vote.weight)} · ${points(e.aligned ? e.effectiveWeight : 0)} of ${points(e.effectiveWeight)}`
+    : `Weight ${points(e.vote.weight)}`;
+
+/** Evidence row and legend labels. */
+export const evidenceCopy = {
+  votePage: "Vote page",
+  legend: "Legend",
+} as const;
+
+/** Party context on an evidence row. Not eligible records get no party: the member was not serving. */
+const partyMember = {
+  Democratic: "Democrat",
+  Republican: "Republican",
+  Independent: "Independent",
+} as const;
+const withArticle = (word: string) =>
+  `${/^[AEIOU]/i.test(word) ? "an" : "a"} ${word}`;
+export function evidenceContext(e: {
+  vote: Pick<Vote, "presidentParty">;
+  outcome: Outcome;
+  partyAtVote: keyof typeof partyMember;
+  scored: boolean;
+  ownParty: boolean;
+}): string {
+  const parts = [`Under ${withArticle(e.vote.presidentParty)} president`];
+  if (e.outcome !== "Not eligible")
+    parts.push(`${partyMember[e.partyAtVote]} at the time`);
+  if (e.scored)
+    parts.push(
+      `Counts toward: ${e.ownParty ? "own-party" : "other-party"} president`,
+    );
+  return parts.join(" · ");
+}

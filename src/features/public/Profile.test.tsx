@@ -29,6 +29,9 @@ function rows(memberIndex: number) {
   render(<Profile member={members[memberIndex]} copy={vi.fn()} />);
   return [...document.querySelectorAll(".evidence-row")];
 }
+/** Rows keyed by vote id, so assertions do not depend on how the list is grouped. */
+const byId = (shown: Element[]) =>
+  new Map(shown.map((row) => [row.getAttribute("data-vote-id")!, row]));
 function expected(memberIndex: number) {
   const member = members[memberIndex];
   return records
@@ -46,27 +49,30 @@ describe("profile evidence rows", () => {
     expect(dates).toEqual([...dates].sort().reverse());
   });
 
-  it("states the reform position and the party context without repeating the outcome", () => {
-    const shown = rows(3);
+  it("states the pro-reform vote and the party context without repeating the outcome", () => {
+    const shown = byId(rows(3));
     const member = members[3];
-    expected(3).forEach((e, i) => {
-      const context = text(shown[i].querySelector(".evidence-context")!);
-      expect(context).toContain(`Reform position: ${e.vote.reformVote}`);
+    for (const e of expected(3)) {
+      const row = shown.get(e.voteId)!;
+      expect(text(row)).toContain(
+        `A ${e.vote.reformVote.toUpperCase()} vote was the pro-reform vote.`,
+      );
+      const context = text(row.querySelector(".evidence-context")!);
       expect(context).toContain(
         `Under a ${e.vote.presidentParty} president · ${member.party} at the time`,
       );
       expect(context).not.toMatch(/Voted|\b(Yes|No) ·/);
-    });
+    }
   });
 
   it("says which side of the presidency split each scored vote counts toward", () => {
-    const shown = rows(3);
-    expected(3).forEach((e, i) => {
+    const shown = byId(rows(3));
+    for (const e of expected(3)) {
       const own = e.partyAtVote === e.vote.presidentParty;
-      expect(text(shown[i])).toContain(
+      expect(text(shown.get(e.voteId)!)).toContain(
         `Counts toward: ${own ? "own-party" : "other-party"} president`,
       );
-    });
+    }
   });
 
   it("names the party in running text and keeps Independents distinct", () => {
@@ -75,45 +81,42 @@ describe("profile evidence rows", () => {
     expect(text(rows(6)[0])).toContain("Independent at the time");
   });
 
-  it("gives every vote mark a screen-reader label", () => {
-    const shown = rows(3);
-    expected(3).forEach((e, i) => {
-      const label = text(shown[i].querySelector(".vote-mark .sr-only")!);
-      expect(label).toBe(
-        e.outcome === e.vote.reformVote
-          ? "Aligned with reform position"
-          : "Not aligned with reform position",
-      );
-    });
-  });
-
-  it("describes votes that were not cast and labels them as not scored", () => {
-    const shown = rows(7);
-    const notEligible = expected(7).flatMap((e, i) =>
-      e.outcome === "Not eligible" ? [shown[i]] : [],
-    );
-    expect(notEligible.length).toBeGreaterThan(0);
-    for (const row of notEligible) {
-      const context = text(row.querySelector(".evidence-context")!);
-      expect(context).toMatch(
-        /^Reform position: (Yes|No)\s*Under an? \w+ president$/,
-      );
-      expect(context).not.toContain("at the time");
-      expect(context).not.toContain("Counts toward");
-      expect(text(row.querySelector(".vote-result")!)).toContain(
-        "Not eligible",
-      );
-      expect(text(row.querySelector(".vote-mark .sr-only")!)).toBe(
-        "Not scored",
+  it("gives every vote mark a visible alignment word", () => {
+    const shown = byId(rows(3));
+    for (const e of expected(3)) {
+      const word = shown.get(e.voteId)!.querySelector(".evidence-state")!;
+      expect(word.closest(".sr-only")).toBeNull();
+      expect(text(word)).toBe(
+        e.outcome === e.vote.reformVote ? "Aligned" : "Not aligned",
       );
     }
+  });
+
+  it("describes votes that were not cast and labels them as not in office", () => {
+    const shown = byId(rows(7));
+    const notEligible = expected(7).filter((e) => e.outcome === "Not eligible");
+    expect(notEligible.length).toBeGreaterThan(0);
+    for (const e of notEligible) {
+      const row = shown.get(e.voteId)!;
+      const context = text(row.querySelector(".evidence-context")!);
+      expect(context).toMatch(/^Under an? \w+ president$/);
+      expect(text(row)).not.toContain("at the time");
+      expect(text(row)).not.toContain("Counts toward");
+      expect(text(row.querySelector(".evidence-state")!)).toBe("Not in office");
+    }
     // Rows the member was eligible for still name their party.
-    expected(7).forEach((e, i) => {
+    for (const e of expected(7))
       if (e.outcome !== "Not eligible")
-        expect(text(shown[i])).toMatch(
+        expect(text(shown.get(e.voteId)!)).toMatch(
           /(Democrat|Republican|Independent) at the time/,
         );
-    });
+  });
+
+  it("prints the legend under the evidence list", () => {
+    rows(3);
+    const legend = document.querySelector(".profile-main .evidence-legend");
+    expect(legend).not.toBeNull();
+    expect(text(legend!)).toContain("Outside the scoring window");
   });
 
   it("uses the shared source label instead of calling missing sources fictional", () => {

@@ -23,15 +23,23 @@ import {
   validateReportQuery,
   type ReportQuery,
 } from "../../core/reports";
+import { EvidenceRow } from "./EvidenceRow";
+import { Legend } from "./Legend";
 import "./public.css";
 
 type Props = { dataset: Dataset; publication?: Publication };
 const servingOutcomes: Outcome[] = ["Yes", "No", "Not voting"];
 const base = "/scorecard";
+/** The publication a page is pinned to: the loaded one, else the one named in the URL. */
+function pinnedId(publication?: Publication) {
+  return (
+    publication?.id ??
+    new URLSearchParams(location.search).get("publication") ??
+    undefined
+  );
+}
 function publicUrl(path: string, publication?: Publication) {
-  const id =
-    publication?.id ?? new URLSearchParams(location.search).get("publication");
-  return publicationUrl(path, id ?? undefined);
+  return publicationUrl(path, pinnedId(publication));
 }
 function save(name: string, text: string, type: string) {
   const url = URL.createObjectURL(new Blob([text], { type }));
@@ -410,19 +418,13 @@ export function ComparePage({ dataset, publication }: Props) {
             <details>
               <summary>Inspect evidence</summary>
               {score.evidence.map((e) => (
-                <p key={e.voteId}>
-                  <a
-                    href={publicUrl(
-                      `${base}/legislation/${encodeURIComponent(e.voteId)}`,
-                      publication,
-                    )}
-                  >
-                    {e.vote.bill}
-                  </a>
-                  : {evidenceLabel(e.vote, e.outcome)} · {e.vote.topic}
-                  {!e.inWindow ? " · Outside rubric time window" : ""}
-                </p>
+                <EvidenceRow
+                  key={e.voteId}
+                  entry={e}
+                  publicationId={pinnedId(publication)}
+                />
               ))}
+              <Legend />
             </details>
           </article>
         ))}
@@ -1149,21 +1151,14 @@ export function ArchivesPage({ dataset, publication }: Props) {
                   <summary>Evidence in this publication</summary>
                   {(index === 0 ? change.before : change.after)?.evidence.map(
                     (e) => (
-                      <p key={e.voteId}>
-                        <a
-                          href={publicUrl(
-                            `${base}/legislation/${encodeURIComponent(e.voteId)}`,
-                            frame,
-                          )}
-                        >
-                          {e.vote.bill}
-                        </a>
-                        : {evidenceLabel(e.vote, e.outcome)} · {e.vote.date} ·{" "}
-                        {e.scored ? "Scored" : "Not scored"} ·{" "}
-                        <Source url={e.vote.source} />
-                      </p>
+                      <EvidenceRow
+                        key={e.voteId}
+                        entry={e}
+                        publicationId={frame.id}
+                      />
                     ),
                   ) ?? <p>Member absent from this publication.</p>}
+                  <Legend />
                 </details>
               </article>
             ))}

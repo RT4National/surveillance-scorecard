@@ -1,13 +1,5 @@
 import { useState } from "react";
-import {
-  ArrowLeft,
-  Check,
-  Copy,
-  History,
-  Info,
-  ShieldCheck,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Copy, History, Info, ShieldCheck } from "lucide-react";
 import { useScorecard } from "../../data/context";
 import { groupLabels } from "../../core/scoring";
 import {
@@ -17,21 +9,13 @@ import {
   scoredNoun,
 } from "../../core/copy";
 import { publicationUrl } from "../../core/navigation";
-import type { Member, Party } from "../../core/types";
-import { CorrectionForm, Source } from ".";
-import { evidenceLabel } from "../../core/evidence";
+import type { Member } from "../../core/types";
+import { CorrectionForm } from ".";
 import { base, fictional, fmt, query, readAsOf } from "./helpers";
 import { Avatar, Grade } from "./member";
 import { splitDisplay } from "./split";
-
-/** How a member of each party is named in running text ("a Democrat at the time"). */
-const partyMember: Record<Party, string> = {
-  Democratic: "Democrat",
-  Republican: "Republican",
-  Independent: "Independent",
-};
-const withArticle = (word: string) =>
-  `${/^[AEIOU]/i.test(word) ? "an" : "a"} ${word}`;
+import { EvidenceRow } from "./EvidenceRow";
+import { Legend } from "./Legend";
 
 export function Profile({
   member,
@@ -246,69 +230,14 @@ export function Profile({
                   a.voteId.localeCompare(b.voteId),
               )
               .map((e) => (
-                <div className="evidence-row" key={e.voteId}>
-                  <div
-                    className={`vote-mark ${!e.scored ? "neutral" : e.aligned ? "yes" : "no"}`}
-                  >
-                    {!e.scored ? (
-                      <span aria-hidden="true">—</span>
-                    ) : e.aligned ? (
-                      <Check size={18} />
-                    ) : (
-                      <X size={18} />
-                    )}
-                    <span className="sr-only">
-                      {!e.scored
-                        ? "Not scored"
-                        : e.aligned
-                          ? "Aligned with reform position"
-                          : "Not aligned with reform position"}
-                    </span>
-                  </div>
-                  <div>
-                    <strong>{e.vote.title}</strong>
-                    <p>{e.vote.rationale}</p>
-                    <p className="evidence-context">
-                      <span>Reform position: {e.vote.reformVote}</span>
-                      <span>
-                        Under {withArticle(e.vote.presidentParty)} president
-                        {/* Not eligible: no service on this date, so no party to report. */}
-                        {e.outcome !== "Not eligible" &&
-                          ` · ${partyMember[e.partyAtVote]} at the time`}
-                      </span>
-                      {e.scored && (
-                        <span>
-                          Counts toward:{" "}
-                          {e.ownParty ? "own-party" : "other-party"} president
-                        </span>
-                      )}
-                    </p>
-                    <small>
-                      {e.vote.date} ·{" "}
-                      <a
-                        href={publicationUrl(
-                          `${base}/legislation/${encodeURIComponent(e.vote.id)}`,
-                          publication?.id,
-                        )}
-                      >
-                        {e.vote.bill}
-                      </a>{" "}
-                      · {e.vote.topic} · <Source url={e.vote.source} />
-                    </small>
-                  </div>
-                  <div className="vote-result">
-                    <strong>{evidenceLabel(e.vote, e.outcome)}</strong>
-                    <small>
-                      {e.scored
-                        ? `${Number((e.aligned ? e.effectiveWeight : 0).toFixed(2))} / ${Number(e.effectiveWeight.toFixed(2))} points`
-                        : e.inWindow
-                          ? "Excluded: not cast"
-                          : "Outside scoring window"}
-                    </small>
-                  </div>
-                </div>
+                <EvidenceRow
+                  key={e.voteId}
+                  entry={e}
+                  publicationId={publication?.id}
+                />
               ))}
             {!s.evidence.length && <p>No evidence before this date.</p>}
+            <Legend />
             <p className="footnote">
               {dataset.demo
                 ? fictional(dataset)
