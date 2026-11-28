@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { members, records, votes } from "../../data/demo";
 import { scoreMember } from "../../core/scoring";
 import { Profile } from "./Profile";
@@ -378,6 +378,79 @@ describe("profile headline", () => {
     headline(3);
     const first = document.querySelector(".profile-main > .panel")!;
     expect(text(first)).toContain("Principles across presidencies");
+  });
+});
+
+describe("profile motion", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const fills = () =>
+    [...document.querySelectorAll<HTMLElement>(".split-fill")].map(
+      (f) => f.style.width,
+    );
+  const percents = () =>
+    [...document.querySelectorAll(".split-percent")].map(text);
+
+  it("renders final values on first render, with no motion applied", () => {
+    render(<Profile member={members[2]} copy={vi.fn()} />);
+    expect(fills()).toEqual(["33%", "100%"]);
+    expect(percents()).toEqual(["33%", "100%"]);
+    expect(
+      document.querySelector(".motion-grow-x, [class*='motion-change']"),
+    ).toBeNull();
+    for (const el of document.querySelectorAll<HTMLElement>("[style]")) {
+      expect(el.style.opacity).toBe("");
+      expect(el.style.transform).toBe("");
+    }
+  });
+
+  it("grows the split bars once, when the panel first scrolls into view", () => {
+    const observers: { cb: IntersectionObserverCallback; disconnect: () => void }[] = [];
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        disconnect = vi.fn();
+        constructor(cb: IntersectionObserverCallback) {
+          observers.push({ cb, disconnect: this.disconnect });
+        }
+        observe() {}
+        unobserve() {}
+        takeRecords() {
+          return [];
+        }
+      },
+    );
+    render(<Profile member={members[2]} copy={vi.fn()} />);
+    const bars = document.querySelector(".split-bars")!;
+    expect(bars.classList.contains("motion-grow-x")).toBe(false);
+    expect(observers).toHaveLength(1);
+    act(() =>
+      observers[0].cb(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    );
+    expect(bars.classList.contains("motion-grow-x")).toBe(true);
+    expect(observers[0].disconnect).toHaveBeenCalled();
+    // The animation sits on top of final values; nothing waits for it.
+    expect(fills()).toEqual(["33%", "100%"]);
+    expect(percents()).toEqual(["33%", "100%"]);
+  });
+
+  it("transitions the grade and evidence when the timeline date changes, without remounting", () => {
+    const buttons = withOldEvidence(false);
+    const input = document.querySelector('input[type="date"]')!;
+    const grade = document.querySelector(".profile-grade")!;
+    const lists = document.querySelector(".evidence-lists")!;
+    expect(grade.className).not.toMatch(/motion-change/);
+    fireEvent.click(buttons[0]);
+    expect(grade.className).toContain("motion-change-a");
+    expect(lists.className).toContain("motion-change-a");
+    fireEvent.click(buttons[1]);
+    expect(grade.className).toContain("motion-change-b");
+    // Same nodes: focus and open forms survive the change.
+    expect(document.querySelector('input[type="date"]')).toBe(input);
+    expect(document.querySelector(".profile-grade")).toBe(grade);
+    expect(document.querySelector(".evidence-lists")).toBe(lists);
   });
 });
 

@@ -22,6 +22,7 @@ import { Avatar, Grade } from "./member";
 import { splitDisplay } from "./split";
 import { EvidenceRow, type EvidenceEntry } from "./EvidenceRow";
 import { Legend } from "./Legend";
+import { useChangeClass, useSeenOnce } from "./motion";
 
 const newestFirst = (list: EvidenceEntry[]) =>
   [...list].sort(
@@ -39,6 +40,18 @@ export function Profile({
 }) {
   const { score, dataset, rubric, publication } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
+  // Motion (src/styles/motion.css): the grade and evidence restart a short change animation on each
+  // timeline date change, and the split bars grow once on first view. Values are final either way.
+  const [changeClass, bumpChange] = useChangeClass();
+  const [barsRef, barsSeen] = useSeenOnce<HTMLDivElement>();
+  const changeAsOf = (d: string) => {
+    if (d === asOf) return;
+    setAsOf(d);
+    bumpChange();
+    const p = query();
+    p.set("asOf", d);
+    window.history.replaceState(null, "", `${window.location.pathname}?${p}`);
+  };
   // Vote id of the row whose error report is open; one at a time.
   const [reporting, setReporting] = useState<string | null>(null);
   const s = score(member, asOf);
@@ -142,12 +155,14 @@ export function Profile({
       </div>
       <div className="profile-layout">
         <aside className="profile-sidebar">
-          <Grade member={member} asOf={asOf} />
-          <h2>
-            {s.value === null
-              ? notGradedLabel(rubric.minVotes)
-              : `${fmt(s.value)} reform alignment`}
-          </h2>
+          <div className={`profile-grade ${changeClass}`.trim()}>
+            <Grade member={member} asOf={asOf} />
+            <h2>
+              {s.value === null
+                ? notGradedLabel(rubric.minVotes)
+                : `${fmt(s.value)} reform alignment`}
+            </h2>
+          </div>
           <ul className="headline-lines">
             <li>
               {headlineCopy.aligned(
@@ -194,23 +209,26 @@ export function Profile({
             <p className="muted">{splitCopy.meaning}</p>
             {split.kind === "comparable" ? (
               <>
-                <div className="split-bars">
+                <div
+                  ref={barsRef}
+                  className={`split-bars${barsSeen ? " motion-grow-x" : ""}`}
+                >
                   {(
                     [
                       [splitCopy.ownLabel, split.own],
                       [splitCopy.otherLabel, split.other],
                     ] as const
-                  ).map(([label, side]) => (
+                  ).map(([label, part]) => (
                     <div className="split-side" key={label}>
                       <span className="split-label">{label}</span>
                       <div className="split-bar" aria-hidden="true">
                         <span
-                          className="split-fill"
-                          style={{ width: `${side.percent}%` }}
+                          className="split-fill motion-fill"
+                          style={{ width: `${part.percent}%` }}
                         />
                       </div>
-                      <strong className="split-percent">{side.percent}%</strong>
-                      <small className="split-count">{count(side.count)}</small>
+                      <strong className="split-percent">{part.percent}%</strong>
+                      <small className="split-count">{count(part.count)}</small>
                     </div>
                   ))}
                 </div>
@@ -273,15 +291,7 @@ export function Profile({
                 max={dataset.asOf}
                 value={asOf}
                 onChange={(e) => {
-                  if (!e.target.value) return;
-                  setAsOf(e.target.value);
-                  const p = query();
-                  p.set("asOf", e.target.value);
-                  window.history.replaceState(
-                    null,
-                    "",
-                    `${window.location.pathname}?${p}`,
-                  );
+                  if (e.target.value) changeAsOf(e.target.value);
                 }}
               />
             </div>
@@ -299,16 +309,7 @@ export function Profile({
                 <button
                   key={d}
                   aria-pressed={d === asOf}
-                  onClick={() => {
-                    setAsOf(d);
-                    const p = query();
-                    p.set("asOf", d);
-                    window.history.replaceState(
-                      null,
-                      "",
-                      `${window.location.pathname}?${p}`,
-                    );
-                  }}
+                  onClick={() => changeAsOf(d)}
                 >
                   <small>{d.slice(0, 4)}</small>
                   <Grade member={member} asOf={d} />
@@ -327,15 +328,17 @@ export function Profile({
                 {scoredLabel(s, dataset.votes)}
               </span>
             </div>
-            <div className="evidence-scored">
-              {newestFirst(shownEvidence.filter((e) => e.scored)).map(row)}
+            <div className={`evidence-lists ${changeClass}`.trim()}>
+              <div className="evidence-scored">
+                {newestFirst(shownEvidence.filter((e) => e.scored)).map(row)}
+              </div>
+              {unscored.length > 0 && (
+                <section className="evidence-unscored">
+                  <h3>{evidenceCopy.contextHeading(unscored.length)}</h3>
+                  {newestFirst(unscored).map(row)}
+                </section>
+              )}
             </div>
-            {unscored.length > 0 && (
-              <section className="evidence-unscored">
-                <h3>{evidenceCopy.contextHeading(unscored.length)}</h3>
-                {newestFirst(unscored).map(row)}
-              </section>
-            )}
             {!s.evidence.length && <p>No evidence before this date.</p>}
             <Legend />
             <p className="footnote">

@@ -406,8 +406,8 @@ hr {
   background: #eff5f7;
   position: relative;
   transition:
-    box-shadow 0.15s,
-    transform 0.15s;
+    box-shadow var(--motion-fast),
+    transform var(--motion-fast);
 }
 .group-card:hover {
   transform: translateY(-2px);
@@ -1851,12 +1851,6 @@ input[type="date"] {
   }
   .empty {
     padding: 40px 15px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
-    scroll-behavior: auto !important;
   }
 }
 @media print {
