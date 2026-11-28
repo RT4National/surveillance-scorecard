@@ -158,6 +158,54 @@ describe("D1 editorial workflow", () => {
       ).status,
     ).toBe(401);
   });
+  it("rejects demo and placeholder drafts in production and refuses open staff mode", async () => {
+    const read = (path: string, payload?: unknown, open?: string) =>
+      worker.fetch(
+        new Request(`https://scorecard.example/scorecard/api/staff/${path}`, {
+          method: payload ? "POST" : "GET",
+          headers: { "Content-Type": "application/json" },
+          body: payload ? JSON.stringify(payload) : undefined,
+        }),
+        {
+          ...env,
+          DEPLOYMENT_TIER: "production",
+          STAFF_OPEN_STAGING: open,
+        } as Env,
+      );
+    expect((await read("session", undefined, "true")).status).toBe(503);
+    const identity = vi
+      .spyOn(auth, "authenticate")
+      .mockResolvedValue({ email: "editor@example.org", role: "editor" });
+    try {
+      const payload = {
+        dataset: fixture,
+        summary: "Test",
+        basePublicationId: null,
+      };
+      const demo = await read("drafts", payload);
+      expect(JSON.stringify(await demo.json())).toContain(
+        "Production requires reviewed evidence without placeholders.",
+      );
+      const placeholder = await read("drafts", {
+        ...payload,
+        dataset: {
+          ...fixture,
+          demo: false,
+          votes: fixture.votes.map((vote) => ({
+            ...vote,
+            source: "https://clerk.house.gov/",
+            rationale: "PLACEHOLDER-review this direction",
+          })),
+        },
+      });
+      expect(placeholder.status).toBe(422);
+      expect(JSON.stringify(await placeholder.json())).toContain(
+        "Production requires reviewed evidence without placeholders.",
+      );
+    } finally {
+      identity.mockRestore();
+    }
+  });
   it("stores complete roster captures for review without creating drafts or publications", async () => {
     const capture = {
       asOf: "2025-01-10T00:00:00.000Z",
@@ -487,6 +535,19 @@ describe("D1 editorial workflow", () => {
     expect(published.status).toBe(201);
     const p = (await published.json()) as { id: string; digest: string };
     expect(p.digest).toMatch(/^[a-f0-9]{64}$/);
+    const productionRollback = await worker.fetch(
+      new Request("https://scorecard.example/scorecard/api/staff/rollback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicationId: p.id,
+          revision: 1,
+          reason: "Production rollback fixture",
+        }),
+      }),
+      { ...env, DEPLOYMENT_TIER: "production" },
+    );
+    expect(productionRollback.status).toBe(422);
     const changelog = await send("/publications");
     expect(changelog.status).toBe(200);
     expect(await changelog.json()).toMatchObject({

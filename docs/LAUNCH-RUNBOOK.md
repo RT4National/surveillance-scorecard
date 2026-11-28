@@ -24,7 +24,7 @@ Constraints that apply even with placeholders:
 - **Two real sign-ins are required for step 4.** Review must be by a different identity than the editor (the server returns 403 otherwise), and placeholder addresses cannot sign in through Access. Map at least two real Access identities before the dry run.
 - **Staging datasets that use placeholder directions set `demo: true`.** Validation accepts real Bioguide IDs with `demo: true`. The UI then shows its fictional-data banner and disables corrections and AI questions. This keeps placeholder grades for real legislators from presenting as editorial positions.
 - **Never promote a placeholder dataset.** `reconcileRoster` carries the prior `demo` flag forward and the rubric version is frozen into every publication. Build the launch dataset from the staged artifacts, not by cloning a placeholder publication.
-- **Production gate:** `grep -rn --exclude=LAUNCH-RUNBOOK.md 'PLACEHOLDER-' cloudflare.config.ts wrangler.jsonc docs src <LAUNCH_DRAFT>.json` must return nothing before step 6. The launch draft JSON is where the rubric version and rationales live.
+- **Production gate:** `rg -n 'PLACEHOLDER-' cloudflare.config.ts wrangler.jsonc <LAUNCH_DRAFT>.json` must return nothing before step 6. The launch draft JSON is where the rubric version and rationales live. The production Worker also rejects demo and placeholder drafts and rollback targets, and refuses staff access if open staging mode is enabled.
 
 ## 1. Tooling and credentials
 

@@ -60,6 +60,7 @@ export default defineConfig((ctx) => {
             ACCESS_ISSUER: bindings.text(""),
             ACCESS_AUDIENCE: bindings.text(""),
             STAFF_ROLES: bindings.text("{}"),
+            DEPLOYMENT_TIER: bindings.text("production"),
             AI_MODEL: bindings.text("@cf/meta/llama-3.1-8b-instruct-fast"),
             DB: bindings.d1({
               name: "surveillance-scorecard-production",

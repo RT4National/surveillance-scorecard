@@ -105,10 +105,21 @@ interface Draft {
   base_publication_id: string | null;
 }
 /** Open staging access may not save or publish anything presented as real scoring. */
-function checkDataset(dataset: unknown, actor: Actor) {
+function containsUnreviewedEvidence(dataset: unknown) {
+  return (
+    (dataset as Partial<Dataset> | null)?.demo !== false ||
+    /\bplaceholder-/i.test(JSON.stringify(dataset))
+  );
+}
+function checkDataset(dataset: unknown, actor: Actor, env: Env) {
   const errors = validateDataset(dataset);
   if (actor.open && (dataset as { demo?: unknown } | null)?.demo !== true)
     errors.push("Open staging access can only save demo datasets");
+  if (
+    env.DEPLOYMENT_TIER === "production" &&
+    containsUnreviewedEvidence(dataset)
+  )
+    errors.push("Production requires reviewed evidence without placeholders.");
   return errors;
 }
 async function buildPublication(
@@ -362,6 +373,8 @@ async function api(
   }
   if (!path.startsWith("/staff/"))
     throw new HttpError(404, "API route not found");
+  if (env.DEPLOYMENT_TIER === "production" && env.STAFF_OPEN_STAGING === "true")
+    throw new HttpError(503, "Open staff mode is unavailable in production.");
   const actor = await authenticate(request, env);
   if (path === "/staff/session" && method === "GET") return json(actor);
   if (path === "/staff/stage/rollcall" && method === "POST") {
@@ -458,7 +471,7 @@ async function api(
     );
   if (path === "/staff/drafts" && method === "POST") {
     const b = await body(request);
-    const errors = checkDataset(b.dataset, actor);
+    const errors = checkDataset(b.dataset, actor, env);
     if (errors.length)
       return json({ error: "Dataset validation failed", errors }, 422);
     if (
@@ -544,7 +557,7 @@ async function api(
         throw new HttpError(409, "Published drafts cannot be edited");
       if (b.basePublicationId !== d.base_publication_id)
         throw new HttpError(409, "Draft base changed; reload");
-      const errors = checkDataset(b.dataset, actor);
+      const errors = checkDataset(b.dataset, actor, env);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
       if (
@@ -580,7 +593,7 @@ async function api(
       if (d.author === actor.email)
         throw new HttpError(403, "A second person must review");
       const dataset = await decodeStoredJson<Dataset>(d.dataset);
-      const errors = checkDataset(dataset, actor);
+      const errors = checkDataset(dataset, actor, env);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
       try {
@@ -622,7 +635,7 @@ async function api(
       if (d.status !== "review" || !d.reviewer)
         throw new HttpError(409, "Review required");
       const dataset = await decodeStoredJson<Dataset>(d.dataset);
-      const errors = checkDataset(dataset, actor);
+      const errors = checkDataset(dataset, actor, env);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
       const previous = d.base_publication_id
@@ -661,9 +674,12 @@ async function api(
     if (actor.role !== "publisher")
       throw new HttpError(403, "Publisher role required");
     const b = await body(request, 20_000);
+    const target =
+      typeof b.publicationId === "string"
+        ? await publication(env, b.publicationId)
+        : null;
     if (
-      typeof b.publicationId !== "string" ||
-      !(await publication(env, b.publicationId)) ||
+      !target ||
       typeof b.reason !== "string" ||
       b.reason.trim().length < 10 ||
       b.reason.length > 4000 ||
@@ -673,10 +689,18 @@ async function api(
         400,
         "Existing publication, pointer revision and reason required",
       );
+    if (
+      env.DEPLOYMENT_TIER === "production" &&
+      containsUnreviewedEvidence(target.dataset)
+    )
+      throw new HttpError(
+        422,
+        "Production requires reviewed evidence without placeholders.",
+      );
     const r = await env.DB.prepare(
       "UPDATE current_publication SET publication_id=?,revision=revision+1,actor=?,reason=? WHERE singleton=1 AND revision=?",
     )
-      .bind(b.publicationId, actor.email, b.reason, b.revision)
+      .bind(target.id, actor.email, b.reason, b.revision)
       .run();
     if (!r.meta.changes)
       throw new HttpError(409, "Publication pointer changed");
