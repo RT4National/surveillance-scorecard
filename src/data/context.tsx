@@ -11,7 +11,11 @@ import {
   publishedScore,
   verifyPublicationScoring,
 } from "../core/publication-scores";
-import type { Dataset, Publication } from "../core/publication";
+import type {
+  Dataset,
+  Publication,
+  PublicationSummary,
+} from "../core/publication";
 import type { Member } from "../core/types";
 
 export const demoDataset: Dataset = {
@@ -25,22 +29,37 @@ export const demoDataset: Dataset = {
     "Fictional demonstration records. Not an official congressional dataset.",
   ],
 };
-type DataState = {
+type LoadState = {
   dataset: Dataset;
   publication?: Publication;
   state: "loading" | "published" | "demo" | "error";
   error?: string;
 };
+type DataState = LoadState & {
+  /** Newest first. Null until loaded, and if the list request fails. */
+  publications: PublicationSummary[] | null;
+};
 const DataContext = createContext<DataState>({
   dataset: demoDataset,
   state: "loading",
+  publications: null,
 });
 
+const isSummary = (p: unknown): p is PublicationSummary =>
+  !!p &&
+  typeof (p as PublicationSummary).id === "string" &&
+  typeof (p as PublicationSummary).createdAt === "string" &&
+  ((p as PublicationSummary).previousId === null ||
+    typeof (p as PublicationSummary).previousId === "string");
+
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<DataState>({
+  const [state, setState] = useState<LoadState>({
     dataset: demoDataset,
     state: "loading",
   });
+  const [publications, setPublications] = useState<
+    PublicationSummary[] | null
+  >(null);
   useEffect(() => {
     const controller = new AbortController();
     const pinned = new URLSearchParams(window.location.search).get(
@@ -104,6 +123,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
           publication,
           state: "published",
         });
+        // Small second request for the freshness label and newer-version notice.
+        // Failure leaves the list null and the page falls back to the date.
+        void fetch("/scorecard/api/publications", {
+          signal: controller.signal,
+        })
+          .then(async (r) => (r.ok ? ((await r.json()) as unknown) : null))
+          .then((body) => {
+            const rows = (body as { publications?: unknown } | null)
+              ?.publications;
+            if (
+              !controller.signal.aborted &&
+              Array.isArray(rows) &&
+              rows.every(isSummary)
+            )
+              setPublications(rows);
+          })
+          .catch(() => undefined);
       })
       .catch((error) => {
         if (!controller.signal.aborted)
@@ -118,7 +154,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
     return () => controller.abort();
   }, []);
-  return <DataContext.Provider value={state}>{children}</DataContext.Provider>;
+  return <DataContext.Provider value={{ ...state, publications }}>{children}</DataContext.Provider>;
 }
 export function useScorecard() {
   const state = useContext(DataContext);

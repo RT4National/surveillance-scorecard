@@ -1831,3 +1831,231 @@ input[type="date"] {
 .alignment-text.not-graded {
   white-space: normal;
 }
+
+/* One-line page heading above the finder. */
+.hero-line {
+  padding-top: 28px;
+}
+.hero-line h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.hero-line + .finder-wrap {
+  padding-top: 16px;
+}
+
+/* Finder: state picker, name search, delegation list. */
+.finder-wrap {
+  padding-top: 28px;
+}
+.finder {
+  background: #fffefa;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 22px;
+}
+.finder h1,
+.finder h2 {
+  font-size: 24px;
+  line-height: 1.2;
+  margin: 0 0 16px;
+  color: var(--ink);
+}
+.finder h3 {
+  font-size: 13px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 20px 0 8px;
+}
+.finder h3 small {
+  font-size: inherit;
+}
+.finder-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.finder-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--muted);
+  flex: 1 1 220px;
+}
+.finder-controls select,
+.finder-controls input {
+  font: inherit;
+  font-size: 15px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #b9c5c9;
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+}
+.finder-note {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 12px 0 0;
+}
+.finder-note a {
+  color: var(--blue-text);
+}
+.finder-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+}
+.finder-list li + li {
+  border-top: 1px solid #e4ebed;
+}
+.finder-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  min-height: 56px;
+  color: inherit;
+  text-decoration: none;
+}
+.finder-row:hover {
+  background: #f2f7f9;
+}
+.finder-name {
+  flex: 1;
+  min-width: 0;
+}
+.finder-name strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 550;
+}
+.finder-name small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.finder-value {
+  font-size: 14px;
+  color: #56676d;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .finder-wrap {
+    padding-top: 16px;
+  }
+  .finder {
+    padding: 16px;
+  }
+}
+
+/* Freshness line under the header. */
+.freshness {
+  background: #fffefa;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--muted);
+}
+.freshness p {
+  margin: 0;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.freshness a {
+  color: var(--blue-text);
+}
+.freshness .newer-version {
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* Under 700 px the directory table becomes a list of cards. */
+@media (max-width: 699px) {
+  .table-scroll {
+    overflow-x: visible;
+  }
+  .member-table,
+  .member-table tbody {
+    display: block;
+    white-space: normal;
+  }
+  .member-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .member-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "name grade"
+      "party value"
+      "category category";
+    gap: 6px 12px;
+    align-items: center;
+    margin: 10px 14px;
+    padding: 14px;
+    background: #fffefa;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .member-table tbody tr.not-graded-group {
+    display: block;
+    margin: 18px 14px 0;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+  .member-table tbody tr.not-graded-group th {
+    display: block;
+    padding: 0;
+    font-size: 13px;
+  }
+  .member-table td,
+  .member-table td:first-child {
+    display: block;
+    padding: 0;
+    border: 0;
+    font-size: 14px;
+  }
+  .member-table td:nth-child(1) {
+    grid-area: name;
+  }
+  .member-table td:nth-child(2) {
+    grid-area: party;
+  }
+  .member-table td:nth-child(3) {
+    grid-area: grade;
+  }
+  .member-table td:nth-child(4) {
+    grid-area: value;
+    text-align: right;
+  }
+  .member-table td:nth-child(5) {
+    grid-area: category;
+  }
+  .member-table td:nth-child(6) {
+    display: none;
+  }
+  .member-table .member-name strong {
+    font-size: 16px;
+  }
+  .member-table small,
+  .alignment-text {
+    font-size: 13px;
+  }
+  .member-table tbody tr:hover {
+    background: #fffefa;
+  }
+}

@@ -50,7 +50,7 @@ describe("app routing", () => {
     expect(former).toBeTruthy();
     await show("/scorecard/former");
     expect(
-      screen.getByRole("heading", { name: /Former members/ }),
+      screen.getByRole("heading", { level: 1, name: "Former members" }),
     ).toBeTruthy();
     expect(listed(former.name)).toBe(true);
     expect(listed(current.name)).toBe(false);

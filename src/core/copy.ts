@@ -65,3 +65,45 @@ export const notGradedLabel = (minVotes: number) =>
 /** Heading for the last directory group. Wording follows decision D5, not yet confirmed by staff. */
 export const notGradedGroupLabel = (count: number) =>
   `Not graded (${count})`;
+
+/** Finder on the home page and /find. Short labels; the data does the explaining. */
+export const finderCopy = {
+  title: "Find your members",
+  state: "State",
+  chooseState: "Choose a state",
+  name: "Name",
+  namePlaceholder: "Search by name",
+  privacy: "We don't ask for your address.",
+  districtHelp: "Not sure of your district?",
+  houseLink: "Find it on house.gov",
+  houseUrl: "https://www.house.gov/representatives/find-your-representative",
+  notGraded: "Not graded",
+  matches: "Matches",
+  senate: "Senate",
+  house: "House",
+} as const;
+export const finderHeading = (label: string, count: number) =>
+  `${label} (${count})`;
+export const districtLabel = (district: number | undefined) =>
+  district === undefined ? "House" : `District ${district}`;
+/** Shown when a name search has more matches than it lists. */
+export const showingFirst = (n: number) => `First ${n}`;
+
+/** Freshness line shown under the header on every page. */
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "7 Sep 2026" from an ISO date or timestamp (UTC); the input unchanged if it is not a date. */
+export function shortDate(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+export const updatedLabel = (date: string) => `Updated ${shortDate(date)}`;
+export const publicationNumberLabel = (n: number) => `Publication ${n}`;
+export const methodologyLinkLabel = "Methodology";
+export const newerVersionLabel = "Newer version available";
+
+/** One-line page heading above the finder. */
+export const heroCopy = {
+  home: "Who votes for privacy?",
+  former: "Former members",
+} as const;
