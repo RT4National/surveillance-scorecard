@@ -65,3 +65,26 @@ export const notGradedLabel = (minVotes: number) =>
 /** Heading for the last directory group. Wording follows decision D5, not yet confirmed by staff. */
 export const notGradedGroupLabel = (count: number) =>
   `Not graded (${count})`;
+
+/** Finder on the home page and /find. Short labels; the data does the explaining. */
+export const finderCopy = {
+  title: "Find your members",
+  state: "State",
+  chooseState: "Choose a state",
+  name: "Name",
+  namePlaceholder: "Search by name",
+  privacy: "We don't ask for your address.",
+  districtHelp: "Not sure of your district?",
+  houseLink: "Find it on house.gov",
+  houseUrl: "https://www.house.gov/representatives/find-your-representative",
+  notGraded: "Not graded",
+  matches: "Matches",
+  senate: "Senate",
+  house: "House",
+} as const;
+export const finderHeading = (label: string, count: number) =>
+  `${label} (${count})`;
+export const districtLabel = (district: number | undefined) =>
+  district === undefined ? "House" : `District ${district}`;
+/** Shown when a name search has more matches than it lists. */
+export const showingFirst = (n: number) => `First ${n}`;

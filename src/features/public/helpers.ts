@@ -16,6 +16,58 @@ export const readAsOf = (dataset: Dataset) => {
 };
 export const fmt = (n: number | null) =>
   n === null ? "Not yet rated" : `${Math.round(n)}%`;
+/** Lowercase, accent-free text for name matching. */
+export const normalize = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+/**
+ * The chosen state lives in the URL fragment (`#state=CA`), never in the query string:
+ * fragments are not sent to the server, query strings are logged by the Worker.
+ * An old `?state=` link is still read, then rewritten by `migrateLegacyState`.
+ */
+export const readState = () =>
+  new URLSearchParams(window.location.hash.slice(1)).get("state") ??
+  query().get("state") ??
+  "";
+export function writeState(state: string) {
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  if (state) hash.set("state", state);
+  else hash.delete("state");
+  const search = query();
+  search.delete("state");
+  const fragment = hash.toString();
+  window.history.replaceState(
+    null,
+    "",
+    window.location.pathname +
+      (search.size ? `?${search}` : "") +
+      (fragment ? `#${fragment}` : ""),
+  );
+}
+export function migrateLegacyState() {
+  if (query().has("state")) writeState(readState());
+}
+/** A state's current members: senators first, then the House by district. */
+export function delegation<
+  M extends {
+    chamber: string;
+    district?: number;
+    name: string;
+    status: string;
+    state: string;
+  },
+>(members: M[], state: string): M[] {
+  return members
+    .filter((m) => m.state === state && m.status === "active")
+    .sort(
+      (a, b) =>
+        Number(b.chamber === "Senate") - Number(a.chamber === "Senate") ||
+        (a.district ?? 0) - (b.district ?? 0) ||
+        a.name.localeCompare(b.name),
+    );
+}
 export type GradeTone = "good" | "mixed" | "poor" | "unrated";
 /**
  * Colour tone from the position of the scorer's grade within the active rubric's bands:

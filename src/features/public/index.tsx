@@ -17,7 +17,6 @@ import {
   reportSvg,
   reportTsv,
   decodeVoteId,
-  findStateRepresentatives,
   loadArchivedPublication,
   membershipSemantics,
   validateReportQuery,
@@ -427,55 +426,6 @@ export function ComparePage({ dataset, publication }: Props) {
           </article>
         ))}
       </div>
-    </section>
-  );
-}
-export function RepresentativeFinder({ dataset }: { dataset: Dataset }) {
-  const [state, setState] = useState("");
-  return (
-    <section className="public-page">
-      <h2>Find representatives by state</h2>
-      <p>
-        No address required. House seats are listed by district; state selection
-        does not identify your district.
-      </p>
-      <label>
-        State
-        <select value={state} onChange={(e) => setState(e.target.value)}>
-          <option value="">Choose a state</option>
-          {[...new Set(dataset.members.map((m) => m.state))].sort().map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
-      </label>
-      {state && (
-        <ul>
-          {findStateRepresentatives(dataset, state).map((m) => (
-            <li key={m.id}>
-              <a
-                href={publicUrl(`${base}/members/${encodeURIComponent(m.id)}`)}
-              >
-                {m.name}
-              </a>{" "}
-              — {m.chamber}
-              {m.district !== undefined ? `, district ${m.district}` : ""}
-            </li>
-          ))}
-        </ul>
-      )}
-      {state && !findStateRepresentatives(dataset, state).length && (
-        <p>
-          No active representatives for this state are included in this
-          publication. Check the coverage notes before interpreting missing
-          results.
-        </p>
-      )}
-      <p>
-        Member status reflects dataset {dataset.id} as of {dataset.asOf}.
-      </p>
-      {dataset.demo && (
-        <p>Demo publication: grades are unreviewed placeholders.</p>
-      )}
     </section>
   );
 }
