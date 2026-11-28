@@ -51,7 +51,11 @@ import { Profile } from "./features/public/Profile";
 import { Finder } from "./features/public/Finder";
 import { Freshness } from "./features/public/Freshness";
 import { Avatar, Grade } from "./features/public/member";
-import { useFilterClass } from "./features/public/motion";
+import {
+  filterChange,
+  filterMotionLimit,
+  useFilterClass,
+} from "./features/public/motion";
 import {
   base,
   fictional,
@@ -234,7 +238,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                     </th>
                   </tr>
                 )}
-                <tr role="row">
+                <tr role="row" data-filter-row="">
                   <td role="cell">
                     <a
                       className="member-name"
@@ -425,7 +429,9 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
   };
   function changeFilter(key: keyof Filters, value: string) {
     const next = { ...filters, [key]: value };
-    setFilters(next);
+    filterChange(() =>
+      setFilters((previous) => ({ ...previous, [key]: value })),
+    );
     if (key === "state" || key === "q") {
       writeFragment(key, value);
       // A pick (or a clear) in the finder is remembered in this browser only.
@@ -449,7 +455,7 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
     writeFragment("browse", open ? "all" : "");
   }
   function reset() {
-    setFilters(defaults);
+    filterChange(() => setFilters(defaults));
     const p = query();
     Object.keys(defaults).forEach((key) => p.delete(key));
     window.history.replaceState(
@@ -1028,7 +1034,12 @@ function Directory({
               </button>
             </div>
           </div>
-          <div className={`directory-results ${resultsMotion}`.trim()}>
+          <div
+            className={`directory-results ${resultsMotion}`.trim()}
+            data-filter-list={
+              filtered.length <= filterMotionLimit ? "" : undefined
+            }
+          >
             <MemberTable list={filtered} asOf={date} />
           </div>
           <div className="table-footer">

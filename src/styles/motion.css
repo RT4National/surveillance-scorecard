@@ -99,3 +99,24 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Snapshot only matching rows. Exit snapshots are visual only, never interactive. */
+:root.motion-filter-transition {
+  view-transition-name: none;
+}
+.motion-filter-transition [data-filter-list] [data-filter-row] {
+  view-transition-name: match-element;
+}
+:root.motion-filter-transition::view-transition {
+  pointer-events: none;
+}
+:root.motion-filter-transition::view-transition-group(*) {
+  animation-duration: var(--motion-fast);
+  animation-timing-function: var(--motion-ease);
+}
+:root.motion-filter-transition::view-transition-old(*):only-child {
+  animation: motion-filter-a var(--motion-fast) var(--motion-ease) reverse both;
+}
+:root.motion-filter-transition::view-transition-new(*):only-child {
+  animation: motion-filter-a var(--motion-fast) var(--motion-ease) both;
+}

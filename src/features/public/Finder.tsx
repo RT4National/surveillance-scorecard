@@ -12,7 +12,7 @@ import {
 import type { Member } from "../../core/types";
 import { Avatar, Grade } from "./member";
 import { base, delegation, fmt, normalize } from "./helpers";
-import { useFilterClass } from "./motion";
+import { filterMotionLimit, useFilterClass } from "./motion";
 import { stateAbbreviation, stateFragment } from "../../core/states";
 
 const searchLimit = 10;
@@ -21,7 +21,7 @@ function Row({ member }: { member: Member }) {
   const { score, linkId } = useScorecard();
   const s = score(member);
   return (
-    <li>
+    <li data-filter-row="">
       <a
         className="finder-row"
         href={publicationUrl(`${base}/members/${member.id}`, linkId)}
@@ -91,11 +91,9 @@ export function Finder({
       ? active.filter(named).sort((a, b) => a.name.localeCompare(b.name))
       : [];
   const Heading = level === 1 ? "h1" : "h2";
-  // Plan item 3.4: the results fade in briefly when the state or name changes.
-  const motion = useFilterClass(
-    `${chosen}|${name}`,
-    chosen ? list.length : Math.min(matches.length, searchLimit),
-  );
+  const rowCount = chosen ? list.length : Math.min(matches.length, searchLimit);
+  // Older browsers use the shared enter-only animation.
+  const motion = useFilterClass(`${chosen}|${name}`, rowCount);
   return (
     <section className="finder" aria-labelledby={`${id}-title`}>
       <Heading id={`${id}-title`}>{finderCopy.title}</Heading>
@@ -150,7 +148,10 @@ export function Finder({
           {finderCopy.houseLink}
         </a>
       </p>
-      <div className={`finder-results ${motion}`.trim()}>
+      <div
+        className={`finder-results ${motion}`.trim()}
+        data-filter-list={rowCount <= filterMotionLimit ? "" : undefined}
+      >
         {terms.length > 0 && !chosen && (
           <>
             <h3>
