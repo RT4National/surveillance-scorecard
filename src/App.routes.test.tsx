@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { createHash, webcrypto } from "node:crypto";
 import { DataProvider, demoDataset } from "./data/context";
 import { appPaths } from "./core/routes";
@@ -58,6 +64,7 @@ describe("app routing", () => {
   });
   it("keeps former members off the current directory but links to them", async () => {
     await show("/scorecard/");
+    fireEvent.click(screen.getByRole("button", { name: /^Browse all/ }));
     expect(listed(current.name)).toBe(true);
     expect(listed(former.name)).toBe(false);
     const link = screen.getByRole("link", { name: /Former members/ });

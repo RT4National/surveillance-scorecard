@@ -1,4 +1,11 @@
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -15,6 +22,12 @@ import {
 import { useScorecard } from "./data/context";
 import { groupLabels, scoreMember } from "./core/scoring";
 import {
+  bannerCopy,
+  browseAllLabel,
+  headerCopy,
+  navLinks,
+  countRowLabel,
+  groupCountLabel,
   hasCosponsorships,
   heroCopy,
   notGradedGroupLabel,
@@ -25,6 +38,7 @@ import type { Dataset, Publication } from "./core/publication";
 import { publishedScore } from "./core/publication-scores";
 import { publicationUrl } from "./core/navigation";
 import { matchRoute } from "./core/routes";
+import { stateFragment } from "./core/states";
 import {
   LegislationPage,
   ComparePage,
@@ -35,6 +49,7 @@ import { Profile } from "./features/public/Profile";
 import { Finder } from "./features/public/Finder";
 import { Freshness } from "./features/public/Freshness";
 import { Avatar, Grade } from "./features/public/member";
+import { useFilterClass } from "./features/public/motion";
 import {
   base,
   fictional,
@@ -45,7 +60,9 @@ import {
   readAsOf,
   readFragment,
   readState,
+  readStoredState,
   writeFragment,
+  writeStoredState,
   writeState,
 } from "./features/public/helpers";
 import { EditorPage } from "./features/editor/EditorPage";
@@ -65,12 +82,15 @@ const defaults = {
 };
 type Filters = typeof defaults;
 // `state` is read from the URL fragment (or an old ?state= link), never written to the query.
-const readFilters = (): Filters =>
+const readBrowse = () => readFragment("browse") === "all";
+const groupOrder: Group[] = ["reformer", "mixed", "surveillance", "unproven"];
+// On the home page, with no state in the address, the visitor's stored pick fills it in memory.
+const readFilters = (home = false): Filters =>
   ({
     ...Object.fromEntries(
       Object.entries(defaults).map(([k, v]) => [k, query().get(k) ?? v]),
     ),
-    state: readState(),
+    state: readState() || (home ? readStoredState() : ""),
     q: readFragment("q"),
   }) as Filters;
 function saveFile(name: string, value: string, type: string) {
@@ -154,7 +174,7 @@ function Select({
   );
 }
 function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
-  const { score, publication, dataset } = useScorecard();
+  const { score, publication, dataset, linkId } = useScorecard();
   const notGraded = notGradedLabel(dataset.rubric.minVotes);
   // The directory sorts not-graded members last; the first one opens their labelled group.
   const firstUngraded = list.findIndex((m) => score(m, asOf).value === null);
@@ -179,89 +199,89 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
             const s = score(m, asOf);
             return (
               <Fragment key={m.id}>
-              {i === firstUngraded && (
-                <tr className="not-graded-group">
-                  <th scope="rowgroup" colSpan={6}>
-                    {notGradedGroupLabel(ungradedCount)}
-                  </th>
+                {i === firstUngraded && (
+                  <tr className="not-graded-group">
+                    <th scope="rowgroup" colSpan={6}>
+                      {notGradedGroupLabel(ungradedCount)}
+                    </th>
+                  </tr>
+                )}
+                <tr>
+                  <td>
+                    <a
+                      className="member-name"
+                      href={publicationUrl(
+                        `${base}/members/${m.id}`,
+                        linkId,
+                        asOf,
+                      )}
+                    >
+                      <Avatar member={m} />
+                      <span>
+                        <strong>{m.name}</strong>
+                        <small>
+                          {m.state}
+                          {m.district !== undefined
+                            ? ` · District ${m.district}`
+                            : ""}
+                        </small>
+                      </span>
+                    </a>
+                  </td>
+                  <td>
+                    <span className={`party-dot ${m.party.toLowerCase()}`} />
+                    {m.party}
+                    <small>{m.chamber}</small>
+                  </td>
+                  <td>
+                    <Grade member={m} asOf={asOf} />
+                  </td>
+                  <td>
+                    {s.value === null ? (
+                      <span className="alignment-text not-graded">
+                        {notGraded}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="alignment-text">{fmt(s.value)}</span>
+                        <div className="meter">
+                          <span style={{ width: `${s.value}%` }} />
+                        </div>
+                      </>
+                    )}
+                  </td>
+                  <td>
+                    <span className={`category ${s.group}`}>
+                      <span />
+                      {s.group === "reformer"
+                        ? "Consistent reformer"
+                        : s.group === "surveillance"
+                          ? "Surveillance supporter"
+                          : s.group === "mixed"
+                            ? "Mixed record"
+                            : "Not enough evidence"}
+                    </span>
+                    <small>
+                      {scoredLabel(s, dataset.votes)} ·{" "}
+                      {s.reason.startsWith("Unproven")
+                        ? "More evidence needed"
+                        : "Both contexts reviewed"}
+                    </small>
+                  </td>
+                  <td>
+                    <a
+                      className="icon-link"
+                      href={publicationUrl(
+                        `${base}/members/${m.id}`,
+                        linkId,
+                        asOf,
+                      )}
+                      aria-label={`View ${m.name}'s profile`}
+                    >
+                      <ArrowUpRight size={18} />
+                    </a>
+                  </td>
                 </tr>
-              )}
-              <tr>
-                <td>
-                  <a
-                    className="member-name"
-                    href={publicationUrl(
-                      `${base}/members/${m.id}`,
-                      publication?.id,
-                      asOf,
-                    )}
-                  >
-                    <Avatar member={m} />
-                    <span>
-                      <strong>{m.name}</strong>
-                      <small>
-                        {m.state}
-                        {m.district !== undefined
-                          ? ` · District ${m.district}`
-                          : ""}
-                      </small>
-                    </span>
-                  </a>
-                </td>
-                <td>
-                  <span className={`party-dot ${m.party.toLowerCase()}`} />
-                  {m.party}
-                  <small>{m.chamber}</small>
-                </td>
-                <td>
-                  <Grade member={m} asOf={asOf} />
-                </td>
-                <td>
-                  {s.value === null ? (
-                    <span className="alignment-text not-graded">
-                      {notGraded}
-                    </span>
-                  ) : (
-                    <>
-                      <span className="alignment-text">{fmt(s.value)}</span>
-                      <div className="meter">
-                        <span style={{ width: `${s.value}%` }} />
-                      </div>
-                    </>
-                  )}
-                </td>
-                <td>
-                  <span className={`category ${s.group}`}>
-                    <span />
-                    {s.group === "reformer"
-                      ? "Consistent reformer"
-                      : s.group === "surveillance"
-                        ? "Surveillance supporter"
-                        : s.group === "mixed"
-                          ? "Mixed record"
-                          : "Not enough evidence"}
-                  </span>
-                  <small>
-                    {scoredLabel(s, dataset.votes)} ·{" "}
-                    {s.reason.startsWith("Unproven")
-                      ? "More evidence needed"
-                      : "Both contexts reviewed"}
-                  </small>
-                </td>
-                <td>
-                  <a
-                    className="icon-link"
-                    href={publicationUrl(
-                      `${base}/members/${m.id}`,
-                      publication?.id,
-                      asOf,
-                    )}
-                    aria-label={`View ${m.name}'s profile`}
-                  >
-                    <ArrowUpRight size={18} />
-                  </a>
-                </td>
-              </tr>
               </Fragment>
             );
           })}
@@ -277,22 +297,82 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
     </div>
   );
 }
-export default function App() {
+/**
+ * Content the Worker rendered into #root for this page (home and member profiles), captured by
+ * main.tsx before React mounts. Shown unchanged while the publication loads, so the first paint
+ * never turns back into a blank loading state. Its state picker and name box already work.
+ */
+function ServerPaint({
+  html,
+  state,
+  onState,
+  onName,
+}: {
+  html: string;
+  /** The current state, whose no-script delegation block stays shown (see worker/render.ts). */
+  state: string;
+  onState: (state: string) => void;
+  onName: (name: string) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const handlers = useRef({ onState, onName });
+  handlers.current = { onState, onName };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const listener = (event: Event) => {
+      const target = event.target as HTMLInputElement | HTMLSelectElement;
+      if (target.name === "state") handlers.current.onState(target.value);
+      else if (target.name === "q") handlers.current.onName(target.value);
+    };
+    el.addEventListener("change", listener);
+    el.addEventListener("input", listener);
+    return () => {
+      el.removeEventListener("change", listener);
+      el.removeEventListener("input", listener);
+    };
+  }, []);
+  // :target stops tracking once React re-creates this markup, and replaceState never moves it, so
+  // mark the current state's block with a class before paint instead (styles.css, .server-chosen).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const id = state ? stateFragment(state) : null;
+    for (const t of el.querySelectorAll(".state-target"))
+      t.classList.toggle("server-chosen", t.id === id);
+  }, [state, html]);
+  // The markup is the Worker's own, built from escaped text (worker/render.ts).
+  return (
+    <div
+      ref={ref}
+      className="server-paint"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+export default function App({ serverHtml }: { serverHtml?: string } = {}) {
   const {
     dataset,
     members,
     publication,
+    linkId,
     state: dataState,
     error: dataError,
   } = useScorecard();
   const path = window.location.pathname.replace(/\/$/, "");
   const route = matchRoute(window.location.pathname);
   const isFormer = route.name === "former";
-  const [filters, setFilters] = useState<Filters>(readFilters);
+  const home = route.name === "home";
+  const [filters, setFilters] = useState<Filters>(() => readFilters(home));
+  // The home directory opens in place ("Browse all"); the open state lives in the fragment.
+  const [browse, setBrowse] = useState(readBrowse);
   const [notice, setNotice] = useState("");
   useEffect(() => {
     migrateLegacyFragment();
-    const listener = () => setFilters(readFilters());
+    const listener = () => {
+      setFilters(readFilters(home));
+      setBrowse(readBrowse());
+    };
     window.addEventListener("popstate", listener);
     window.addEventListener("hashchange", listener);
     return () => {
@@ -320,6 +400,8 @@ export default function App() {
     setFilters(next);
     if (key === "state" || key === "q") {
       writeFragment(key, value);
+      // A pick (or a clear) in the finder is remembered in this browser only.
+      if (key === "state") writeStoredState(value);
       return;
     }
     const params = query();
@@ -334,6 +416,10 @@ export default function App() {
       `${window.location.pathname}${params.size ? `?${params}` : ""}${window.location.hash}`,
     );
   }
+  function openBrowse(open: boolean) {
+    setBrowse(open);
+    writeFragment("browse", open ? "all" : "");
+  }
   function reset() {
     setFilters(defaults);
     const p = query();
@@ -344,6 +430,7 @@ export default function App() {
       window.location.pathname + (p.size ? `?${p}` : "") + window.location.hash,
     );
     writeState("");
+    writeStoredState("");
     writeFragment("q", "");
   }
   // A state that is not in the data (stale link) filters nothing and selects nothing.
@@ -351,14 +438,6 @@ export default function App() {
     ? filters.state
     : "";
   const effectiveFilters = { ...filters, state: knownState };
-  const nav = [
-    { href: `${base}/`, title: "Scorecard" },
-    { href: `${base}/legislation`, title: "Legislation" },
-    { href: `${base}/compare`, title: "Compare" },
-    { href: `${base}/research`, title: "Research" },
-    { href: `${base}/methodology`, title: "Methodology" },
-    { href: `${base}/archive`, title: "Archive" },
-  ];
   const member =
     route.name === "member"
       ? members.find((m) => m.id === route.id)
@@ -366,9 +445,7 @@ export default function App() {
   const notFoundPage = (
     <section className="container empty">
       <h1>Page not found</h1>
-      <a href={publicationUrl(`${base}/`, publication?.id)}>
-        Back to the directory
-      </a>
+      <a href={publicationUrl(`${base}/`, linkId)}>Back to the directory</a>
     </section>
   );
   const directoryPage = (
@@ -391,64 +468,89 @@ export default function App() {
         className="container scorecard-section"
         aria-label="Explore legislators"
       >
-        <div className="section-heading">
-          <div>
-            <div className="eyebrow muted">
-              {isFormer ? "HISTORICAL EXPLORER" : "EXPLORE THE RECORD"}
+        {isFormer && (
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow muted">
+                {isFormer ? "HISTORICAL EXPLORER" : "EXPLORE THE RECORD"}
+              </div>
+              <h2>
+                {isFormer ? "All former members" : "All members"}
+                <span className="count-pill">
+                  {
+                    members.filter((m) =>
+                      isFormer ? m.status !== "active" : m.status === "active",
+                    ).length
+                  }{" "}
+                  {fictional(dataset) ? "demo members" : "members"}
+                </span>
+              </h2>
             </div>
-            <h2>
-              {isFormer ? "All former members" : "All members"}
-              <span className="count-pill">
-                {
-                  members.filter((m) =>
-                    isFormer ? m.status !== "active" : m.status === "active",
-                  ).length
-                }{" "}
-                {fictional(dataset) ? "demo members" : "members"}
-              </span>
-            </h2>
+            <a
+              className="subtle-link"
+              href={publicationUrl(
+                isFormer ? `${base}/` : `${base}/former`,
+                linkId,
+              )}
+            >
+              {isFormer ? "Current members" : "Former members"}{" "}
+              <ArrowRight size={16} />
+            </a>
+            <a
+              className="subtle-link"
+              href={publicationUrl(`${base}/research`, linkId)}
+            >
+              Build a research report <ArrowUpRight size={16} />
+            </a>
           </div>
-          <a
-            className="subtle-link"
-            href={publicationUrl(
-              isFormer ? `${base}/` : `${base}/former`,
-              publication?.id,
-            )}
-          >
-            {isFormer ? "Current members" : "Former members"}{" "}
-            <ArrowRight size={16} />
-          </a>
-          <a
-            className="subtle-link"
-            href={publicationUrl(`${base}/research`, publication?.id)}
-          >
-            Build a research report <ArrowUpRight size={16} />
-          </a>
-        </div>
+        )}
         <Directory
-          filters={effectiveFilters}
+          // Home: the finder owns the state; "Browse all" is the whole roster.
+          filters={
+            isFormer ? effectiveFilters : { ...effectiveFilters, state: "" }
+          }
           setFilter={changeFilter}
           reset={reset}
           archive={isFormer}
           copy={copy}
+          open={isFormer || browse}
+          onBrowse={openBrowse}
+          links={
+            <>
+              <a
+                className="subtle-link"
+                href={publicationUrl(`${base}/former`, linkId)}
+              >
+                {headerCopy.formerMembers} <ArrowRight size={16} />
+              </a>
+              <a
+                className="subtle-link"
+                href={publicationUrl(`${base}/research`, linkId)}
+              >
+                {headerCopy.research} <ArrowUpRight size={16} />
+              </a>
+            </>
+          }
         />
       </section>
-      <section className="container bottom-callout">
-        <div>
-          <span className="eyebrow">FOLLOW THE EVIDENCE</span>
-          <h2>A score should start a conversation.</h2>
-          <p>
-            Open a profile to see the votes, the calculation, and what the
-            record can—and cannot—tell us.
-          </p>
-        </div>
-        <a
-          className="button dark"
-          href={publicationUrl(`${base}/methodology`, publication?.id)}
-        >
-          Explore the methodology <ArrowRight size={16} />
-        </a>
-      </section>
+      {isFormer && (
+        <section className="container bottom-callout">
+          <div>
+            <span className="eyebrow">FOLLOW THE EVIDENCE</span>
+            <h2>A score should start a conversation.</h2>
+            <p>
+              Open a profile to see the votes, the calculation, and what the
+              record can—and cannot—tell us.
+            </p>
+          </div>
+          <a
+            className="button dark"
+            href={publicationUrl(`${base}/methodology`, linkId)}
+          >
+            Explore the methodology <ArrowRight size={16} />
+          </a>
+        </section>
+      )}
     </>
   );
   function routePage(): ReactNode {
@@ -457,7 +559,15 @@ export default function App() {
       case "former":
         return directoryPage;
       case "member":
-        return member ? <Profile member={member} copy={copy} /> : notFoundPage;
+        return member ? (
+          <Profile
+            member={member}
+            copy={copy}
+            serverPainted={serverHtml !== undefined}
+          />
+        ) : (
+          notFoundPage
+        );
       case "research":
         return <ReportsPage dataset={dataset} publication={publication} />;
       case "compare":
@@ -496,32 +606,38 @@ export default function App() {
       }
     }
   }
+  if (dataState === "loading" && serverHtml && route.name !== "editor")
+    return (
+      <ServerPaint
+        html={serverHtml}
+        state={knownState}
+        onState={(s) => changeFilter("state", s)}
+        onName={(q) => changeFilter("q", q)}
+      />
+    );
   return (
     <>
       <a className="skip-link" href="#main">
-        Skip to content
+        {headerCopy.skip}
       </a>
       <div className="preview-banner">
         <span className="preview-dot" />{" "}
         {dataState === "loading"
-          ? "LOADING SCORECARD"
+          ? bannerCopy.loading
           : dataset.demo
-            ? "DESIGN PREVIEW"
-            : "PUBLISHED SCORECARD"}{" "}
+            ? bannerCopy.preview
+            : bannerCopy.published}{" "}
         <span className="preview-copy">
           {dataset.demo
             ? fictional(dataset)
-              ? "Fictional members and votes. Explore the proposed experience."
-              : "Real congressional records. Scores use unreviewed placeholder vote directions, not Restore the Fourth's positions."
-            : `Evidence through ${dataset.asOf} · Publication ${publication?.id}`}
+              ? bannerCopy.fictional
+              : bannerCopy.placeholder
+            : bannerCopy.publishedLine(dataset.asOf, publication?.id ?? "")}
         </span>
       </div>
       <header className="site-header">
         <div className="header-inner">
-          <a
-            className="brand"
-            href={publicationUrl(`${base}/`, publication?.id)}
-          >
+          <a className="brand" href={publicationUrl(`${base}/`, linkId)}>
             <span className="brand-symbol">
               IV
               <span />
@@ -533,10 +649,10 @@ export default function App() {
             </span>
           </a>
           <nav aria-label="Main navigation">
-            {nav.map((n) => (
+            {navLinks.map((n) => (
               <a
                 key={n.href}
-                href={publicationUrl(n.href, publication?.id)}
+                href={publicationUrl(n.href, linkId)}
                 className={
                   n.href.replace(/\/$/, "") === path ||
                   (n.title === "Scorecard" && (!!member || isFormer))
@@ -548,8 +664,8 @@ export default function App() {
               </a>
             ))}
           </nav>
-          <a className="about-link" href="https://restorethe4th.com/">
-            Our mission <ArrowUpRight size={15} />
+          <a className="about-link" href={headerCopy.missionUrl}>
+            {headerCopy.mission} <ArrowUpRight size={15} />
           </a>
         </div>
       </header>
@@ -581,12 +697,7 @@ export default function App() {
         <div>
           Independent. Nonpartisan. Evidence-led.
           <br />
-          <a
-            href={publicationUrl(
-              `${base}/methodology#sources`,
-              publication?.id,
-            )}
-          >
+          <a href={publicationUrl(`${base}/methodology#sources`, linkId)}>
             Sources & reuse
           </a>
           <span>
@@ -600,7 +711,7 @@ export default function App() {
           </span>
           <br />
           <a href={`${base}/editor`}>Staff workspace</a> ·{" "}
-          <a href={publicationUrl(`${base}/find`, publication?.id)}>
+          <a href={publicationUrl(`${base}/find`, linkId)}>
             Find my representatives
           </a>
         </div>
@@ -620,14 +731,22 @@ function Directory({
   reset,
   archive,
   copy,
+  open,
+  onBrowse,
+  links,
 }: {
   filters: Filters;
   setFilter: (k: keyof Filters, v: string) => void;
   reset: () => void;
   archive: boolean;
   copy: (text: string) => Promise<void>;
+  /** False on the home page until "Browse all" (or a count link) opens the directory. */
+  open: boolean;
+  onBrowse: (open: boolean) => void;
+  /** Former-member and research links, shown beside "Browse all" on the home page. */
+  links: ReactNode;
 }) {
-  const { score, dataset, members, publication } = useScorecard();
+  const { score, dataset, members, publication, linkId } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
   const [status, setStatus] = useState(query().get("status") || "all");
   const source = members.filter((m) =>
@@ -664,30 +783,34 @@ function Directory({
   ];
   const counts = (group: Group) =>
     source.filter((m) => score(m, date).group === group).length;
-  const groups: { key: Group; short: string; description: string }[] = [
-    {
-      key: "reformer",
-      short: "Consistent reformers",
-      description: "Support reform under presidents of both parties.",
-    },
-    {
-      key: "mixed",
-      short: "Mixed record",
-      description:
-        "Voted both ways, or differently depending on the president's party.",
-    },
-    {
-      key: "unproven",
-      short: "Not enough evidence",
-      description:
-        "Too few scored votes, or votes under only one party's president.",
-    },
-    {
-      key: "surveillance",
-      short: "Surveillance supporters",
-      description: "Support surveillance under presidents of both parties.",
-    },
-  ];
+  // Plan item 3.4: the result table fades in briefly when a filter changes (skipped above ~100 rows).
+  const resultsMotion = useFilterClass(
+    JSON.stringify([filters, status, date]),
+    filtered.length,
+  );
+  const countRow = (
+    <nav className="count-row" aria-label={countRowLabel}>
+      {groupOrder.map((g) => (
+        <a
+          key={g}
+          className={`count-link ${g}`}
+          href={publicationUrl(
+            `${base}/${archive ? "former" : ""}?group=${g}${archive ? "" : "#browse=all"}`,
+            linkId,
+          )}
+          aria-current={filters.group === g ? "true" : undefined}
+          onClick={(e) => {
+            e.preventDefault();
+            setFilter("group", filters.group === g ? "" : g);
+            if (!archive) onBrowse(true);
+          }}
+        >
+          <span className={`count-icon ${g}`} aria-hidden="true" />
+          {groupCountLabel(g, counts(g))}
+        </a>
+      ))}
+    </nav>
+  );
   function archiveParam(key: string, value: string) {
     const p = query();
     p.set(key, value);
@@ -736,167 +859,160 @@ function Directory({
           </Select>
         </div>
       )}
-      <div className="group-cards">
-        {groups.map((g) => (
+      {countRow}
+      {!archive && (
+        <div className="browse-bar">
           <button
-            key={g.key}
-            onClick={() =>
-              setFilter("group", filters.group === g.key ? "" : g.key)
-            }
-            className={`group-card ${g.key} ${filters.group === g.key ? "selected" : ""}`}
-            aria-pressed={filters.group === g.key}
+            type="button"
+            className="button"
+            aria-expanded={open}
+            aria-controls="directory-panel"
+            onClick={() => onBrowse(!open)}
           >
-            <div>
-              <span className="category-dot" />
-              <strong>{g.short}</strong>
-              <span className="group-count">{counts(g.key)}</span>
-            </div>
-            <p>{g.description}</p>
-            <span className="group-action">
-              Explore group <ArrowRight size={14} />
-            </span>
+            {browseAllLabel(source.length)}
+            <ChevronDown size={15} aria-hidden="true" />
           </button>
-        ))}
-      </div>
-      <div className="directory-panel">
-        <p>
-          Current party and chamber describe the roster in this publication,
-          including the last recorded affiliation for former members. Historical
-          date filters narrow vote evidence, not roster membership.
-        </p>
-        <div className="filter-bar">
-          {archive && (
-            <label className="search-box">
-              <Search size={18} />
-              <span className="sr-only">Search legislators</span>
-              <input
-                type="search"
-                placeholder="Search by name or state…"
-                value={filters.q}
-                onChange={(e) => setFilter("q", e.target.value)}
-              />
-            </label>
-          )}
-          <Select
-            label="Current chamber"
-            value={filters.chamber}
-            onChange={(v) => setFilter("chamber", v)}
-          >
-            <option value="">All chambers</option>
-            <option>House</option>
-            <option>Senate</option>
-          </Select>
-          {archive && (
+          {links}
+        </div>
+      )}
+      {open && (
+        <div className="directory-panel" id="directory-panel">
+          <div className="filter-bar">
+            {archive && (
+              <label className="search-box">
+                <Search size={18} />
+                <span className="sr-only">Search legislators</span>
+                <input
+                  type="search"
+                  placeholder="Search by name or state…"
+                  value={filters.q}
+                  onChange={(e) => setFilter("q", e.target.value)}
+                />
+              </label>
+            )}
             <Select
-              label="State"
-              value={filters.state}
-              onChange={(v) => setFilter("state", v)}
+              label="Current chamber"
+              value={filters.chamber}
+              onChange={(v) => setFilter("chamber", v)}
             >
-              <option value="">All states</option>
-              {[...new Set(source.map((m) => m.state))].sort().map((s) => (
-                <option key={s}>{s}</option>
-              ))}
+              <option value="">All chambers</option>
+              <option>House</option>
+              <option>Senate</option>
             </Select>
-          )}
-          <Select
-            label="Current party"
-            value={filters.party}
-            onChange={(v) => setFilter("party", v)}
-          >
-            <option value="">All parties</option>
-            <option>Democratic</option>
-            <option>Republican</option>
-            <option>Independent</option>
-          </Select>
-          <Select
-            label="Committee / caucus"
-            value={filters.membership}
-            onChange={(v) => setFilter("membership", v)}
-          >
-            <option value="">All memberships</option>
-            {[
-              ...new Set(
-                source.flatMap((m) => [...m.committees, ...m.caucuses]),
-              ),
-            ]
-              .sort()
-              .map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-          </Select>
-        </div>
-        <div className="table-toolbar">
-          <div role="status">
-            <strong>{filtered.length}</strong> legislators
-            {filters.group && (
-              <span className="filter-chip">
-                {groupLabels[filters.group as Group] ?? filters.group}
-                <button
-                  aria-label="Clear group filter"
-                  onClick={() => setFilter("group", "")}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            )}
-            {Object.keys(filters).some(
-              (k) =>
-                filters[k as keyof Filters] !== defaults[k as keyof Filters],
-            ) && (
-              <button className="inline-button" onClick={reset}>
-                Clear filters
-              </button>
-            )}
-          </div>
-          <div className="toolbar-actions">
-            <label>
-              Sort by{" "}
-              <select
-                aria-label="Sort results"
-                value={filters.sort}
-                onChange={(e) => setFilter("sort", e.target.value)}
+            {archive && (
+              <Select
+                label="State"
+                value={filters.state}
+                onChange={(v) => setFilter("state", v)}
               >
-                <option value="score">Highest score</option>
-                <option value="name">Name A–Z</option>
-              </select>
-            </label>
-            <button onClick={() => void copy(window.location.href)}>
-              <Copy size={14} /> Share view
-            </button>
-            <button
-              onClick={() =>
-                saveFile(
-                  dataset.demo
-                    ? "scorecard-demo.csv"
-                    : "surveillance-scorecard.csv",
-                  toCsv(exportRows(filtered, dataset, date, publication)),
-                  "text/csv;charset=utf-8",
-                )
-              }
+                <option value="">All states</option>
+                {[...new Set(source.map((m) => m.state))].sort().map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </Select>
+            )}
+            <Select
+              label="Current party"
+              value={filters.party}
+              onChange={(v) => setFilter("party", v)}
             >
-              <ArrowDownToLine size={15} /> Export
-            </button>
+              <option value="">All parties</option>
+              <option>Democratic</option>
+              <option>Republican</option>
+              <option>Independent</option>
+            </Select>
+            <Select
+              label="Committee / caucus"
+              value={filters.membership}
+              onChange={(v) => setFilter("membership", v)}
+            >
+              <option value="">All memberships</option>
+              {[
+                ...new Set(
+                  source.flatMap((m) => [...m.committees, ...m.caucuses]),
+                ),
+              ]
+                .sort()
+                .map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+            </Select>
+          </div>
+          <div className="table-toolbar">
+            <div role="status">
+              <strong>{filtered.length}</strong> legislators
+              {filters.group && (
+                <span className="filter-chip">
+                  {groupLabels[filters.group as Group] ?? filters.group}
+                  <button
+                    aria-label="Clear group filter"
+                    onClick={() => setFilter("group", "")}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {Object.keys(filters).some(
+                (k) =>
+                  filters[k as keyof Filters] !== defaults[k as keyof Filters],
+              ) && (
+                <button className="inline-button" onClick={reset}>
+                  Clear filters
+                </button>
+              )}
+            </div>
+            <div className="toolbar-actions">
+              <label>
+                Sort by{" "}
+                <select
+                  aria-label="Sort results"
+                  value={filters.sort}
+                  onChange={(e) => setFilter("sort", e.target.value)}
+                >
+                  <option value="score">Highest score</option>
+                  <option value="name">Name A–Z</option>
+                </select>
+              </label>
+              <button onClick={() => void copy(window.location.href)}>
+                <Copy size={14} /> Share view
+              </button>
+              <button
+                onClick={() =>
+                  saveFile(
+                    dataset.demo
+                      ? "scorecard-demo.csv"
+                      : "surveillance-scorecard.csv",
+                    toCsv(exportRows(filtered, dataset, date, publication)),
+                    "text/csv;charset=utf-8",
+                  )
+                }
+              >
+                <ArrowDownToLine size={15} /> Export
+              </button>
+            </div>
+          </div>
+          <div className={`directory-results ${resultsMotion}`.trim()}>
+            <MemberTable list={filtered} asOf={date} />
+          </div>
+          <div className="table-footer">
+            <Info size={14} />
+            <span>
+              Grades reflect reform-aligned votes. Consistency is evaluated
+              separately.{" "}
+              <a href={publicationUrl(`${base}/methodology`, linkId)}>
+                How scoring works
+              </a>
+            </span>
+            <span className="demo-stamp">
+              {fictional(dataset)
+                ? "FICTIONAL DATA"
+                : dataset.demo
+                  ? "PLACEHOLDER SCORES"
+                  : dataset.asOf}
+            </span>
           </div>
         </div>
-        <MemberTable list={filtered} asOf={date} />
-        <div className="table-footer">
-          <Info size={14} />
-          <span>
-            Grades reflect reform-aligned votes. Consistency is evaluated
-            separately.{" "}
-            <a href={publicationUrl(`${base}/methodology`, publication?.id)}>
-              How scoring works
-            </a>
-          </span>
-          <span className="demo-stamp">
-            {fictional(dataset)
-              ? "FICTIONAL DATA"
-              : dataset.demo
-                ? "PLACEHOLDER SCORES"
-                : dataset.asOf}
-          </span>
-        </div>
-      </div>
+      )}
     </>
   );
 }

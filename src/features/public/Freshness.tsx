@@ -13,7 +13,7 @@ import { base } from "./helpers";
  * methodology link. The label needs the publication list; without it the date stands alone.
  */
 export function Freshness() {
-  const { publication, publications } = useScorecard();
+  const { publication, publications, linkId } = useScorecard();
   if (!publication) return null;
   const label = publicationLabel(publications, publication.id);
   const newer = newerPublication(publications, publication.id);
@@ -22,7 +22,7 @@ export function Freshness() {
       <p className="container">
         <span>{updatedLabel(publication.createdAt)}</span>
         {label && <span>{label}</span>}
-        <a href={publicationUrl(`${base}/methodology`, publication.id)}>
+        <a href={publicationUrl(`${base}/methodology`, linkId)}>
           {methodologyLinkLabel}
         </a>
         {newer && (

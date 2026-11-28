@@ -1,26 +1,30 @@
-import { useId } from "react";
+import { useId, useRef } from "react";
 import { useScorecard } from "../../data/context";
 import { publicationUrl } from "../../core/navigation";
 import {
+  changeStateLabel,
   districtLabel,
   finderCopy,
+  stateGridLabel,
   finderHeading,
   showingFirst,
 } from "../../core/copy";
 import type { Member } from "../../core/types";
 import { Avatar, Grade } from "./member";
 import { base, delegation, fmt, normalize } from "./helpers";
+import { useFilterClass } from "./motion";
+import { stateAbbreviation, stateFragment } from "../../core/states";
 
 const searchLimit = 10;
 
 function Row({ member }: { member: Member }) {
-  const { score, publication } = useScorecard();
+  const { score, linkId } = useScorecard();
   const s = score(member);
   return (
     <li>
       <a
         className="finder-row"
-        href={publicationUrl(`${base}/members/${member.id}`, publication?.id)}
+        href={publicationUrl(`${base}/members/${member.id}`, linkId)}
       >
         <Grade member={member} />
         <Avatar member={member} />
@@ -74,6 +78,7 @@ export function Finder({
 }) {
   const { members } = useScorecard();
   const id = useId();
+  const select = useRef<HTMLSelectElement>(null);
   const active = members.filter((m) => m.status === "active");
   const states = [...new Set(active.map((m) => m.state))].sort();
   const chosen = states.includes(state) ? state : "";
@@ -81,19 +86,28 @@ export function Finder({
   const named = (m: Member) =>
     terms.every((t) => normalize(m.name).includes(t));
   const list = chosen ? delegation(members, chosen).filter(named) : [];
-  const matches = terms.length && !chosen
-    ? active
-        .filter(named)
-        .sort((a, b) => a.name.localeCompare(b.name))
-    : [];
+  const matches =
+    terms.length && !chosen
+      ? active.filter(named).sort((a, b) => a.name.localeCompare(b.name))
+      : [];
   const Heading = level === 1 ? "h1" : "h2";
+  // Plan item 3.4: the results fade in briefly when the state or name changes.
+  const motion = useFilterClass(
+    `${chosen}|${name}`,
+    chosen ? list.length : Math.min(matches.length, searchLimit),
+  );
   return (
     <section className="finder" aria-labelledby={`${id}-title`}>
       <Heading id={`${id}-title`}>{finderCopy.title}</Heading>
       <div className="finder-controls">
         <label>
           <span>{finderCopy.state}</span>
-          <select value={chosen} onChange={(e) => onState(e.target.value)}>
+          <select
+            ref={select}
+            name="state"
+            value={chosen}
+            onChange={(e) => onState(e.target.value)}
+          >
             <option value="">{finderCopy.chooseState}</option>
             {states.map((s) => (
               <option key={s}>{s}</option>
@@ -104,6 +118,7 @@ export function Finder({
           <span>{finderCopy.name}</span>
           <input
             type="search"
+            name="q"
             placeholder={finderCopy.namePlaceholder}
             autoComplete="off"
             value={name}
@@ -111,6 +126,23 @@ export function Finder({
           />
         </label>
       </div>
+      <nav className="state-grid" aria-label={stateGridLabel}>
+        {states.map((s) => (
+          <a
+            key={s}
+            href={`#${stateFragment(s)}`}
+            aria-label={s}
+            title={s}
+            aria-current={s === chosen ? "true" : undefined}
+            onClick={(e) => {
+              e.preventDefault();
+              onState(s);
+            }}
+          >
+            {stateAbbreviation(s)}
+          </a>
+        ))}
+      </nav>
       <p className="finder-note">{finderCopy.privacy}</p>
       <p className="finder-note">
         {finderCopy.districtHelp}{" "}
@@ -118,33 +150,48 @@ export function Finder({
           {finderCopy.houseLink}
         </a>
       </p>
-      {terms.length > 0 && !chosen && (
-        <>
-          <h3>
-            {finderHeading(finderCopy.matches, matches.length)}
-            {matches.length > searchLimit && (
-              <small> · {showingFirst(searchLimit)}</small>
-            )}
-          </h3>
-          <ul className="finder-list">
-            {matches.slice(0, searchLimit).map((m) => (
-              <Row key={m.id} member={m} />
-            ))}
-          </ul>
-        </>
-      )}
-      {chosen && (
-        <>
-          <Group
-            label={finderCopy.senate}
-            list={list.filter((m) => m.chamber === "Senate")}
-          />
-          <Group
-            label={finderCopy.house}
-            list={list.filter((m) => m.chamber !== "Senate")}
-          />
-        </>
-      )}
+      <div className={`finder-results ${motion}`.trim()}>
+        {terms.length > 0 && !chosen && (
+          <>
+            <h3>
+              {finderHeading(finderCopy.matches, matches.length)}
+              {matches.length > searchLimit && (
+                <small> · {showingFirst(searchLimit)}</small>
+              )}
+            </h3>
+            <ul className="finder-list">
+              {matches.slice(0, searchLimit).map((m) => (
+                <Row key={m.id} member={m} />
+              ))}
+            </ul>
+          </>
+        )}
+        {chosen && (
+          <>
+            <p className="finder-chosen">
+              <strong>{chosen}</strong> ·{" "}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  onState("");
+                  select.current?.focus();
+                }}
+              >
+                {changeStateLabel}
+              </button>
+            </p>
+            <Group
+              label={finderCopy.senate}
+              list={list.filter((m) => m.chamber === "Senate")}
+            />
+            <Group
+              label={finderCopy.house}
+              list={list.filter((m) => m.chamber !== "Senate")}
+            />
+          </>
+        )}
+      </div>
     </section>
   );
 }

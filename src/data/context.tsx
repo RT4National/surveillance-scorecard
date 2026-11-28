@@ -5,8 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { dataset as demoMetadata, members, votes, records } from "./demo";
-import { rubric, scoreMember } from "../core/scoring";
+import { scoreMember } from "../core/scoring";
 import {
   publishedScore,
   verifyPublicationScoring,
@@ -17,18 +16,9 @@ import type {
   PublicationSummary,
 } from "../core/publication";
 import type { Member } from "../core/types";
+import { demoDataset } from "./demo-dataset";
 
-export const demoDataset: Dataset = {
-  ...demoMetadata,
-  members,
-  votes,
-  records,
-  rubric,
-  sources: [],
-  coverage: [
-    "Fictional demonstration records. Not an official congressional dataset.",
-  ],
-};
+export { demoDataset };
 type LoadState = {
   dataset: Dataset;
   publication?: Publication;
@@ -36,6 +26,11 @@ type LoadState = {
   error?: string;
 };
 type DataState = LoadState & {
+  /**
+   * Publication to carry in links: set only when the visitor arrived pinned to one with
+   * ?publication=. Exports and reports record `publication.id` instead, pinned or not.
+   */
+  linkId?: string;
   /** Newest first. Null until loaded, and if the list request fails. */
   publications: PublicationSummary[] | null;
 };
@@ -57,9 +52,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     dataset: demoDataset,
     state: "loading",
   });
-  const [publications, setPublications] = useState<
-    PublicationSummary[] | null
-  >(null);
+  const [publications, setPublications] = useState<PublicationSummary[] | null>(
+    null,
+  );
   useEffect(() => {
     const controller = new AbortController();
     const pinned = new URLSearchParams(window.location.search).get(
@@ -109,15 +104,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           );
         await verifyPublicationScoring(publication);
         if (controller.signal.aborted) return;
-        if (!pinned) {
-          const url = new URL(window.location.href);
-          url.searchParams.set("publication", publication.id);
-          window.history.replaceState(
-            null,
-            "",
-            url.pathname + url.search + url.hash,
-          );
-        }
+        // The latest publication leaves the address clean; only a pinned visit keeps ?publication=.
         setState({
           dataset: publication.dataset,
           publication,
@@ -154,7 +141,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
     return () => controller.abort();
   }, []);
-  return <DataContext.Provider value={{ ...state, publications }}>{children}</DataContext.Provider>;
+  const linkId =
+    state.publication &&
+    new URLSearchParams(window.location.search).get("publication") ===
+      state.publication.id
+      ? state.publication.id
+      : undefined;
+  return (
+    <DataContext.Provider value={{ ...state, publications, linkId }}>
+      {children}
+    </DataContext.Provider>
+  );
 }
 export function useScorecard() {
   const state = useContext(DataContext);

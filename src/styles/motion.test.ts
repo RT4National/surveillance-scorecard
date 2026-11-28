@@ -105,3 +105,14 @@ describe("motion module", () => {
     }
   });
 });
+describe("filter motion (plan item 3.4)", () => {
+  it("defines a restartable filter class pair under 200 ms", () => {
+    for (const name of ["motion-filter-a", "motion-filter-b"]) {
+      const rule = block(motion, new RegExp(`\\.${name}\\s*(?=\\{)`));
+      expect(rule, name).not.toBeNull();
+      expect(squash(rule!)).toMatch(new RegExp(`animation\\s*:\\s*${name}\\s+var\\(--motion-fast\\)`));
+    }
+    const fast = Number(/--motion-fast\s*:\s*(\d+)ms/.exec(motion)?.[1]);
+    expect(fast).toBeLessThan(200);
+  });
+});

@@ -392,58 +392,6 @@ hr {
 .muted {
   color: var(--muted);
 }
-.group-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
-  margin-bottom: 23px;
-}
-.group-card {
-  text-align: left;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  padding: 18px;
-  background: #eff5f7;
-  position: relative;
-  transition:
-    box-shadow var(--motion-fast),
-    transform var(--motion-fast);
-}
-.group-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px #193e3510;
-}
-.group-card.selected {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-.group-card.mixed {
-  background: #f7f0eb;
-  border-color: #e9d8ce;
-}
-.group-card.unproven {
-  background: #f2f4f4;
-  border-color: #e0e2de;
-}
-.group-card.surveillance {
-  background: #f8efec;
-  border-color: #e9d9d4;
-}
-.group-card > div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.group-card strong {
-  font-size: 12px;
-  font-weight: 600;
-}
-.group-count {
-  margin-left: auto;
-  font-size: 25px;
-  font-weight: 450;
-  line-height: 1;
-}
 .category-dot {
   width: 6px;
   height: 6px;
@@ -458,18 +406,6 @@ hr {
 }
 .surveillance .category-dot {
   background: var(--orange);
-}
-.group-card p {
-  font-size: 11px;
-  margin: 10px 0 17px;
-  line-height: 1.5;
-}
-.group-action {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 550;
 }
 .directory-panel {
   border: 1px solid var(--line);
@@ -1513,18 +1449,6 @@ input[type="date"] {
   .search-box {
     grid-column: span 4;
   }
-  .group-card strong {
-    font-size: 11px;
-  }
-  .group-card {
-    padding: 15px 12px;
-  }
-  .group-card p {
-    min-height: 34px;
-  }
-  .group-count {
-    font-size: 21px;
-  }
   .method-layout {
     grid-template-columns: 1.4fr 1fr;
   }
@@ -1635,23 +1559,6 @@ input[type="date"] {
     gap: 8px;
   }
   .section-heading > .subtle-link {
-    display: none;
-  }
-  .group-cards {
-    grid-template-columns: 1fr;
-    gap: 9px;
-  }
-  .group-card {
-    padding: 14px 16px;
-  }
-  .group-card strong {
-    font-size: 12px;
-  }
-  .group-card p {
-    min-height: 0;
-    margin: 7px 0 0;
-  }
-  .group-action {
     display: none;
   }
   .group-count {
@@ -2164,4 +2071,124 @@ input[type="date"] {
   .member-table tbody tr:hover {
     background: #fffefa;
   }
+}
+
+/* Home count row: one compact filter link per category. Each has a shape and words, not colour alone. */
+.count-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+.count-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+.count-link:hover {
+  text-decoration-color: currentColor;
+}
+.count-link[aria-current="true"] {
+  font-weight: 650;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 2px;
+}
+.count-icon {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+}
+/* Reformer: filled circle. Mixed: half-filled circle. Supporter: filled square. Not enough: hollow circle. */
+.count-icon.reformer {
+  border-radius: 50%;
+  background: var(--blue);
+}
+.count-icon.mixed {
+  border-radius: 50%;
+  border: 2px solid var(--brown);
+  background: linear-gradient(90deg, var(--brown) 50%, transparent 50%);
+}
+.count-icon.surveillance {
+  background: var(--orange);
+}
+.count-icon.unproven {
+  border-radius: 50%;
+  border: 2px solid #7d827c;
+}
+.browse-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-bottom: 18px;
+}
+.browse-bar .button[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* Wrapper around the Worker's first paint while the publication loads (App.tsx, ServerPaint). */
+.server-paint {
+  display: contents;
+}
+
+/* One-tap state links beside the picker. Targets are at least 24 x 24 px (WCAG 2.5.8). */
+.state-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 10px 0 4px;
+}
+.state-grid a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--ink);
+  text-decoration: none;
+}
+.state-grid a:hover,
+.state-grid a:focus-visible {
+  border-color: var(--ink);
+}
+.state-grid a[aria-current="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+/* The chosen (or remembered) state, with a one-click way to clear it. */
+.finder-chosen {
+  margin: 14px 0 0;
+  font-size: 14px;
+}
+/* Server first paint without JavaScript: a state's delegation shows when the fragment targets it. */
+.server-delegation {
+  display: none;
+}
+.state-target {
+  display: block;
+  /* A #state= landing scrolls here; keep the heading and finder above it in view. */
+  scroll-margin-top: 40vh;
+}
+.state-target:target + .server-delegation {
+  display: block;
+}
+/* Once the app runs, the class set by ServerPaint decides instead of :target. */
+.server-paint .state-target:target + .server-delegation {
+  display: none;
+}
+.server-paint .state-target.server-chosen + .server-delegation {
+  display: block;
 }

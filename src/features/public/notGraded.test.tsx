@@ -70,7 +70,8 @@ describe("profile", () => {
 
 describe("directory", () => {
   function directory(sort: string) {
-    window.history.replaceState(null, "", `/scorecard/?sort=${sort}`);
+    // The home directory is collapsed until "Browse all"; open it from the fragment.
+    window.history.replaceState(null, "", `/scorecard/?sort=${sort}#browse=all`);
     const { container } = render(<App />);
     const rows = [...container.querySelectorAll("table.member-table tbody tr")];
     return { container, rows };

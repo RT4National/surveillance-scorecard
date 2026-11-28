@@ -10,6 +10,7 @@ import type { Rubric } from "../core/types";
 import {
   hasCosponsorships,
   methodologyCopy,
+  rosterNote,
   scoredNoun,
 } from "../core/copy";
 import { GradingRulesControls } from "./GradingRules";
@@ -73,6 +74,7 @@ export function PolicyLab({ dataset }: { dataset: Dataset }) {
             <h2>What the published score measures</h2>
             <p>{methodologyCopy.definition}</p>
             <p>{methodologyCopy.cosponsorships}</p>
+            <p>{rosterNote}</p>
             <p>
               At least {dataset.rubric.minVotes} scored actions are required for
               a grade. Consistency requires {dataset.rubric.minPerContext} votes

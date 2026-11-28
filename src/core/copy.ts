@@ -42,7 +42,11 @@ export function scoredActionCounts(
 export const scoredLabel = (
   score: { evidence: { voteId: string; scored: boolean }[] },
   votes: Pick<Vote, "id" | "kind">[],
-) => scoredActionsLabel(scoredActionCounts(score, votes), hasCosponsorships(votes));
+) =>
+  scoredActionsLabel(
+    scoredActionCounts(score, votes),
+    hasCosponsorships(votes),
+  );
 
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
@@ -64,8 +68,7 @@ export const notGradedLabel = (minVotes: number) =>
   `Not graded: fewer than ${minVotes} votes`;
 
 /** Heading for the last directory group. Wording follows decision D5, not yet confirmed by staff. */
-export const notGradedGroupLabel = (count: number) =>
-  `Not graded (${count})`;
+export const notGradedGroupLabel = (count: number) => `Not graded (${count})`;
 
 /** One word per evidence state. Each pairs with an icon shape in EvidenceRow, so colour is never the only signal. */
 export const alignmentLabels: Record<AlignmentState, string> = {
@@ -121,7 +124,8 @@ export const splitCopy = {
   ownLabel: "Own party's president",
   otherLabel: "Other party's president",
   meaning: "Same record, split by which party held the White House.",
-  limits: "Different votes come up under different presidents: a pattern, not a motive.",
+  limits:
+    "Different votes come up under different presidents: a pattern, not a motive.",
   chipsLabel: "Show evidence",
   chipAll: "All",
   chipOwn: "Own-party president",
@@ -221,7 +225,20 @@ export const districtLabel = (district: number | undefined) =>
 export const showingFirst = (n: number) => `First ${n}`;
 
 /** Freshness line shown under the header on every page. */
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const months = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 /** "7 Sep 2026" from an ISO date or timestamp (UTC); the input unchanged if it is not a date. */
 export function shortDate(value: string): string {
   const d = new Date(value);
@@ -244,3 +261,73 @@ export const heroCopy = {
  * minimum, so rounding down keeps the shown number inside the shown band (89.6 is a B, shown as 89%).
  */
 export const percentLabel = (n: number) => `${Math.floor(n)}%`;
+
+/** Home count row: one compact filter link per category. */
+export const countRowLabel = "Filter by record";
+const groupCountWords: Record<
+  "reformer" | "mixed" | "surveillance" | "unproven",
+  [string, string]
+> = {
+  reformer: ["reformer", "reformers"],
+  mixed: ["mixed", "mixed"],
+  surveillance: ["surveillance supporter", "surveillance supporters"],
+  unproven: ["not enough evidence", "not enough evidence"],
+};
+/** "52 reformers", "1 mixed", "79 surveillance supporters", "234 not enough evidence". */
+export const groupCountLabel = (
+  group: keyof typeof groupCountWords,
+  n: number,
+) => `${n} ${groupCountWords[group][n === 1 ? 0 : 1]}`;
+/** The control that opens the full directory in place. */
+export const browseAllLabel = (n: number) => `Browse all ${n}`;
+/** What the directory's roster columns mean. Methodology page only. */
+export const rosterNote =
+  "Current party and chamber describe the roster in this publication, including the last recorded affiliation for former members. Historical date filters narrow vote evidence, not roster membership.";
+
+/** Site banner. Shown by the app and in the Worker's server-rendered first paint. */
+export const bannerCopy = {
+  loading: "LOADING SCORECARD",
+  preview: "DESIGN PREVIEW",
+  published: "PUBLISHED SCORECARD",
+  fictional: "Fictional members and votes. Explore the proposed experience.",
+  placeholder:
+    "Real congressional records. Scores use unreviewed placeholder vote directions, not Restore the Fourth's positions.",
+  publishedLine: (asOf: string, id: string) =>
+    `Evidence through ${asOf} · Publication ${id}`,
+} as const;
+
+/** Main navigation, in order. Paths are under /scorecard. */
+export const navLinks = [
+  { href: "/scorecard/", title: "Scorecard" },
+  { href: "/scorecard/legislation", title: "Legislation" },
+  { href: "/scorecard/compare", title: "Compare" },
+  { href: "/scorecard/research", title: "Research" },
+  { href: "/scorecard/methodology", title: "Methodology" },
+  { href: "/scorecard/archive", title: "Archive" },
+] as const;
+export const headerCopy = {
+  skip: "Skip to content",
+  mission: "Our mission",
+  missionUrl: "https://restorethe4th.com/",
+  formerMembers: "Former members",
+  research: "Build a research report",
+} as const;
+
+/** Profile labels shared by the app and the server-rendered first paint. */
+export const profileCopy = {
+  back: "All legislators",
+  eyebrow: (fictional: boolean, status: string) =>
+    `${fictional ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} · ${status.toUpperCase()}`,
+  alignment: (percent: string) => `${percent} reform alignment`,
+  splitHeading: "Principles across presidencies",
+  copyLink: "Copy profile link",
+  memberships: "Committees & caucuses",
+  noMemberships: "No current memberships listed",
+  serviceBegins: (since: number | string) => `Service begins ${since}.`,
+  demoRecord: "Demonstration record.",
+  verify: "See the publication sources for verification.",
+} as const;
+
+/** Finder extras: the one-tap state links and the remembered-state line. */
+export const stateGridLabel = "States";
+export const changeStateLabel = "Change";

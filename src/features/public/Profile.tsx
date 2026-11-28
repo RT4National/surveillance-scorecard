@@ -10,6 +10,7 @@ import {
   headlineCopy,
   hasCosponsorships,
   notGradedLabel,
+  profileCopy,
   scoredLabel,
   scoredNoun,
   splitCopy,
@@ -34,11 +35,14 @@ const newestFirst = (list: EvidenceEntry[]) =>
 export function Profile({
   member,
   copy,
+  serverPainted = false,
 }: {
   member: Member;
   copy: (text: string) => Promise<void>;
+  /** The Worker already painted the split bars at full width: do not grow them again. */
+  serverPainted?: boolean;
 }) {
-  const { score, dataset, rubric, publication } = useScorecard();
+  const { score, dataset, rubric, publication, linkId } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
   // Motion (src/styles/motion.css): the grade and evidence restart a short change animation on each
   // timeline date change, and the split bars grow once on first view. Values are final either way.
@@ -88,7 +92,7 @@ export function Profile({
     <Fragment key={e.voteId}>
       <EvidenceRow
         entry={e}
-        publicationId={publication?.id}
+        publicationId={linkId}
         actions={
           <button
             type="button"
@@ -116,11 +120,8 @@ export function Profile({
   );
   return (
     <section className="container inner-page">
-      <a
-        className="back-link"
-        href={publicationUrl(`${base}/`, publication?.id)}
-      >
-        <ArrowLeft size={16} /> All legislators
+      <a className="back-link" href={publicationUrl(`${base}/`, linkId)}>
+        <ArrowLeft size={16} /> {profileCopy.back}
       </a>
       <div className="profile-heading">
         <figure className="profile-portrait">
@@ -135,8 +136,7 @@ export function Profile({
         </figure>
         <div>
           <div className="eyebrow">
-            {fictional(dataset) ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} ·{" "}
-            {member.status.toUpperCase()}
+            {profileCopy.eyebrow(fictional(dataset), member.status)}
           </div>
           <h1>{member.name}</h1>
           <p>
@@ -150,7 +150,7 @@ export function Profile({
           className="button"
           onClick={() => void copy(window.location.href)}
         >
-          <Copy size={15} /> Copy profile link
+          <Copy size={15} /> {profileCopy.copyLink}
         </button>
       </div>
       <div className="profile-layout">
@@ -160,7 +160,7 @@ export function Profile({
             <h2>
               {s.value === null
                 ? notGradedLabel(rubric.minVotes)
-                : `${fmt(s.value)} reform alignment`}
+                : profileCopy.alignment(fmt(s.value))}
             </h2>
           </div>
           <ul className="headline-lines">
@@ -188,22 +188,20 @@ export function Profile({
           <span className={`category ${s.group}`}>{groupLabels[s.group]}</span>
           <p>{s.reason}</p>
           <hr />
-          <h3>Committees & caucuses</h3>
+          <h3>{profileCopy.memberships}</h3>
           <p>
             {[...member.committees, ...member.caucuses].join(" · ") ||
-              "No current memberships listed"}
+              profileCopy.noMemberships}
           </p>
           <p className="muted">
-            Service begins {member.since}.{" "}
-            {fictional(dataset)
-              ? "Demonstration record."
-              : "See the publication sources for verification."}
+            {profileCopy.serviceBegins(member.since)}{" "}
+            {fictional(dataset) ? profileCopy.demoRecord : profileCopy.verify}
           </p>
         </aside>
         <div className="profile-main">
           <div className="panel">
             <div className="section-heading">
-              <h2>Principles across presidencies</h2>
+              <h2>{profileCopy.splitHeading}</h2>
               <ShieldCheck size={20} />
             </div>
             <p className="muted">{splitCopy.meaning}</p>
@@ -211,7 +209,7 @@ export function Profile({
               <>
                 <div
                   ref={barsRef}
-                  className={`split-bars${barsSeen ? " motion-grow-x" : ""}`}
+                  className={`split-bars${barsSeen && !serverPainted ? " motion-grow-x" : ""}`}
                 >
                   {(
                     [
@@ -299,7 +297,7 @@ export function Profile({
               {frozen(asOf)
                 ? `Frozen published grade · scorer ${publication?.scoring?.version} · rubric ${rubric.version}.`
                 : `Recalculated with rubric ${rubric.version} and the current scoring engine.`}{" "}
-              <a href={publicationUrl(`${base}/archive`, publication?.id)}>
+              <a href={publicationUrl(`${base}/archive`, linkId)}>
                 View immutable published versions
               </a>{" "}
               to see what was actually published at the time.

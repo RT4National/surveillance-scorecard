@@ -3,7 +3,8 @@ import { authenticate, HttpError, type Actor } from "./auth";
 import { digest, validateDataset } from "./validation";
 import { research } from "./ai";
 import { createPublicationScoring } from "../src/core/publication-scores";
-import { members as demoMembers, votes as demoVotes } from "../src/data/demo";
+import { demoDataset } from "../src/data/demo-dataset";
+import { renderHome, renderMember, type PageData } from "./render";
 import {
   encodeStoredJson,
   decodeStoredJson,
@@ -507,16 +508,25 @@ async function page(request: Request, env: Env, url: URL): Promise<Response> {
   if (requested && !p)
     return new Response("Publication not found", { status: 404 });
   const demo = p?.dataset.demo ?? true;
+  const data: PageData = {
+    dataset: p?.dataset ?? demoDataset,
+    publication: p ?? undefined,
+    linkId: requested && p ? p.id : undefined,
+  };
+  let root: { kind: string; render: () => string } | undefined;
+  if (route.name === "home")
+    root = { kind: "home", render: () => renderHome(data) };
   if (route.name === "member") {
-    const m = (p?.dataset.members ?? demoMembers).find(
-      (m) => m.id === route.id,
-    );
+    const m = data.dataset.members.find((m) => m.id === route.id);
     if (!m) return notFound(request, env, url);
+    // TODO(phase 6, items 6.1-6.2): grade in the title and og tags and a per-member og:image,
+    // only for non-demo publications with frozen scoring. Not before.
     title = `${m.name} — Surveillance reform scorecard`;
     description = `Explore ${m.name}’s surveillance reform record and the evidence behind the grade.`;
+    root = { kind: "member", render: () => renderMember(data, m) };
   } else if (route.name === "legislation" && route.voteId !== undefined) {
     const id = route.voteId;
-    const v = (p?.dataset.votes ?? demoVotes).find((v) => v.id === id);
+    const v = data.dataset.votes.find((v) => v.id === id);
     if (!v) return notFound(request, env, url);
     title = `${v.bill}: ${v.title}`;
     description = v.rationale;
@@ -524,11 +534,25 @@ async function page(request: Request, env: Env, url: URL): Promise<Response> {
   const canonical = new URL(url);
   canonical.search = "";
   if (requested) canonical.searchParams.set("publication", requested);
+  // Server-rendered first paint. A rendering failure leaves the root empty; the app still loads.
+  let rootHtml: { kind: string; html: string } | undefined;
+  if (root)
+    try {
+      rootHtml = { kind: root.kind, html: root.render() };
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "first-paint-failed",
+          error: error instanceof Error ? error.name : "unknown",
+        }),
+      );
+    }
   return shell(request, env, url, {
     title,
     description,
     noindex: demo || route.name === "editor",
     canonical: canonical.href,
+    root: rootHtml,
   });
 }
 /** The app shell with a 404 status. The app itself renders "Page not found". */
@@ -550,6 +574,8 @@ async function shell(
     noindex: boolean;
     canonical?: string;
     status?: number;
+    /** Escaped markup for #root (worker/render.ts) and the page kind for data-server. */
+    root?: { kind: string; html: string };
   },
 ): Promise<Response> {
   const { title, description, noindex, canonical } = meta;
@@ -606,6 +632,13 @@ async function shell(
     .on("head", {
       element(e) {
         e.append(head, { html: true });
+      },
+    })
+    .on("div#root", {
+      element(e) {
+        if (!meta.root) return;
+        e.setAttribute("data-server", meta.root.kind);
+        e.setInnerContent(meta.root.html, { html: true });
       },
     })
     .transform(response);
