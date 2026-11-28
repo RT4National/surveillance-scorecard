@@ -112,15 +112,15 @@ describe("profile split panel", () => {
       (cell) => [...cell.children].map(text),
     );
     expect(cells).toEqual([
-      ["President of their own party", "33%", "4 scored votes"],
-      ["President of another party", "100%", "2 scored votes"],
+      ["President of their own party", "33%", "4 votes"],
+      ["President of another party", "100%", "2 votes"],
     ]);
   });
 
   it("shows counts and no percentage when the scorer reports the record unproven", () => {
     const panel = split(8);
     expect(text(panel)).toContain(
-      "2 votes under a president of their own party, 0 under a president of the other party.",
+      "2 own-party · 0 other-party votes",
     );
     expect(text(panel)).toContain(splitCopy.notEnough);
     expect(text(panel)).not.toContain("%");
@@ -133,6 +133,6 @@ describe("profile split panel", () => {
     expect(text(panel)).toContain(splitCopy.independent);
     expect(text(panel)).not.toContain("%");
     expect(panel.querySelector(".context-grid")).toBeNull();
-    expect(text(panel)).not.toContain("under a president of the other party");
+    expect(text(panel)).not.toContain("other-party votes");
   });
 });

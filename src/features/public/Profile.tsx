@@ -108,12 +108,12 @@ export function Profile({
                   <div>
                     <span>President of their own party</span>
                     <strong>{split.own.percent}%</strong>
-                    <small>{voteCount(split.own.count, "scored")}</small>
+                    <small>{voteCount(split.own.count)}</small>
                   </div>
                   <div>
                     <span>President of another party</span>
                     <strong>{split.other.percent}%</strong>
-                    <small>{voteCount(split.other.count, "scored")}</small>
+                    <small>{voteCount(split.other.count)}</small>
                   </div>
                 </div>
                 {s.topicCoverageWarning && (

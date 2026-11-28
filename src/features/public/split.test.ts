@@ -28,7 +28,7 @@ describe("splitDisplay", () => {
     expect(d.ownCount).toBe(2);
     expect(d.otherCount).toBe(0);
     expect(d.counts).toBe(
-      "2 votes under a president of their own party, 0 under a president of the other party.",
+      "2 own-party · 0 other-party votes",
     );
     expect(d.counts).not.toContain("%");
     expect(d.message).toBe(splitCopy.notEnough);
@@ -42,7 +42,7 @@ describe("splitDisplay", () => {
       ),
     ).toMatchObject({
       counts:
-        "1 vote under a president of their own party, 9 under a president of the other party.",
+        "1 own-party · 9 other-party votes",
     });
   });
 

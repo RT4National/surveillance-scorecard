@@ -36,7 +36,7 @@ describe("compare page split", () => {
 
     const u = text(card(unproven.name));
     expect(u).toContain(
-      "2 votes under a president of their own party, 0 under a president of the other party.",
+      "2 own-party · 0 other-party votes",
     );
     expect(u).toContain(splitCopy.notEnough);
     expect(u).not.toMatch(/Same party|Other party/);

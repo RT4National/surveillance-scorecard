@@ -27,15 +27,12 @@ export type SplitDisplay =
  * The Independent sentence follows the plan's D6 recommendation (no split shown), not yet confirmed by staff.
  */
 export const splitCopy = {
-  notEnough:
-    "There is not yet enough evidence to compare the record under the two kinds of president.",
-  independent:
-    "Not applicable: an Independent never serves under a president of their own party, so this comparison is not shown.",
+  notEnough: "Too few votes to compare.",
+  independent: "Not shown for Independents.",
 };
 
-/** "1 vote", "4 votes"; with a qualifier, "1 scored vote". */
-export const voteCount = (n: number, qualifier?: string) =>
-  `${n} ${qualifier ? `${qualifier} ` : ""}${n === 1 ? "vote" : "votes"}`;
+/** "1 vote", "4 votes". */
+export const voteCount = (n: number) => `${n} ${n === 1 ? "vote" : "votes"}`;
 
 export function splitDisplay(score: SplitInput, party: Party): SplitDisplay {
   if (party === "Independent" && score.ownCount === 0)
@@ -54,7 +51,7 @@ export function splitDisplay(score: SplitInput, party: Party): SplitDisplay {
     kind: "unproven",
     ownCount: score.ownCount,
     otherCount: score.otherCount,
-    counts: `${voteCount(score.ownCount)} under a president of their own party, ${score.otherCount} under a president of the other party.`,
+    counts: `${score.ownCount} own-party · ${score.otherCount} other-party ${score.otherCount === 1 ? "vote" : "votes"}`,
     message: splitCopy.notEnough,
   };
 }
