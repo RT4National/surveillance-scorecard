@@ -1,7 +1,11 @@
 import { useScorecard } from "../../data/context";
 import { publicationUrl } from "../../core/navigation";
-import { methodologyLinkLabel, updatedLabel } from "../../core/copy";
-import { publicationLabel } from "../../core/publication";
+import {
+  methodologyLinkLabel,
+  newerVersionLabel,
+  updatedLabel,
+} from "../../core/copy";
+import { newerPublication, publicationLabel } from "../../core/publication";
 import { base } from "./helpers";
 
 /**
@@ -12,6 +16,7 @@ export function Freshness() {
   const { publication, publications } = useScorecard();
   if (!publication) return null;
   const label = publicationLabel(publications, publication.id);
+  const newer = newerPublication(publications, publication.id);
   return (
     <div className="freshness">
       <p className="container">
@@ -20,6 +25,14 @@ export function Freshness() {
         <a href={publicationUrl(`${base}/methodology`, publication.id)}>
           {methodologyLinkLabel}
         </a>
+        {newer && (
+          <a
+            className="newer-version"
+            href={publicationUrl(window.location.pathname, newer.id)}
+          >
+            {newerVersionLabel}
+          </a>
+        )}
       </p>
     </div>
   );

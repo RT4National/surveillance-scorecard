@@ -1959,6 +1959,10 @@ input[type="date"] {
 .freshness a {
   color: var(--blue-text);
 }
+.freshness .newer-version {
+  font-weight: 600;
+  margin-left: auto;
+}
 
 /* Under 700 px the directory table becomes a list of cards. */
 @media (max-width: 699px) {

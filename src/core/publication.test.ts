@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  newerPublication,
   publicationLabel,
   type PublicationSummary,
 } from "./publication";
@@ -33,5 +34,16 @@ describe("publicationLabel", () => {
   });
   it("does not loop on a cyclic chain", () => {
     expect(publicationLabel([row("a", "b"), row("b", "a")], "a")).toBeNull();
+  });
+});
+
+describe("newerPublication", () => {
+  it("returns the latest when the id is older", () => {
+    expect(newerPublication(list, "a")?.id).toBe("c");
+  });
+  it("returns null for the latest, an unknown id, or no list", () => {
+    expect(newerPublication(list, "c")).toBeNull();
+    expect(newerPublication(list, "zzz")).toBeNull();
+    expect(newerPublication(null, "a")).toBeNull();
   });
 });

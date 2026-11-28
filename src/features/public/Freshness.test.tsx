@@ -75,3 +75,21 @@ describe("freshness line", () => {
     ).toBeTruthy();
   });
 });
+
+describe("newer-publication notice", () => {
+  it("shows for an older pinned publication and links to the latest", async () => {
+    await show("p1", summaries);
+    const link = await screen.findByRole("link", { name: "Newer version available" });
+    expect(link.getAttribute("href")).toBe("/scorecard/?publication=p3");
+  });
+  it("shows nothing on the latest publication", async () => {
+    await show("p3", summaries);
+    await screen.findByText(/Publication 3/);
+    expect(screen.queryByText("Newer version available")).toBeNull();
+  });
+  it("shows nothing when the list failed to load", async () => {
+    await show("p1", null);
+    await screen.findByText(/Updated 7 Sep 2026/);
+    expect(screen.queryByText("Newer version available")).toBeNull();
+  });
+});

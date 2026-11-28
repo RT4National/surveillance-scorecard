@@ -81,3 +81,12 @@ export function publicationLabel(
   }
   return publicationNumberLabel(position);
 }
+
+/** The latest publication when `id` is an older one in the list, else null. */
+export function newerPublication(
+  list: PublicationSummary[] | null | undefined,
+  id: string,
+): PublicationSummary | null {
+  const index = list ? list.findIndex((p) => p.id === id) : -1;
+  return list && index > 0 ? list[0] : null;
+}

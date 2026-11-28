@@ -100,3 +100,4 @@ export function shortDate(value: string): string {
 export const updatedLabel = (date: string) => `Updated ${shortDate(date)}`;
 export const publicationNumberLabel = (n: number) => `Publication ${n}`;
 export const methodologyLinkLabel = "Methodology";
+export const newerVersionLabel = "Newer version available";
