@@ -1,3 +1,5 @@
+import { SeriesTrends } from "./features/public/SeriesTrends";
+import { canShowPublicationTrends } from "./core/seriesTrends";
 import {
   Fragment,
   useEffect,
@@ -480,6 +482,11 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
           />
         </div>
       )}
+      {!isFormer &&
+      canShowPublicationTrends(publication) &&
+      dataset.seriesTrends?.length ? (
+        <SeriesTrends series={dataset.seriesTrends} publicationId={linkId} />
+      ) : null}
       <section
         className="container scorecard-section"
         aria-label="Explore legislators"

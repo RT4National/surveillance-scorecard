@@ -2220,3 +2220,58 @@ html {
 .profile-share summary {
   min-block-size: 24px;
 }
+
+.series-trends {
+  margin-block: 1.5rem;
+}
+.series-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.series-heading label {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  min-height: 24px;
+}
+.series-trends h3,
+.series-trends p {
+  margin-block: 0.5rem;
+}
+.series-points {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+}
+.series-points li {
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffefa;
+}
+.series-points a {
+  text-decoration: underline;
+}
+.series-result {
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+.series-track {
+  height: 0.375rem;
+  margin-block: 0.25rem;
+  background: #e4ebed;
+}
+.series-track .motion-fill {
+  height: 100%;
+  background: #18415d;
+}
+@media (max-width: 699px) {
+  .series-points {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,3 +1,4 @@
+import type { SeriesTrend } from "../core/seriesTrends";
 import {
   createContext,
   useContext,
@@ -43,7 +44,10 @@ export type ViewScore = Score & { actions?: ActionCounts };
  * votes and rubric from the index, plus one member's records on a profile; `sourceCount` stands
  * in for the source captures, which are not loaded there.
  */
-export type ViewDataset = Dataset & { sourceCount?: number };
+export type ViewDataset = Dataset & {
+  sourceCount?: number;
+  seriesTrends?: SeriesTrend[];
+};
 /**
  * How much of the publication is loaded. "index": the slim index (home, finder). "member": the
  * index plus one member's evidence (a profile). "full": the complete, verified publication.
@@ -225,6 +229,7 @@ export function slimView(
     coverage: index.dataset.coverage,
     votes: index.dataset.votes,
     voteSeries: index.dataset.voteSeries,
+    seriesTrends: index.dataset.seriesTrends,
     members: [...index.members, ...extra],
     records: slice?.records ?? [],
     affiliations: slice?.affiliations,

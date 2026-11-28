@@ -10,6 +10,7 @@
 //
 // Responses are cached as immutable per publication ID, so a change to either shape must change
 // INDEX_FORMAT and the endpoint path.
+import { publicationSeriesTrends, type SeriesTrend } from "./seriesTrends";
 import type { Dataset, Publication, PublicationScore } from "./publication";
 import type { Member, RecordEntry, Vote } from "./types";
 import { publishedScore } from "./publication-scores";
@@ -38,6 +39,7 @@ export interface PublicationIndex {
   dataset: Pick<Dataset, "id" | "asOf" | "demo" | "rubric" | "coverage"> & {
     votes: Vote[];
     voteSeries?: Dataset["voteSeries"];
+    seriesTrends?: SeriesTrend[];
     /** Number of source captures. A demo dataset without any is the fictional preview. */
     sourceCount: number;
   };
@@ -79,6 +81,7 @@ export function buildPublicationIndex(p: Publication): PublicationIndex {
       };
     }
   }
+  const seriesTrends = publicationSeriesTrends(p);
   return {
     format: INDEX_FORMAT,
     publication: {
@@ -95,6 +98,7 @@ export function buildPublicationIndex(p: Publication): PublicationIndex {
       coverage: dataset.coverage,
       votes: dataset.votes,
       voteSeries: dataset.voteSeries,
+      ...(seriesTrends.length ? { seriesTrends } : {}),
       sourceCount: dataset.sources.length,
     },
     members,
