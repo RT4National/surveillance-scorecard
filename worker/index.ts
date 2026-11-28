@@ -1,3 +1,7 @@
+import {
+  authorizeRosterCapture,
+  normalizeRosterCapture,
+} from "./roster-intake";
 import { stageBillSupport } from "./bill-intake";
 import { stageOfficialRollcall } from "./rollcall-intake";
 import { memberShareMeta } from "./meta";
@@ -311,6 +315,32 @@ async function api(
       .run();
     return json({ id }, 201);
   }
+  if (path === "/ingestion/roster" && method === "POST") {
+    const { ROSTER_INGESTION_TOKEN } = env as Env & {
+      ROSTER_INGESTION_TOKEN?: string;
+    };
+    await authorizeRosterCapture(request, ROSTER_INGESTION_TOKEN);
+    const capture = await body(request, 1_500_000);
+    const roster = await normalizeRosterCapture(capture);
+    // Keep the original source pages with their normalized roster. Separate rows
+    // keep each payload within the database's per-row limit.
+    const [result] = await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO staged_roster(singleton,captured_at,roster) VALUES(1,?,?)
+         ON CONFLICT(singleton) DO UPDATE SET captured_at=excluded.captured_at,roster=excluded.roster
+         WHERE excluded.captured_at > staged_roster.captured_at`,
+      ).bind(roster.asOf, JSON.stringify(roster)),
+      env.DB.prepare(
+        `INSERT INTO staged_roster_capture(singleton,captured_at,capture) VALUES(1,?,?)
+         ON CONFLICT(singleton) DO UPDATE SET captured_at=excluded.captured_at,capture=excluded.capture
+         WHERE excluded.captured_at > staged_roster_capture.captured_at`,
+      ).bind(
+        roster.asOf,
+        JSON.stringify({ asOf: roster.asOf, pages: capture.pages }),
+      ),
+    ]);
+    return json({ capturedAt: roster.asOf, stored: result.meta.changes === 1 });
+  }
   if (!path.startsWith("/staff/"))
     throw new HttpError(404, "API route not found");
   const actor = await authenticate(request, env);
@@ -330,6 +360,15 @@ async function api(
     const input = await body(request, 4096);
     const { CONGRESS_API_KEY } = env as Env & { CONGRESS_API_KEY?: string };
     return json(await stageBillSupport(input, CONGRESS_API_KEY));
+  }
+  if (path === "/staff/stage/roster" && method === "GET") {
+    if (actor.open)
+      throw new HttpError(403, "Official imports require a staff sign-in.");
+    const row = await env.DB.prepare(
+      "SELECT roster FROM staged_roster WHERE singleton=1",
+    ).first<{ roster: string }>();
+    if (!row) throw new HttpError(404, "No scheduled roster capture is ready.");
+    return json(JSON.parse(row.roster));
   }
   if (path === "/staff/status" && method === "GET") {
     const p = await publication(env);

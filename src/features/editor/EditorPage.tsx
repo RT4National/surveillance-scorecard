@@ -1,3 +1,4 @@
+import type { RosterRun } from "../../ingestion/members";
 import type { BillSupportStage } from "../../ingestion/cosponsors";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { RollcallStage } from "../../ingestion/rollcalls";
@@ -371,6 +372,9 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
           key={active?.id}
           dataset={preview}
           onChange={setDataset}
+          loadRoster={
+            session?.open ? undefined : () => call<RosterRun>("stage/roster")
+          }
           stageBillSupport={
             session?.open
               ? undefined

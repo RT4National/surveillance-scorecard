@@ -37,7 +37,7 @@ Deploys use Wrangler; account and D1 operations use the Cloudflare CLI ([`cf`](h
    npx wrangler login
    ```
 
-2. **Congress API key.** Locally it lives in the gitignored `.env.ingestion` (not `.env`, which Wrangler would load into the local Worker); run importers with `node --env-file=.env.ingestion`. It is set as the `CONGRESS_API_KEY` secret on `RT4National/surveillance-scorecard` for the daily ingestion workflow. The repository is public, so roster artifacts (official public data, never the key) are downloadable by any signed-in GitHub user for 14 days.
+2. **Congress API key.** Locally it lives in the gitignored `.env.ingestion` (not `.env`, which Wrangler would load into the local Worker); run importers with `node --env-file=.env.ingestion`. It is set as the `CONGRESS_API_KEY` secret on `RT4National/surveillance-scorecard` for the daily ingestion workflow. The repository is public, so roster artifacts (official public data, never the key) are downloadable by any signed-in GitHub user for 14 days. Configure scheduled D1 roster storage and staff intake using the [staff guide](STAFF-GUIDE.md).
 
 `cf` resource commands take database IDs, not names. Find commands with `cf cli search "<task>"`. It has no D1 export command, so backups use `wrangler d1 export`.
 

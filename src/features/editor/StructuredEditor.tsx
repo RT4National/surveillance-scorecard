@@ -1,3 +1,5 @@
+import { RosterIntake } from "./RosterIntake";
+import type { RosterRun } from "../../ingestion/members";
 import { ItemImpactPreview } from "./ItemImpactPreview";
 import { useId, useState } from "react";
 import type { Dataset } from "../../core/publication";
@@ -15,6 +17,7 @@ type PanelProps = {
     bill: string,
     congress: number,
   ) => Promise<BillSupportStage>;
+  loadRoster?: () => Promise<RosterRun>;
   stageRollcall?: (url: string) => Promise<RollcallStage>;
 };
 
@@ -488,7 +491,11 @@ export function VotesPanel({
 }
 
 /** Tab 2: legislators' names, party, committees and photos. */
-export function LegislatorsPanel({ dataset: d, onChange }: PanelProps) {
+export function LegislatorsPanel({
+  dataset: d,
+  onChange,
+  loadRoster,
+}: PanelProps) {
   const [memberId, setMemberId] = useState("");
   const m = d.members.find((m) => m.id === memberId) ?? d.members[0];
   const member = (patch: Partial<Member>) =>
@@ -502,6 +509,9 @@ export function LegislatorsPanel({ dataset: d, onChange }: PanelProps) {
         Correct how a legislator appears on the scorecard. Their votes are
         edited under “Votes to score”.
       </p>
+      {loadRoster && (
+        <RosterIntake dataset={d} load={loadRoster} onApply={onChange} />
+      )}
       <label>
         Choose a legislator
         <select

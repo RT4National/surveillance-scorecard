@@ -49,9 +49,20 @@ jobs:
           path: ${{ runner.temp }}/scorecard-roster/
           if-no-files-found: error
           retention-days: 14
+      - name: Store capture for staff review
+        if: steps.configuration.outputs.enabled == 'true' && success() && github.ref == 'refs/heads/main'
+        env:
+          ROSTER_INGESTION_TOKEN: ${{ secrets.ROSTER_INGESTION_TOKEN }}
+          SCORECARD_ROSTER_URL: ${{ vars.SCORECARD_ROSTER_URL }}
+        run: |
+          if [ -z "$ROSTER_INGESTION_TOKEN" ] || [ -z "$SCORECARD_ROSTER_URL" ]; then
+            echo 'Staff roster storage skipped: configure the roster URL and token.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            node scripts/ingestion/store-roster.mjs "$RUNNER_TEMP/scorecard-roster"
+          fi
       - name: Summarize review boundary
         if: steps.configuration.outputs.enabled == 'true' && success()
-        run: echo 'Complete roster staged with exact source captures. Artifact retained for 14 days. Reconcile against the published dataset and submit for editorial review; this workflow never publishes or deactivates members.' >> "$GITHUB_STEP_SUMMARY"
+        run: echo 'Complete roster staged with exact source captures. Artifact retained for 14 days. Preview and apply the stored capture in a draft, then submit for editorial review. This workflow never publishes or deactivates members.' >> "$GITHUB_STEP_SUMMARY"
       - name: Report failure
         if: failure()
         run: echo 'Roster staging failed. No import was published. Inspect the failing step; the last published roster remains unchanged.' >> "$GITHUB_STEP_SUMMARY"

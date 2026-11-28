@@ -17,6 +17,10 @@ Open **Add bill support from Congress.gov** under **Votes to score**, and enter 
 
 Select an item under **Votes to score**. When you change its weight or reform position, open **Per-legislator impact** to compare grades and alignment within the draft. To retire an item, choose **Preview retirement** and inspect the proposed impact. Confirm to remove the item and its records from the draft. Save and submit the draft through **Review & publish**.
 
+## Review a scheduled roster change
+
+Under **Legislators**, open **Scheduled roster update** and choose **Preview latest roster capture**. Review additions and updates. Legislators absent from the capture stay on the draft roster until staff decide their status. Choose **Apply roster changes to draft**, save, and submit it for review. Applying a roster capture preserves the draft’s evidence cutoff.
+
 ## Environment setup
 
 The intake endpoint requires real staff authentication. Configure Cloudflare Access and `STAFF_ROLES` before enabling the staff workflow. Never set `STAFF_OPEN_STAGING` in production.
@@ -24,3 +28,5 @@ The intake endpoint requires real staff authentication. Configure Cloudflare Acc
 Set `SENATE_LIS_CROSSWALK` for the Worker environment that will import Senate votes. Its value is a reviewed JSON object that maps Senate LIS IDs to Bioguide IDs. House intake can run without this setting.
 
 Set `CONGRESS_API_KEY` as a Worker secret in each environment that imports bill support. The browser and stored source URLs do not receive the key.
+
+For scheduled roster storage, apply migration `0003_staged_roster.sql`, set a dedicated `ROSTER_INGESTION_TOKEN` secret in both the Worker and GitHub Actions, and set the repository variable `SCORECARD_ROSTER_URL` to the Worker’s HTTPS `/scorecard/api/ingestion/roster` endpoint. The workflow stores the newest complete capture and its original response pages in D1 and retains the GitHub review artifact for 14 days. The token can send captures only. Staff Access controls reading and applying them.
