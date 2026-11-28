@@ -467,6 +467,29 @@ describe("server-rendered first paint from stored publications", () => {
     const preview = await (await get(`${route}?publication=pub-older`)).text();
     expect(preview).not.toContain("data-frozen-summary");
   });
+  it("accepts corrections only for publishable evidence and preserves rate limits", async () => {
+    const record = latest.records[0];
+    const send = (publicationId: string, memberId = record.memberId) =>
+      mf.dispatchFetch("https://scorecard.example/scorecard/api/corrections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicationId,
+          memberId,
+          voteId: record.voteId,
+          message:
+            "Please verify the recorded ballot against the official source.",
+        }),
+      });
+    expect((await send("pub-older")).status).toBe(403);
+    expect((await send(p2.id, "missing")).status).toBe(400);
+    for (let i = 0; i < 5; i++) {
+      const accepted = await send(p2.id);
+      expect(accepted.status).toBe(201);
+      expect(await accepted.json()).toHaveProperty("id");
+    }
+    expect((await send(p2.id)).status).toBe(429);
+  });
   it("renders the latest publication with the published banner and clean links", async () => {
     const m = latest.members[1];
     const root = rootOf(await (await get(`/scorecard/members/${m.id}`)).text());

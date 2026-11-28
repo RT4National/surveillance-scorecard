@@ -1,10 +1,8 @@
-import type { Dataset } from "./publication";
+import { isPreviewDataset, type Dataset } from "./publication";
 import type { Vote, VoteSeries } from "./types";
 
 export function seriesVisibility(dataset: Pick<Dataset, "id" | "demo">) {
-  return dataset.demo || /^placeholder-/i.test(dataset.id)
-    ? "preview"
-    : "reviewed";
+  return isPreviewDataset(dataset) ? "preview" : "reviewed";
 }
 
 export function validateVoteSeries(

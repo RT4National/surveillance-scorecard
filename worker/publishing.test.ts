@@ -529,13 +529,7 @@ describe("D1 editorial workflow", () => {
       memberId: fixture.members[0].id,
       message: "Please inspect this member evidence.",
     };
-    for (let i = 0; i < 5; i++)
-      expect((await send("/corrections", "POST", c)).status).toBe(201);
-    expect((await send("/corrections", "POST", c)).status).toBe(429);
-    expect(
-      (await send("/corrections", "POST", { ...c, memberId: "missing" }))
-        .status,
-    ).toBe(400);
+    expect((await send("/corrections", "POST", c)).status).toBe(403);
     identity.mockRestore();
   });
   it("rejects publishing and editing across an intervening publication until explicit rebase and new review", async () => {

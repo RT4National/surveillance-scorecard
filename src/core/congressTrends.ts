@@ -2,7 +2,7 @@ import { congressNumber } from "./congress";
 import { percentLabel } from "./copy";
 import type { Publication } from "./publication";
 import { toCsv } from "./research";
-import { canShowPublicationTrends } from "./seriesTrends";
+import { isPublishable } from "./publication";
 import type { Party } from "./types";
 
 export const minCongressItems = 5;
@@ -22,7 +22,7 @@ export interface CongressAlignment {
 export function congressAlignment(
   publication: Publication,
 ): CongressAlignment[] {
-  if (!canShowPublicationTrends(publication) || !publication.scoring) return [];
+  if (!isPublishable(publication)) return [];
   const byCongress = new Map<
     number,
     {

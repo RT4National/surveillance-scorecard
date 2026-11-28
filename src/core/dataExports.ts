@@ -1,7 +1,7 @@
 import { publicationUrl } from "./navigation";
 import type { Dataset, Publication } from "./publication";
 import { toCsv } from "./research";
-import { canShowPublicationTrends } from "./seriesTrends";
+import { isPublishable } from "./publication";
 import type { Vote } from "./types";
 
 export const reuseLicences = {
@@ -35,9 +35,7 @@ export function dataLicence(
 export function canDownloadPublication(
   publication: Publication | undefined,
 ): publication is Publication {
-  return (
-    canShowPublicationTrends(publication) && !!dataLicence(publication.dataset)
-  );
+  return isPublishable(publication) && !!dataLicence(publication.dataset);
 }
 
 export function exportAttribution(

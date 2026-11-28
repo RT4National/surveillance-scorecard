@@ -1,4 +1,4 @@
-import { canShowPublicationTrends } from "../../core/seriesTrends";
+import { isPublishable } from "../../core/publication";
 import {
   canDownloadPublication,
   exportAttribution,
@@ -14,7 +14,7 @@ export function HeadlineDownloads({
 }: {
   publication?: Publication;
 }) {
-  if (!canShowPublicationTrends(publication)) return null;
+  if (!isPublishable(publication)) return null;
   if (!canDownloadPublication(publication))
     return (
       <p>

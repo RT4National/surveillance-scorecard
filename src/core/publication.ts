@@ -96,16 +96,26 @@ export function newerPublication(
   return list && index > 0 ? list[0] : null;
 }
 
-/** Shareable claims require a reviewed publication and a captured score for this member. */
+export const isPreviewDataset = (dataset: Pick<Dataset, "id" | "demo">) =>
+  dataset.demo || /^placeholder-/i.test(dataset.id);
+
+/** Public grade claims and corrections require a reviewed, frozen publication. */
+export function isPublishable(
+  publication: Publication | null | undefined,
+): publication is Publication & { scoring: PublicationScoring } {
+  return Boolean(
+    publication?.scoring &&
+    !isPreviewDataset(publication.dataset) &&
+    !/^placeholder-/i.test(publication.id),
+  );
+}
+
 export function frozenShareScore(
   publication: Publication | null | undefined,
   memberId: string,
 ) {
   if (
-    !publication?.scoring ||
-    publication.dataset.demo ||
-    /^placeholder-/i.test(publication.dataset.id) ||
-    /^placeholder-/i.test(publication.id) ||
+    !isPublishable(publication) ||
     !Object.hasOwn(publication.scoring.scores, memberId)
   )
     return undefined;

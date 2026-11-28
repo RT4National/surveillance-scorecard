@@ -6,7 +6,12 @@ import {
 import { stageBillSupport } from "./bill-intake";
 import { stageOfficialRollcall } from "./rollcall-intake";
 import { memberShareMeta } from "./meta";
-import type { Dataset, Publication } from "../src/core/publication";
+import {
+  isPreviewDataset,
+  isPublishable,
+  type Dataset,
+  type Publication,
+} from "../src/core/publication";
 import { authenticate, HttpError, type Actor } from "./auth";
 import { digest, validateDataset } from "./validation";
 import { research } from "./ai";
@@ -280,6 +285,11 @@ async function api(
       throw new HttpError(
         400,
         "A publication and explanation (10–4000 characters) are required",
+      );
+    if (!isPublishable(p))
+      throw new HttpError(
+        403,
+        "Corrections are available for frozen published evidence.",
       );
     const memberId = typeof b.memberId === "string" ? b.memberId : undefined;
     const voteId = typeof b.voteId === "string" ? b.voteId : undefined;
@@ -757,7 +767,7 @@ async function renderPage(
   let description =
     "Evidence, methodology, and voting records behind surveillance reform grades.";
   const requested = url.searchParams.get("publication");
-  const demo = p?.dataset.demo ?? true;
+  const demo = !p || isPreviewDataset(p.dataset) || /^placeholder-/i.test(p.id);
   const data: PageData = {
     dataset: p?.dataset ?? demoDataset,
     publication: p ?? undefined,

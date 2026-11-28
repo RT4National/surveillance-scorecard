@@ -1,3 +1,4 @@
+import { isPreviewDataset, isPublishable } from "../../core/publication";
 import { useState } from "react";
 import { base, publicUrl, type Props } from "./pageShared";
 import { VoteList } from "./VoteList";
@@ -56,9 +57,9 @@ export function CorrectionForm({
       (dataset.members.find((m) => m.id === memberId)?.name ?? memberId),
     voteId && (dataset.votes.find((v) => v.id === voteId)?.title ?? voteId),
   ].filter(Boolean);
-  const closed = dataset.demo
+  const closed = isPreviewDataset(dataset)
     ? correctionCopy.closedDemo
-    : !publication
+    : !isPublishable(publication)
       ? correctionCopy.closedUnpublished
       : null;
   return (
@@ -95,7 +96,11 @@ export function CorrectionForm({
     >
       <h3>{correctionCopy.title}</h3>
       <p>
-        <strong>{reference.join(" · ") || dataset.id}</strong>
+        <strong>
+          {[...reference, publication && `Publication ${publication.id}`]
+            .filter(Boolean)
+            .join(" · ") || dataset.id}
+        </strong>
       </p>
       <label>
         {correctionCopy.label}

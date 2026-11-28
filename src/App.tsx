@@ -1,6 +1,6 @@
 import { exportAttribution } from "./core/dataExports";
 import { SeriesTrends } from "./features/public/SeriesTrends";
-import { canShowPublicationTrends } from "./core/seriesTrends";
+import { isPublishable } from "./core/publication";
 import {
   Fragment,
   useEffect,
@@ -493,7 +493,7 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
         </div>
       )}
       {!isFormer &&
-      canShowPublicationTrends(publication) &&
+      isPublishable(publication) &&
       dataset.seriesTrends?.length ? (
         <SeriesTrends series={dataset.seriesTrends} publicationId={linkId} />
       ) : null}

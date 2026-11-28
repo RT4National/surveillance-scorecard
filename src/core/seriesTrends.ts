@@ -1,7 +1,6 @@
-import type { Publication } from "./publication";
+import { isPublishable, type Publication } from "./publication";
 import { tallyRollCall } from "./tally";
 import type { Party, RecordEntry, Vote, VoteSeries } from "./types";
-import { seriesVisibility } from "./voteSeries";
 
 type Tally = ReturnType<typeof tallyRollCall>;
 export type ReformCounts = {
@@ -34,20 +33,10 @@ function reformCounts(
   };
 }
 
-export function canShowPublicationTrends(
-  publication: Publication | null | undefined,
-): publication is Publication {
-  return (
-    !!publication?.scoring &&
-    !/^placeholder-/i.test(publication.id) &&
-    seriesVisibility(publication.dataset) === "reviewed"
-  );
-}
-
 export function publicationSeriesTrends(
   publication: Publication,
 ): SeriesTrend[] {
-  if (!canShowPublicationTrends(publication)) return [];
+  if (!isPublishable(publication)) return [];
   const { dataset } = publication;
   const series = dataset.voteSeries ?? [];
   if (!series.length) return [];
