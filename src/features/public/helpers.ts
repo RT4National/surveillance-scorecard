@@ -1,3 +1,4 @@
+import { percentLabel } from "../../core/copy";
 // Plain (non-component) helpers shared by the scorecard directory (App.tsx) and the member profile.
 // Kept out of member.tsx so that module exports only components and Vite Fast Refresh can hot-swap it.
 import type { Dataset } from "../../core/publication";
@@ -15,7 +16,65 @@ export const readAsOf = (dataset: Dataset) => {
     : dataset.asOf;
 };
 export const fmt = (n: number | null) =>
-  n === null ? "Not yet rated" : `${Math.round(n)}%`;
+  n === null ? "Not yet rated" : percentLabel(n);
+/** Lowercase, accent-free text for name matching. */
+export const normalize = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+/**
+ * The chosen state and the name search live in the URL fragment (`#state=CA&q=smith`),
+ * never in the query string: fragments are not sent to the server, query strings are
+ * logged by the Worker. Old `?state=` and `?q=` links are still read, then rewritten
+ * by `migrateLegacyFragment`.
+ */
+export type FragmentKey = "state" | "q";
+const fragmentKeys: FragmentKey[] = ["state", "q"];
+export const readFragment = (key: FragmentKey) =>
+  new URLSearchParams(window.location.hash.slice(1)).get(key) ??
+  query().get(key) ??
+  "";
+export const readState = () => readFragment("state");
+export function writeFragment(key: FragmentKey, value: string) {
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  if (value) hash.set(key, value);
+  else hash.delete(key);
+  const search = query();
+  search.delete(key);
+  const fragment = hash.toString();
+  window.history.replaceState(
+    null,
+    "",
+    window.location.pathname +
+      (search.size ? `?${search}` : "") +
+      (fragment ? `#${fragment}` : ""),
+  );
+}
+export const writeState = (state: string) => writeFragment("state", state);
+export function migrateLegacyFragment() {
+  for (const key of fragmentKeys)
+    if (query().has(key)) writeFragment(key, readFragment(key));
+}
+/** A state's current members: senators first, then the House by district. */
+export function delegation<
+  M extends {
+    chamber: string;
+    district?: number;
+    name: string;
+    status: string;
+    state: string;
+  },
+>(members: M[], state: string): M[] {
+  return members
+    .filter((m) => m.state === state && m.status === "active")
+    .sort(
+      (a, b) =>
+        Number(b.chamber === "Senate") - Number(a.chamber === "Senate") ||
+        (a.district ?? 0) - (b.district ?? 0) ||
+        a.name.localeCompare(b.name),
+    );
+}
 export type GradeTone = "good" | "mixed" | "poor" | "unrated";
 /**
  * Colour tone from the position of the scorer's grade within the active rubric's bands:

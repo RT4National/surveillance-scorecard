@@ -39,8 +39,8 @@ export function splitDisplay(score: SplitInput, party: Party): SplitDisplay {
   )
     return {
       kind: "comparable",
-      own: { percent: Math.round(score.ownScore), count: score.ownCount },
-      other: { percent: Math.round(score.otherScore), count: score.otherCount },
+      own: { percent: Math.floor(score.ownScore), count: score.ownCount },
+      other: { percent: Math.floor(score.otherScore), count: score.otherCount },
     };
   return {
     kind: "unproven",

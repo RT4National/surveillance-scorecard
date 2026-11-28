@@ -57,3 +57,14 @@ describe("scored action counts", () => {
     expect(scoredNoun(true)).toBe("actions");
   });
 });
+
+describe("percent display", () => {
+  it("rounds down so a shown percentage never crosses into the next band", async () => {
+    const { percentLabel } = await import("./copy");
+    expect(percentLabel(89.6)).toBe("89%");
+    expect(percentLabel(90)).toBe("90%");
+    expect(percentLabel(79.99999999999)).toBe("79%");
+    expect(percentLabel(0)).toBe("0%");
+    expect(percentLabel(100)).toBe("100%");
+  });
+});

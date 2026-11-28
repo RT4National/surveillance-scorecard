@@ -14,8 +14,8 @@ describe("splitDisplay", () => {
     const d = splitDisplay(s, members[2].party);
     expect(d).toEqual({
       kind: "comparable",
-      own: { percent: Math.round(s.ownScore!), count: s.ownCount },
-      other: { percent: Math.round(s.otherScore!), count: s.otherCount },
+      own: { percent: Math.floor(s.ownScore!), count: s.ownCount },
+      other: { percent: Math.floor(s.otherScore!), count: s.otherCount },
     });
   });
 
@@ -84,8 +84,8 @@ describe("splitDisplay", () => {
         } else
           expect(d).toEqual({
             kind: "comparable",
-            own: { percent: Math.round(s.ownScore!), count: s.ownCount },
-            other: { percent: Math.round(s.otherScore!), count: s.otherCount },
+            own: { percent: Math.floor(s.ownScore!), count: s.ownCount },
+            other: { percent: Math.floor(s.otherScore!), count: s.otherCount },
           });
       }
     expect(kinds).toEqual(new Set(["comparable", "unproven", "not-applicable"]));

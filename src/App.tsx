@@ -9,7 +9,6 @@ import {
   FlaskConical,
   Info,
   Search,
-  ShieldCheck,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -17,6 +16,7 @@ import { useScorecard } from "./data/context";
 import { groupLabels, scoreMember } from "./core/scoring";
 import {
   hasCosponsorships,
+  heroCopy,
   notGradedGroupLabel,
   notGradedLabel,
   scoredLabel,
@@ -30,16 +30,23 @@ import {
   ComparePage,
   ReportsPage,
   ArchivesPage,
-  RepresentativeFinder,
 } from "./features/public";
 import { Profile } from "./features/public/Profile";
+import { Finder } from "./features/public/Finder";
+import { Freshness } from "./features/public/Freshness";
 import { Avatar, Grade } from "./features/public/member";
 import {
   base,
   fictional,
   fmt,
+  migrateLegacyFragment,
+  normalize,
   query,
   readAsOf,
+  readFragment,
+  readState,
+  writeFragment,
+  writeState,
 } from "./features/public/helpers";
 import { EditorPage } from "./features/editor/EditorPage";
 import { PolicyLab } from "./features/PolicyLab";
@@ -57,15 +64,15 @@ const defaults = {
   sort: "score",
 };
 type Filters = typeof defaults;
+// `state` is read from the URL fragment (or an old ?state= link), never written to the query.
 const readFilters = (): Filters =>
-  Object.fromEntries(
-    Object.entries(defaults).map(([k, v]) => [k, query().get(k) ?? v]),
-  ) as Filters;
-const normalize = (s: string) =>
-  s
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+  ({
+    ...Object.fromEntries(
+      Object.entries(defaults).map(([k, v]) => [k, query().get(k) ?? v]),
+    ),
+    state: readState(),
+    q: readFragment("q"),
+  }) as Filters;
 function saveFile(name: string, value: string, type: string) {
   const url = URL.createObjectURL(new Blob([value], { type }));
   const anchor = document.createElement("a");
@@ -284,9 +291,14 @@ export default function App() {
   const [filters, setFilters] = useState<Filters>(readFilters);
   const [notice, setNotice] = useState("");
   useEffect(() => {
+    migrateLegacyFragment();
     const listener = () => setFilters(readFilters());
     window.addEventListener("popstate", listener);
-    return () => window.removeEventListener("popstate", listener);
+    window.addEventListener("hashchange", listener);
+    return () => {
+      window.removeEventListener("popstate", listener);
+      window.removeEventListener("hashchange", listener);
+    };
   }, []);
   useEffect(() => {
     if (!notice) return;
@@ -306,16 +318,20 @@ export default function App() {
   function changeFilter(key: keyof Filters, value: string) {
     const next = { ...filters, [key]: value };
     setFilters(next);
+    if (key === "state" || key === "q") {
+      writeFragment(key, value);
+      return;
+    }
     const params = query();
     Object.entries(next).forEach(([k, v]) =>
-      v && v !== defaults[k as keyof Filters]
+      k !== "state" && k !== "q" && v && v !== defaults[k as keyof Filters]
         ? params.set(k, v)
         : params.delete(k),
     );
     window.history.replaceState(
       null,
       "",
-      `${window.location.pathname}${params.size ? `?${params}` : ""}`,
+      `${window.location.pathname}${params.size ? `?${params}` : ""}${window.location.hash}`,
     );
   }
   function reset() {
@@ -325,9 +341,16 @@ export default function App() {
     window.history.replaceState(
       null,
       "",
-      window.location.pathname + (p.size ? `?${p}` : ""),
+      window.location.pathname + (p.size ? `?${p}` : "") + window.location.hash,
     );
+    writeState("");
+    writeFragment("q", "");
   }
+  // A state that is not in the data (stale link) filters nothing and selects nothing.
+  const knownState = members.some((m) => m.state === filters.state)
+    ? filters.state
+    : "";
+  const effectiveFilters = { ...filters, state: knownState };
   const nav = [
     { href: `${base}/`, title: "Scorecard" },
     { href: `${base}/legislation`, title: "Legislation" },
@@ -350,58 +373,20 @@ export default function App() {
   );
   const directoryPage = (
     <>
-      <section className="hero container">
-        <div className="hero-copy">
-          <div className="eyebrow">
-            <span /> THE SURVEILLANCE SCORECARD
-          </div>
-          <h1>
-            {isFormer ? (
-              <>
-                The record.
-                <br />
-                <em>Over time.</em>
-              </>
-            ) : (
-              <>
-                Privacy is a right.
-                <br />
-                <em>Who votes like it?</em>
-              </>
-            )}
-          </h1>
-          <p>
-            {isFormer
-              ? "Explore former members and revisit the evidence available at a moment in time."
-              : "Follow the votes. Understand the record. See who protects your privacy—and whose principles change with the presidency."}
-          </p>
-          <a
-            className="text-link"
-            href={publicationUrl(`${base}/methodology`, publication?.id)}
-          >
-            Every grade has a paper trail <ArrowRight size={16} />
-          </a>
-        </div>
-        <aside className="hero-note">
-          <div className="note-top">
-            <ShieldCheck size={23} />
-            <span>PRINCIPLES OVER PARTY</span>
-          </div>
-          <h2>
-            A voting record.
-            <br />
-            Not a campaign promise.
-          </h2>
-          <p>
-            We look at actions across administrations to see where support for
-            surveillance reform holds up.
-          </p>
-          <div className="note-foot">
-            <span className="tiny-line" /> Transparent scores. Accountable
-            power.
-          </div>
-        </aside>
+      <section className="hero-line container">
+        <h1>{isFormer ? heroCopy.former : heroCopy.home}</h1>
       </section>
+      {!isFormer && (
+        <div className="container finder-wrap">
+          <Finder
+            state={effectiveFilters.state}
+            onState={(s) => changeFilter("state", s)}
+            name={filters.q}
+            onName={(q) => changeFilter("q", q)}
+            level={2}
+          />
+        </div>
+      )}
       <section
         className="container scorecard-section"
         aria-label="Explore legislators"
@@ -412,7 +397,7 @@ export default function App() {
               {isFormer ? "HISTORICAL EXPLORER" : "EXPLORE THE RECORD"}
             </div>
             <h2>
-              {isFormer ? "Former members" : "Find your legislators"}
+              {isFormer ? "All former members" : "All members"}
               <span className="count-pill">
                 {
                   members.filter((m) =>
@@ -441,7 +426,7 @@ export default function App() {
           </a>
         </div>
         <Directory
-          filters={filters}
+          filters={effectiveFilters}
           setFilter={changeFilter}
           reset={reset}
           archive={isFormer}
@@ -490,7 +475,13 @@ export default function App() {
       case "find":
         return (
           <section className="container inner-page">
-            <RepresentativeFinder dataset={dataset} />
+            <Finder
+              state={effectiveFilters.state}
+              onState={(s) => changeFilter("state", s)}
+              name={filters.q}
+              onName={(q) => changeFilter("q", q)}
+              level={1}
+            />
           </section>
         );
       case "methodology":
@@ -562,6 +553,7 @@ export default function App() {
           </a>
         </div>
       </header>
+      <Freshness />
       <main id="main">
         {route.name === "editor" ? (
           <EditorPage dataset={dataset} />
@@ -773,16 +765,18 @@ function Directory({
           date filters narrow vote evidence, not roster membership.
         </p>
         <div className="filter-bar">
-          <label className="search-box">
-            <Search size={18} />
-            <span className="sr-only">Search legislators</span>
-            <input
-              type="search"
-              placeholder="Search by name or state…"
-              value={filters.q}
-              onChange={(e) => setFilter("q", e.target.value)}
-            />
-          </label>
+          {archive && (
+            <label className="search-box">
+              <Search size={18} />
+              <span className="sr-only">Search legislators</span>
+              <input
+                type="search"
+                placeholder="Search by name or state…"
+                value={filters.q}
+                onChange={(e) => setFilter("q", e.target.value)}
+              />
+            </label>
+          )}
           <Select
             label="Current chamber"
             value={filters.chamber}
@@ -792,16 +786,18 @@ function Directory({
             <option>House</option>
             <option>Senate</option>
           </Select>
-          <Select
-            label="State"
-            value={filters.state}
-            onChange={(v) => setFilter("state", v)}
-          >
-            <option value="">All states</option>
-            {[...new Set(source.map((m) => m.state))].sort().map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </Select>
+          {archive && (
+            <Select
+              label="State"
+              value={filters.state}
+              onChange={(v) => setFilter("state", v)}
+            >
+              <option value="">All states</option>
+              {[...new Set(source.map((m) => m.state))].sort().map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </Select>
+          )}
           <Select
             label="Current party"
             value={filters.party}
