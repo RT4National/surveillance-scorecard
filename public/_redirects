@@ -4,4 +4,5 @@
 /scorecard/research /index.html 200
 /scorecard/methodology /index.html 200
 /scorecard/archive /index.html 200
+/scorecard/former /index.html 200
 /scorecard/members/:member /index.html 200

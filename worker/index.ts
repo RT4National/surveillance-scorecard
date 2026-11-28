@@ -9,6 +9,7 @@ import {
   decodeStoredJson,
   MAX_STORED_BYTES,
 } from "./storage";
+import { matchRoute, redirectFor } from "../src/core/routes";
 
 const prefix = "/scorecard/api";
 const json = (data: unknown, status = 200) =>
@@ -494,42 +495,72 @@ async function page(request: Request, env: Env, url: URL): Promise<Response> {
   let title = "Surveillance reform scorecard";
   let description =
     "Evidence, methodology, and voting records behind surveillance reform grades.";
-  let demo = false;
-  const detail = url.pathname.match(
-    /^\/scorecard\/(members|legislation)\/([^/]+)\/?$/,
-  );
-  const known =
-    /^\/scorecard\/(?:|compare|find|legislation|archive|archives|reports|editor|methodology|research|history)\/?$/.test(
-      url.pathname,
-    );
-  if (!detail && !known) return env.ASSETS.fetch(request);
+  const route = matchRoute(url.pathname);
+  if (route.name === "notFound") {
+    // Built files (scripts, styles, portraits) also live under /scorecard/.
+    const asset = await env.ASSETS.fetch(request);
+    if (asset.status !== 404) return asset;
+    return notFound(request, env, url);
+  }
   const requested = url.searchParams.get("publication");
   const p = await publication(env, requested ?? undefined);
   if (requested && !p)
     return new Response("Publication not found", { status: 404 });
-  demo = p?.dataset.demo ?? true;
-  if (detail) {
-    const id = decodeURIComponent(detail[2]);
-    if (detail[1] === "members") {
-      const m = (p?.dataset.members ?? demoMembers).find((m) => m.id === id);
-      if (!m) return new Response("Member not found", { status: 404 });
-      title = `${m.name} — Surveillance reform scorecard`;
-      description = `Explore ${m.name}’s surveillance reform record and the evidence behind the grade.`;
-    } else {
-      const v = (p?.dataset.votes ?? demoVotes).find((v) => v.id === id);
-      if (!v) return new Response("Legislation not found", { status: 404 });
-      title = `${v.bill}: ${v.title}`;
-      description = v.rationale;
-    }
+  const demo = p?.dataset.demo ?? true;
+  if (route.name === "member") {
+    const m = (p?.dataset.members ?? demoMembers).find(
+      (m) => m.id === route.id,
+    );
+    if (!m) return notFound(request, env, url);
+    title = `${m.name} — Surveillance reform scorecard`;
+    description = `Explore ${m.name}’s surveillance reform record and the evidence behind the grade.`;
+  } else if (route.name === "legislation" && route.voteId !== undefined) {
+    const id = route.voteId;
+    const v = (p?.dataset.votes ?? demoVotes).find((v) => v.id === id);
+    if (!v) return notFound(request, env, url);
+    title = `${v.bill}: ${v.title}`;
+    description = v.rationale;
   }
   const canonical = new URL(url);
-  const noindex = demo || /\/editor\/?$/.test(url.pathname);
   canonical.search = "";
   if (requested) canonical.searchParams.set("publication", requested);
-  url.pathname = "/index.html";
-  url.search = "";
-  const asset = await env.ASSETS.fetch(new Request(url, request));
-  const response = new Response(asset.body, asset);
+  return shell(request, env, url, {
+    title,
+    description,
+    noindex: demo || route.name === "editor",
+    canonical: canonical.href,
+  });
+}
+/** The app shell with a 404 status. The app itself renders "Page not found". */
+function notFound(request: Request, env: Env, url: URL): Promise<Response> {
+  return shell(request, env, url, {
+    title: "Page not found — Surveillance reform scorecard",
+    description: "This address does not match a page in the scorecard.",
+    noindex: true,
+    status: 404,
+  });
+}
+async function shell(
+  request: Request,
+  env: Env,
+  url: URL,
+  meta: {
+    title: string;
+    description: string;
+    noindex: boolean;
+    canonical?: string;
+    status?: number;
+  },
+): Promise<Response> {
+  const { title, description, noindex, canonical } = meta;
+  const index = new URL(url);
+  index.pathname = "/index.html";
+  index.search = "";
+  const asset = await env.ASSETS.fetch(new Request(index, request));
+  const response = new Response(asset.body, {
+    status: meta.status ?? asset.status,
+    headers: asset.headers,
+  });
   response.headers.set(
     "X-Robots-Tag",
     noindex ? "noindex, nofollow" : "index, follow",
@@ -541,6 +572,13 @@ async function page(request: Request, env: Env, url: URL): Promise<Response> {
       .replace(/"/g, "&quot;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
+  const head =
+    (canonical ? `<link rel="canonical" href="${escape(canonical)}">` : "") +
+    `<meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}">` +
+    (canonical
+      ? `<meta property="og:url" content="${escape(canonical)}">`
+      : "") +
+    `<meta property="og:type" content="website">`;
   return new HTMLRewriter()
     .on("title", {
       element(e) {
@@ -567,10 +605,7 @@ async function page(request: Request, env: Env, url: URL): Promise<Response> {
     })
     .on("head", {
       element(e) {
-        e.append(
-          `<link rel="canonical" href="${escape(canonical.href)}"><meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}"><meta property="og:url" content="${escape(canonical.href)}"><meta property="og:type" content="website">`,
-          { html: true },
-        );
+        e.append(head, { html: true });
       },
     })
     .transform(response);
@@ -583,6 +618,9 @@ export default {
         return await api(request, env, url.pathname.slice(prefix.length));
       if (url.pathname === "/scorecard")
         return Response.redirect(`${url.origin}/scorecard/${url.search}`, 308);
+      const moved = redirectFor(url.pathname);
+      if (moved)
+        return Response.redirect(`${url.origin}${moved}${url.search}`, 301);
       return await page(request, env, url);
     } catch (error) {
       if (error instanceof HttpError)
