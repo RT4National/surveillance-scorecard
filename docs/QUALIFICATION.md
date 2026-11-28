@@ -43,3 +43,20 @@ Local Chrome used the production build and a loopback-only synthetic publication
 - Earlier 390 px checks also verified reduced-motion vote bars and a 1200 × 630 profile card downloaded by the browser.
 
 The launch qualification still needs a screen-reader pass, broader contrast measurements, and a complete walkthrough of the six journeys with the launch candidate publication.
+
+## Six reader journeys at 390 px — November 27, 2026
+
+Chrome exercised the production build using loopback-only synthetic fixtures. The fixture included a frozen publication and a test licence so the gated downloads could be exercised. No fixture, licence, correction, or grade was sent to a live service.
+
+| Journey | Observed result |
+| --- | --- |
+| Find a member | The first keyboard Tab reached the skip link. Selecting California showed the fixture delegation and its member link. |
+| Understand a grade | The member name and evidence heading appeared in Chrome’s accessibility tree, with the published evidence visible below the grade. |
+| Check a vote | Chrome exposed the party table with its caption as its name. Selecting Yes narrowed the member rows to Yes ballots. |
+| Share or act | The panel exposed named copy-link and PNG buttons. Chrome saved a 1200 × 630 PNG. |
+| Research and reuse | Chrome exposed the full-publication download and “Reporting accurately” heading. The all-records CSV contained the test licence and pinned citation. |
+| Dispute a record | The row action opened a named text field. The loopback server accepted the request only when it carried the fixture member, vote, and publication IDs. The form showed the neutral confirmation. |
+
+Each view fit the 390 px viewport. Measured normal-text contrast was 4.70:1 for the finder label, 5.11:1 for the sampled evidence state, 14.24:1 for the vote breadcrumb and data download link, and 14.80:1 for the share button and correction label. These measurements cover those sampled pairs.
+
+Chrome’s accessibility tree verifies exposed names and roles. The launch candidate still needs an actual screen-reader walkthrough, broader contrast checks, and a repeat of these journeys with reviewed data.
