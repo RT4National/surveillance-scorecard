@@ -1,0 +1,8 @@
+{
+  "name": "Senate only: drop one cosponsorship item, double one roll call",
+  "votes": {
+    "cosponsor-118-s-686": { "exclude": true },
+    "senate-118-1-342": { "weight": 2 }
+  },
+  "filter": { "chamber": "Senate" }
+}

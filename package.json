@@ -14,7 +14,8 @@
     "db:seed:staging": "node --import tsx scripts/local-seed.ts --staging",
     "types": "wrangler types worker/env.d.ts --strict-vars false",
     "deploy:check": "npm run build && wrangler deploy --dry-run",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "experiment": "node --import tsx scripts/experiment.ts"
   },
   "dependencies": {
     "fast-xml-parser": "^5.11.1",
