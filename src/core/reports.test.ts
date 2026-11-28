@@ -11,6 +11,7 @@ import {
   decodeVoteId,
   loadArchivedPublication,
   validateReportQuery,
+  membershipSemantics,
 } from "./reports";
 const data: Dataset = {
   id: "test",
@@ -146,6 +147,21 @@ describe("reproducible reports", () => {
     });
     expect(result.rows.map((r) => r.member.id)).toEqual(["a"]);
     expect(result.sources).toEqual(["https://example.org/1"]);
+  });
+  it("excludes Not eligible records from a presidential context, since they have no party at the time", () => {
+    const withIneligible: Dataset = {
+      ...data,
+      records: [
+        ...data.records,
+        // Not serving on this date; partyAtVote is a placeholder with no source.
+        { memberId: "c", voteId: "v1", outcome: "Not eligible", partyAtVote: "Democratic" },
+      ],
+    };
+    const notEligible = { kind: "intersection", conditions: [{ voteId: "v1", outcome: "Not eligible" }] };
+    expect(executeReport(withIneligible, notEligible).rows.map((r) => r.member.id)).toEqual(["c"]);
+    for (const context of ["same", "opposing"] as const)
+      expect(executeReport(withIneligible, { ...notEligible, context }).rows).toEqual([]);
+    expect(membershipSemantics).toMatch(/Not eligible records .*excluded/);
   });
   it("validates arbitrary external queries and prevents false empty results from mismatched scope", () => {
     for (const query of [
