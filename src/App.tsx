@@ -397,7 +397,7 @@ export default function App() {
               {isFormer ? "HISTORICAL EXPLORER" : "EXPLORE THE RECORD"}
             </div>
             <h2>
-              {isFormer ? "Former members" : "Find your legislators"}
+              {isFormer ? "All former members" : "All members"}
               <span className="count-pill">
                 {
                   members.filter((m) =>

@@ -105,5 +105,5 @@ export const newerVersionLabel = "Newer version available";
 /** One-line page heading above the finder. */
 export const heroCopy = {
   home: "Who votes for privacy?",
-  former: "The record, over time",
+  former: "Former members",
 } as const;
