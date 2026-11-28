@@ -13,6 +13,8 @@ const partyMember: Record<Party, string> = {
   Republican: "Republican",
   Independent: "Independent",
 };
+const withArticle = (word: string) =>
+  `${/^[AEIOU]/i.test(word) ? "an" : "a"} ${word}`;
 
 export function Profile({
   member,
@@ -207,16 +209,19 @@ export function Profile({
                     <strong>{e.vote.title}</strong>
                     <p>{e.vote.rationale}</p>
                     <p className="evidence-context">
+                      <span>Reform position: {e.vote.reformVote}</span>
                       <span>
-                        {e.outcome === "Yes" || e.outcome === "No"
-                          ? `Voted ${e.outcome}`
-                          : e.outcome}{" "}
-                        · Reform position: {e.vote.reformVote}
+                        Under {withArticle(e.vote.presidentParty)} president
+                        {/* Not eligible: no service on this date, so no party to report. */}
+                        {e.outcome !== "Not eligible" &&
+                          ` · ${partyMember[e.partyAtVote]} at the time`}
                       </span>
-                      <span>
-                        Under a {e.vote.presidentParty} president ·{" "}
-                        {partyMember[e.partyAtVote]} at the time
-                      </span>
+                      {e.scored && (
+                        <span>
+                          Counts toward: president of{" "}
+                          {e.ownParty ? "their own party" : "another party"}
+                        </span>
+                      )}
                     </p>
                     <small>
                       {e.vote.date} ·{" "}

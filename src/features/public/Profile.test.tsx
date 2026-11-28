@@ -26,14 +26,25 @@ describe("profile evidence rows", () => {
     expect(dates).toEqual([...dates].sort().reverse());
   });
 
-  it("states the recorded vote, the reform position and the party context", () => {
+  it("states the reform position and the party context without repeating the outcome", () => {
     const shown = rows(3);
     const member = members[3];
     expected(3).forEach((e, i) => {
-      const row = text(shown[i]);
-      expect(row).toContain(`Voted ${e.outcome} · Reform position: ${e.vote.reformVote}`);
-      expect(row).toContain(
+      const context = text(shown[i].querySelector(".evidence-context")!);
+      expect(context).toContain(`Reform position: ${e.vote.reformVote}`);
+      expect(context).toContain(
         `Under a ${e.vote.presidentParty} president · ${member.party} at the time`,
+      );
+      expect(context).not.toMatch(/Voted|\b(Yes|No) ·/);
+    });
+  });
+
+  it("says which side of the presidency split each scored vote counts toward", () => {
+    const shown = rows(3);
+    expected(3).forEach((e, i) => {
+      const own = e.partyAtVote === e.vote.presidentParty;
+      expect(text(shown[i])).toContain(
+        `Counts toward: president of ${own ? "their own party" : "another party"}`,
       );
     });
   });
@@ -63,9 +74,18 @@ describe("profile evidence rows", () => {
     );
     expect(notEligible.length).toBeGreaterThan(0);
     for (const row of notEligible) {
-      expect(text(row)).toMatch(/Not eligible · Reform position: (Yes|No)/);
+      const context = text(row.querySelector(".evidence-context")!);
+      expect(context).toMatch(/^Reform position: (Yes|No)\s*Under an? \w+ president$/);
+      expect(context).not.toContain("at the time");
+      expect(context).not.toContain("Counts toward");
+      expect(text(row.querySelector(".vote-result")!)).toContain("Not eligible");
       expect(text(row.querySelector(".vote-mark .sr-only")!)).toBe("Not scored");
     }
+    // Rows the member was eligible for still name their party.
+    expected(7).forEach((e, i) => {
+      if (e.outcome !== "Not eligible")
+        expect(text(shown[i])).toMatch(/(Democrat|Republican|Independent) at the time/);
+    });
   });
 
   it("uses the shared source label instead of calling missing sources fictional", () => {
