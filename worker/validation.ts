@@ -1,3 +1,4 @@
+import { validateVoteSeries } from "../src/core/voteSeries";
 import type { Dataset } from "../src/core/publication";
 import { validateRubric } from "../src/core/scoring";
 export function validateDataset(value: unknown): string[] {
@@ -60,6 +61,7 @@ function checkDataset(value: unknown): string[] {
   );
   const members = new Map(d.members.map((m) => [m.id, m]));
   const votes = new Map(d.votes.map((v) => [v.id, v]));
+  errors.push(...validateVoteSeries(d.voteSeries, votes));
   const dateBoundary = (v: unknown, precision: string) =>
     typeof v === "string" &&
     (precision === "year"

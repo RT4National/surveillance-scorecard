@@ -224,6 +224,7 @@ export function slimView(
     rubric: index.dataset.rubric,
     coverage: index.dataset.coverage,
     votes: index.dataset.votes,
+    voteSeries: index.dataset.voteSeries,
     members: [...index.members, ...extra],
     records: slice?.records ?? [],
     affiliations: slice?.affiliations,

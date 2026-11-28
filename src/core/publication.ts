@@ -1,4 +1,4 @@
-import type { Member, RecordEntry, Rubric, Vote } from "./types";
+import type { Member, RecordEntry, Rubric, Vote, VoteSeries } from "./types";
 import { publicationNumberLabel } from "./copy";
 import type { scoreMember } from "./scoring";
 
@@ -26,6 +26,7 @@ export interface Dataset {
   demo: boolean;
   members: Member[];
   votes: Vote[];
+  voteSeries?: VoteSeries[];
   records: RecordEntry[];
   rubric: Rubric;
   sources: SourceCapture[];

@@ -37,6 +37,7 @@ export interface PublicationIndex {
     Pick<Publication, "createdAt" | "previousId" | "summary">;
   dataset: Pick<Dataset, "id" | "asOf" | "demo" | "rubric" | "coverage"> & {
     votes: Vote[];
+    voteSeries?: Dataset["voteSeries"];
     /** Number of source captures. A demo dataset without any is the fictional preview. */
     sourceCount: number;
   };
@@ -93,6 +94,7 @@ export function buildPublicationIndex(p: Publication): PublicationIndex {
       rubric: dataset.rubric,
       coverage: dataset.coverage,
       votes: dataset.votes,
+      voteSeries: dataset.voteSeries,
       sourceCount: dataset.sources.length,
     },
     members,

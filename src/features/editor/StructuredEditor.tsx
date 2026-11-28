@@ -1,3 +1,5 @@
+import { VoteSeriesEditor } from "./VoteSeriesEditor";
+import { removeVoteFromSeries } from "../../core/voteSeries";
 import { RosterIntake } from "./RosterIntake";
 import type { RosterRun } from "../../ingestion/members";
 import { ItemImpactPreview } from "./ItemImpactPreview";
@@ -78,6 +80,7 @@ export function VotesPanel({
       ? {
           ...d,
           votes: d.votes.filter((item) => item.id !== v.id),
+          voteSeries: removeVoteFromSeries(d.voteSeries, v.id),
           records: d.records.filter((record) => record.voteId !== v.id),
         }
       : null;
@@ -153,6 +156,7 @@ export function VotesPanel({
           Add a vote
         </button>
       </div>
+      <VoteSeriesEditor dataset={d} onChange={onChange} />
       {!v && <p>No votes yet. Use “Add a vote” to start.</p>}
       {v && (
         <article className="editor-card">
@@ -457,7 +461,8 @@ export function VotesPanel({
             <section aria-label="Review retirement">
               <p>
                 Retiring this item removes its records from the draft. Published
-                versions keep their records.
+                versions keep their records. Any series left with fewer than two
+                votes is removed from this draft.
               </p>
               <ItemImpactPreview
                 before={d}

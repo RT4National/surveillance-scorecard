@@ -234,6 +234,39 @@ describe("Staff editing workflow", () => {
     });
     expect(raw().votes[0].weight).toBe(3);
   });
+  it("lets staff add an explicitly selected repeated-vote series to a draft", async () => {
+    render(<EditorPage dataset={fixture} />);
+    await openDraft();
+    fireEvent.click(screen.getByText("Repeated-vote series"));
+    fireEvent.change(screen.getByLabelText("Series name"), {
+      target: { value: "Warrant requirement" },
+    });
+    fireEvent.change(screen.getByLabelText("Why these votes are comparable"), {
+      target: { value: "Both votes test the same warrant requirement." },
+    });
+    const options = within(
+      screen.getByRole("group", { name: "Roll calls in this series" }),
+    ).getAllByRole("checkbox");
+    fireEvent.click(options[0]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add series to draft" }),
+    );
+    expect(screen.getByRole("alert").textContent).toMatch(
+      /at least two distinct roll calls/,
+    );
+    fireEvent.click(options[1]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add series to draft" }),
+    );
+    expect(raw().voteSeries).toMatchObject([
+      {
+        name: "Warrant requirement",
+        chamber: "House",
+        rationale: "Both votes test the same warrant requirement.",
+        voteIds: [expect.any(String), expect.any(String)],
+      },
+    ]);
+  });
   it("previews retirement and removes the item only after confirmation", async () => {
     render(<EditorPage dataset={fixture} />);
     await openDraft();
@@ -249,7 +282,9 @@ describe("Staff editing workflow", () => {
       screen.getByRole("button", { name: "Retire item from draft" }),
     );
     expect(current().votes.some((vote) => vote.id === id)).toBe(false);
-    expect(current().records.some((record) => record.voteId === id)).toBe(false);
+    expect(current().records.some((record) => record.voteId === id)).toBe(
+      false,
+    );
   });
   it("explains why a draft cannot be approved by its author", async () => {
     draft = { ...draft, author: "publisher@example.org" };

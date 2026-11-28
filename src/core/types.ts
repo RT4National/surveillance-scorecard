@@ -55,3 +55,12 @@ export interface Rubric {
   halfLifeYears?: number;
   minSharedTopics?: number;
 }
+
+/** Staff-selected roll calls that ask the same question in one chamber. */
+export interface VoteSeries {
+  id: string;
+  name: string;
+  rationale: string;
+  chamber: Vote["chamber"];
+  voteIds: string[];
+}
