@@ -14,6 +14,8 @@ import { createHash, webcrypto } from "node:crypto";
 import { DataProvider, demoDataset } from "./data/context";
 import { renderHome, renderMember } from "../worker/render";
 import App from "./App";
+import { scoreMember } from "./core/scoring";
+import { splitDisplay } from "./features/public/split";
 
 let resolve: (r: Response) => void = () => undefined;
 const publication = {
@@ -28,6 +30,7 @@ const publication = {
     .digest("hex"),
 };
 beforeEach(() => {
+  localStorage.clear();
   vi.stubGlobal("crypto", webcrypto);
   vi.stubGlobal(
     "fetch",
@@ -79,7 +82,9 @@ describe("server first paint", () => {
     mount("/scorecard/", renderHome({ dataset: demoDataset }));
     const shape = () =>
       [...document.querySelectorAll("main *")]
-        .filter((el) => el.closest(".finder-controls, .count-row, .hero-line"))
+        .filter((el) =>
+          el.closest(".finder-controls, .state-grid, .count-row, .hero-line"),
+        )
         .map((el) => `${el.tagName}.${el.className}`);
     const before = shape();
     await finish();
@@ -109,9 +114,84 @@ describe("server first paint", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(m.name);
     expect(document.querySelector(".evidence-lists")).toBeTruthy();
   });
+  it("keeps the profile heading and sidebar structure, and does not regrow the split bars", async () => {
+    // Every observed element counts as in view, so the grow-once motion would fire.
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(private cb: (e: { isIntersecting: boolean }[]) => void) {}
+        observe() {
+          this.cb([{ isIntersecting: true }]);
+        }
+        disconnect() {}
+      },
+    );
+    const m = demoDataset.members.find(
+      (x) =>
+        splitDisplay(
+          scoreMember(
+            x,
+            demoDataset.votes,
+            demoDataset.records,
+            demoDataset.rubric,
+            demoDataset.asOf,
+          ),
+          x.party,
+        ).kind === "comparable",
+    )!;
+    expect(m).toBeTruthy();
+    mount(
+      `/scorecard/members/${m.id}`,
+      renderMember({ dataset: demoDataset }, m),
+    );
+    const shape = () =>
+      [...document.querySelectorAll("main *")]
+        .filter((el) => el.closest(".profile-heading, .profile-sidebar"))
+        .map((el) => `${el.tagName}.${el.getAttribute("class") ?? ""}`);
+    const before = shape();
+    await finish();
+    expect(shape()).toEqual(before);
+    expect(document.querySelector(".split-bars")?.className).not.toMatch(
+      /motion-grow-x/,
+    );
+  });
+  it("shows the fragment's state block in the server copy and follows a new pick", () => {
+    window.history.replaceState(null, "", "/scorecard/#state=California");
+    render(
+      <DataProvider>
+        <App serverHtml={renderHome({ dataset: demoDataset })} />
+      </DataProvider>,
+    );
+    const chosen = () =>
+      [...document.querySelectorAll(".state-target.server-chosen")].map(
+        (e) => e.id,
+      );
+    expect(chosen()).toEqual(["state=California"]);
+    fireEvent.change(document.querySelector("select[name=state]")!, {
+      target: { value: "New York" },
+    });
+    expect(chosen()).toEqual(["state=New+York"]);
+  });
   it("still shows the loading state on pages without server content", async () => {
     mount("/scorecard/methodology", undefined);
     expect(screen.getByText(/Loading the published scorecard/)).toBeTruthy();
     await act(async () => resolve(Response.json(publication)));
+  });
+});
+
+describe("remembered state privacy", () => {
+  it("never puts a state in location.search or in any fetch URL", async () => {
+    localStorage.setItem("scorecard.state", "California");
+    mount("/scorecard/", renderHome({ dataset: demoDataset }));
+    await finish();
+    fireEvent.change(document.querySelector("select[name=state]")!, {
+      target: { value: "New York" },
+    });
+    expect(localStorage.getItem("scorecard.state")).toBe("New York");
+    expect(window.location.search).toBe("");
+    const urls = vi.mocked(fetch).mock.calls.map((c) => String(c[0]));
+    expect(urls.length).toBeGreaterThan(0);
+    for (const u of urls) expect(u).not.toMatch(/state|California|New.York/i);
+    localStorage.clear();
   });
 });

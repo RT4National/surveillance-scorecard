@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { members, records, votes, dataset as meta } from "../../data/demo";
 import { scoreMember } from "../../core/scoring";
 import type { Dataset } from "../../core/publication";
@@ -26,7 +32,12 @@ const dataset: Dataset = {
   members: fixtureMembers,
   votes,
   records,
-  rubric: { version: "custom", minVotes: 5, minPerContext: 2, consistencyThreshold: 75 },
+  rubric: {
+    version: "custom",
+    minVotes: 5,
+    minPerContext: 2,
+    consistencyThreshold: 75,
+  },
   sources: [],
   coverage: [],
 };
@@ -77,7 +88,9 @@ describe("finder on the home page", () => {
     expect(rows.join()).not.toContain("Old Former");
     expect(finder().querySelectorAll("li .grade")).toHaveLength(4);
     const own = within(finder()).getByText(ca.name).closest("li")!;
-    expect(own.querySelector(".grade")?.getAttribute("aria-label")).toMatch(/^Grade /);
+    expect(own.querySelector(".grade")?.getAttribute("aria-label")).toMatch(
+      /^Grade /,
+    );
   });
   it("keeps the state in the fragment and never in location.search", () => {
     render(<App />);
@@ -85,12 +98,13 @@ describe("finder on the home page", () => {
     expect(window.location.search).toBe("");
     expect(window.location.hash).toBe("#state=California");
   });
-  it("filters the directory to the chosen state", () => {
+  it("keeps Browse all as the whole roster when a state is chosen", () => {
     render(<App />);
     openDirectory();
     pick("California");
+    expect(delegation().join()).toContain(ca.name);
     expect(directoryNames()).toContain(ca.name);
-    expect(directoryNames()).not.toContain(tx.name);
+    expect(directoryNames()).toContain(tx.name);
   });
   it("opens a delegation from a fragment link", () => {
     window.history.replaceState(null, "", "/scorecard/#state=California");
@@ -98,10 +112,13 @@ describe("finder on the home page", () => {
     expect(delegation()).toHaveLength(4);
   });
   it("honours an old ?state= link, then moves it to the fragment", () => {
-    window.history.replaceState(null, "", "/scorecard/?state=California&sort=name");
+    window.history.replaceState(
+      null,
+      "",
+      "/scorecard/?state=California&sort=name",
+    );
     render(<App />);
     expect(delegation()).toHaveLength(4);
-    expect(directoryNames()).not.toContain(tx.name);
     expect(window.location.search).toBe("?sort=name");
     expect(window.location.hash).toBe("#state=California");
   });
@@ -112,7 +129,9 @@ describe("finder on the home page", () => {
   });
   it("says it asks for no address and links to house.gov", () => {
     render(<App />);
-    expect(within(finder()).getByText("We don't ask for your address.")).toBeTruthy();
+    expect(
+      within(finder()).getByText("We don't ask for your address."),
+    ).toBeTruthy();
     const link = within(finder()).getByRole("link", { name: /house\.gov/i });
     expect(link.getAttribute("href")).toMatch(/^https:\/\/www\.house\.gov\//);
   });
@@ -145,7 +164,11 @@ describe("finder on the home page", () => {
     expect(window.location.search).toBe("");
   });
   it("moves an old ?q= link to the fragment and still filters", () => {
-    window.history.replaceState(null, "", "/scorecard/?q=senator%20one&sort=name#browse=all");
+    window.history.replaceState(
+      null,
+      "",
+      "/scorecard/?q=senator%20one&sort=name#browse=all",
+    );
     render(<App />);
     expect(directoryNames()).toEqual(["Yan Senator One"]);
     expect(window.location.search).toBe("?sort=name");

@@ -10,7 +10,11 @@
 import type { Dataset, Publication } from "../src/core/publication";
 import type { Group, Member, RecordEntry } from "../src/core/types";
 import { publishedScore } from "../src/core/publication-scores";
-import { defaultGradeBands, scoreMember } from "../src/core/scoring";
+import {
+  defaultGradeBands,
+  groupLabels,
+  scoreMember,
+} from "../src/core/scoring";
 import { publicationUrl } from "../src/core/navigation";
 import { bandRange, profileSummary } from "../src/core/summary";
 import {
@@ -24,7 +28,10 @@ import {
   headerCopy,
   headlineCopy,
   heroCopy,
+  districtLabel,
+  finderHeading,
   methodologyLinkLabel,
+  stateGridLabel,
   navLinks,
   notGradedLabel,
   profileCopy,
@@ -33,7 +40,13 @@ import {
   splitCopy,
   updatedLabel,
 } from "../src/core/copy";
-import { fictional, fmt, gradeTone } from "../src/features/public/helpers";
+import {
+  delegation,
+  fictional,
+  fmt,
+  gradeTone,
+} from "../src/features/public/helpers";
+import { stateAbbreviation, stateFragment } from "../src/core/states";
 import { splitDisplay } from "../src/features/public/split";
 
 export const escapeHtml = (value: string) =>
@@ -63,6 +76,7 @@ const icons = {
     svg(size, "arrow-up-right", ["M7 7h10v10", "M7 17 17 7"]),
   arrowLeft: svg(16, "arrow-left", ["m12 19-7-7 7-7", "M19 12H5"]),
   chevronDown: svg(15, "chevron-down", ["m6 9 6 6 6-6"]),
+  copy: `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>`,
 };
 
 /**
@@ -130,7 +144,14 @@ export function renderHome(data: PageData): string {
   const key = `${publication?.id ?? `demo:${dataset.id}`}|${linkId ?? ""}`;
   const cached = homeCache.get(key);
   if (cached !== undefined) return chrome(data, cached);
-  const score = scorer(data);
+  // Counts and the no-script delegations both need every active member's score: compute once.
+  const scoreOf = scorer(data);
+  const scores = new Map<string, Score>();
+  const score = (m: Member) => {
+    let s = scores.get(m.id);
+    if (!s) scores.set(m.id, (s = scoreOf(m)));
+    return s;
+  };
   const active = dataset.members.filter((m) => m.status === "active");
   const states = [...new Set(active.map((m) => m.state))].sort();
   const counts = new Map<Group, number>();
@@ -148,11 +169,22 @@ export function renderHome(data: PageData): string {
     finderCopy.name,
   )}</span><input type="search" name="q" placeholder="${e(
     finderCopy.namePlaceholder,
-  )}" autocomplete="off" value=""></label></div><p class="finder-note">${e(
+  )}" autocomplete="off" value=""></label></div><nav class="state-grid" aria-label="${e(
+    stateGridLabel,
+  )}">${states
+    .map(
+      (s) =>
+        `<a href="#${e(stateFragment(s))}" aria-label="${e(s)}" title="${e(s)}">${e(
+          stateAbbreviation(s),
+        )}</a>`,
+    )
+    .join("")}</nav><p class="finder-note">${e(
     finderCopy.privacy,
   )}</p><p class="finder-note">${e(finderCopy.districtHelp)} <a href="${e(
     finderCopy.houseUrl,
-  )}" rel="noopener noreferrer">${e(finderCopy.houseLink)}</a></p><div class="finder-results"></div></section></div>`;
+  )}" rel="noopener noreferrer">${e(finderCopy.houseLink)}</a></p><div class="finder-results"></div>${states
+    .map((st) => noScriptDelegation(data, st, score))
+    .join("")}</section></div>`;
   const countRow = `<nav class="count-row" aria-label="${e(countRowLabel)}">${groupOrder
     .map(
       (g) =>
@@ -179,20 +211,68 @@ export function renderHome(data: PageData): string {
   return chrome(data, main);
 }
 
-function avatar(m: Member): string {
+/**
+ * A state's delegation for visitors without JavaScript (or before it loads). Hidden until the
+ * address fragment is that state's (#state=California): the span's id is the fragment, and CSS
+ * :target shows the block after it. The app replaces it with the live finder results.
+ */
+function noScriptDelegation(
+  data: PageData,
+  state: string,
+  score: (m: Member) => Score,
+): string {
+  const { dataset, linkId } = data;
+  const bands = dataset.rubric.gradeBands ?? defaultGradeBands;
+  const list = delegation(dataset.members, state);
+  const group = (label: string, rows: Member[]) =>
+    rows.length
+      ? `<h3>${e(finderHeading(label, rows.length))}</h3><ul class="finder-list">${rows
+          .map((m) => {
+            const s = score(m);
+            return `<li><a class="finder-row" href="${e(
+              publicationUrl(`/scorecard/members/${m.id}`, linkId),
+            )}">${grade(s, bands, dataset.rubric.minVotes)}${avatar(m, false)}<span class="finder-name"><strong>${e(
+              m.name,
+            )}</strong><small>${e(
+              `${m.party} · ${m.chamber === "Senate" ? finderCopy.senate : districtLabel(m.district)}`,
+            )}</small></span><span class="finder-value">${e(
+              s.value === null ? finderCopy.notGraded : fmt(s.value),
+            )}</span></a></li>`;
+          })
+          .join("")}</ul>`
+      : "";
+  return `<span class="state-target" id="${e(stateFragment(state))}"></span><div class="finder-results server-delegation">${group(
+    finderCopy.senate,
+    list.filter((m) => m.chamber === "Senate"),
+  )}${group(
+    finderCopy.house,
+    list.filter((m) => m.chamber !== "Senate"),
+  )}</div>`;
+}
+function grade(
+  s: Score,
+  bands: { label: string; minimum: number }[],
+  minVotes: number,
+): string {
+  return `<span class="grade ${gradeTone(s.grade, s.value, bands)}" aria-label="${e(
+    s.value === null ? notGradedLabel(minVotes) : `Grade ${s.grade}`,
+  )}">${e(s.grade)}</span>`;
+}
+
+function avatar(m: Member, large = true): string {
   if (
     m.portrait?.url.startsWith("/scorecard/portraits/") &&
     m.portrait.reviewedBy &&
     m.portrait.attribution
   )
-    return `<img class="avatar large" src="${e(m.portrait.url)}" alt="" loading="lazy" title="${e(
+    return `<img class="avatar ${large ? "large" : ""}" src="${e(m.portrait.url)}" alt="" loading="lazy" title="${e(
       m.portrait.attribution,
     )}">`;
   const initials = m.name
     .split(" ")
     .map((n) => n[0])
     .join("");
-  return `<span aria-hidden="true" class="avatar large ${e(m.party.toLowerCase())}">${e(initials)}</span>`;
+  return `<span aria-hidden="true" class="avatar ${large ? "large" : ""} ${e(m.party.toLowerCase())}">${e(initials)}</span>`;
 }
 
 /**
@@ -247,7 +327,9 @@ export function renderMember(data: PageData, m: Member): string {
     profileCopy.eyebrow(fictional(dataset), m.status),
   )}</div><h1>${e(m.name)}</h1><p>${e(
     `${m.party} · ${m.state} · ${m.chamber}${m.district !== undefined ? `, District ${m.district}` : ""}`,
-  )}</p></div></div><div class="profile-layout"><aside class="profile-sidebar"><div class="profile-grade"><span class="grade ${gradeTone(
+  )}</p></div><button class="button">${icons.copy} ${e(
+    profileCopy.copyLink,
+  )}</button></div><div class="profile-layout"><aside class="profile-sidebar"><div class="profile-grade"><span class="grade ${gradeTone(
     s.grade,
     s.value,
     bands,
@@ -261,9 +343,17 @@ export function renderMember(data: PageData, m: Member): string {
       : profileCopy.alignment(fmt(s.value)),
   )}</h2></div><ul class="headline-lines">${lines
     .map((l) => `<li>${e(l)}</li>`)
-    .join(
-      "",
-    )}</ul></aside><div class="profile-main"><div class="panel"><div class="section-heading"><h2>${e(
+    .join("")}</ul><details class="does-not-measure"><summary>${e(
+    headlineCopy.doesNotMeasure,
+  )}</summary><ul>${headlineCopy.doesNotMeasureItems
+    .map((i) => `<li>${e(i)}</li>`)
+    .join("")}</ul></details><span class="category ${s.group}">${e(
+    groupLabels[s.group],
+  )}</span><p>${e(s.reason)}</p><hr><h3>${e(profileCopy.memberships)}</h3><p>${e(
+    [...m.committees, ...m.caucuses].join(" · ") || profileCopy.noMemberships,
+  )}</p><p class="muted">${e(profileCopy.serviceBegins(m.since))} ${e(
+    fictional(dataset) ? profileCopy.demoRecord : profileCopy.verify,
+  )}</p></aside><div class="profile-main"><div class="panel"><div class="section-heading"><h2>${e(
     profileCopy.splitHeading,
   )}</h2></div><p class="muted">${e(splitCopy.meaning)}</p>${splitHtml}</div></div></div></section>`;
   return chrome(data, main);

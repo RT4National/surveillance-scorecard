@@ -19,10 +19,7 @@ export const fmt = (n: number | null) =>
   n === null ? "Not yet rated" : percentLabel(n);
 /** Lowercase, accent-free text for name matching. */
 export const normalize = (s: string) =>
-  s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
+  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 /**
  * The chosen state and the name search live in the URL fragment (`#state=CA&q=smith`),
  * never in the query string: fragments are not sent to the server, query strings are
@@ -53,6 +50,27 @@ export function writeFragment(key: FragmentKey, value: string) {
   );
 }
 export const writeState = (state: string) => writeFragment("state", state);
+/**
+ * The visitor's own last pick, kept in this browser (localStorage) so a later visit to the home
+ * page opens their delegation. Never sent to the server and never written to the URL. Storage may
+ * be unavailable (private windows, blocked site data); then nothing is remembered.
+ */
+const storedStateKey = "scorecard.state";
+export function readStoredState(): string {
+  try {
+    return localStorage.getItem(storedStateKey) ?? "";
+  } catch {
+    return "";
+  }
+}
+export function writeStoredState(state: string) {
+  try {
+    if (state) localStorage.setItem(storedStateKey, state);
+    else localStorage.removeItem(storedStateKey);
+  } catch {
+    // Not remembered; the fragment still holds the choice for this page.
+  }
+}
 export function migrateLegacyFragment() {
   for (const key of fragmentKeys)
     if (query().has(key)) writeFragment(key, readFragment(key));

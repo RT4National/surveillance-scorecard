@@ -64,6 +64,7 @@ const countRow = () =>
 
 let reduced = false;
 beforeEach(() => {
+  localStorage.clear();
   dataset = base;
   reduced = false;
   window.history.replaceState(null, "", "/scorecard/");
@@ -217,5 +218,97 @@ describe("filter motion (plan item 3.4)", () => {
     expect(document.querySelector(".directory-results")!.className).not.toMatch(
       /motion-filter/,
     );
+  });
+});
+
+const finderRegion = () => screen.getByRole("region", { name: /find/i });
+const delegationNames = () =>
+  [...finderRegion().querySelectorAll(".finder-list li strong")].map(
+    (e) => e.textContent,
+  );
+const activeStates = [...new Set(active.map((m) => m.state))].sort();
+const inState = (s: string) =>
+  active
+    .filter((m) => m.state === s)
+    .map((m) => m.name)
+    .sort();
+
+describe("one-tap state links", () => {
+  it("has a link for every state in the data, named with the full state name", () => {
+    render(<App />);
+    const grid = within(finderRegion()).getByRole("navigation", {
+      name: "States",
+    });
+    const links = within(grid).getAllByRole("link");
+    expect(links.map((l) => l.getAttribute("aria-label"))).toEqual(
+      activeStates,
+    );
+    for (const s of activeStates) {
+      const link = within(grid).getByRole("link", { name: s });
+      expect(link.textContent!.length).toBeLessThanOrEqual(2);
+      expect(link.getAttribute("href")).toBe(
+        `#${new URLSearchParams({ state: s })}`,
+      );
+    }
+  });
+  it("shows that delegation when a state link is activated", () => {
+    render(<App />);
+    const s = activeStates[0];
+    fireEvent.click(within(finderRegion()).getByRole("link", { name: s }));
+    expect(delegationNames().sort()).toEqual(inState(s));
+    expect(window.location.hash).toBe(`#${new URLSearchParams({ state: s })}`);
+    expect(window.location.search).toBe("");
+  });
+});
+
+describe("remembered state", () => {
+  const key = "scorecard.state";
+  it("stores a pick in this browser only", () => {
+    render(<App />);
+    fireEvent.change(within(finderRegion()).getByLabelText("State"), {
+      target: { value: "California" },
+    });
+    expect(localStorage.getItem(key)).toBe("California");
+    expect(window.location.search).toBe("");
+  });
+  it("preselects the stored state on a later visit, without writing it to the URL", () => {
+    localStorage.setItem(key, "California");
+    render(<App />);
+    expect(delegationNames().sort()).toEqual(inState("California"));
+    expect(window.location.search).toBe("");
+    expect(window.location.hash).toBe("");
+    expect(
+      within(finderRegion()).getByText("California", {
+        selector: ".finder-chosen strong",
+      }),
+    ).toBeTruthy();
+  });
+  it("lets a state in the fragment win over the stored one", () => {
+    localStorage.setItem(key, "California");
+    const other = activeStates.find((s) => s !== "California")!;
+    window.history.replaceState(
+      null,
+      "",
+      `/scorecard/#${new URLSearchParams({ state: other })}`,
+    );
+    render(<App />);
+    expect(delegationNames().sort()).toEqual(inState(other));
+  });
+  it("clears the stored state with Change", () => {
+    localStorage.setItem(key, "California");
+    render(<App />);
+    fireEvent.click(
+      within(finderRegion()).getByRole("button", { name: /Change/ }),
+    );
+    expect(localStorage.getItem(key)).toBeNull();
+    expect(delegationNames()).toEqual([]);
+    expect(document.activeElement).toBe(
+      within(finderRegion()).getByLabelText("State"),
+    );
+  });
+  it("ignores a stored state that is not in the data", () => {
+    localStorage.setItem(key, "Atlantis");
+    render(<App />);
+    expect(delegationNames()).toEqual([]);
   });
 });

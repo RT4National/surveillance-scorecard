@@ -2137,3 +2137,58 @@ input[type="date"] {
 .server-paint {
   display: contents;
 }
+
+/* One-tap state links beside the picker. Targets are at least 24 x 24 px (WCAG 2.5.8). */
+.state-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 10px 0 4px;
+}
+.state-grid a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--ink);
+  text-decoration: none;
+}
+.state-grid a:hover,
+.state-grid a:focus-visible {
+  border-color: var(--ink);
+}
+.state-grid a[aria-current="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+/* The chosen (or remembered) state, with a one-click way to clear it. */
+.finder-chosen {
+  margin: 14px 0 0;
+  font-size: 14px;
+}
+/* Server first paint without JavaScript: a state's delegation shows when the fragment targets it. */
+.server-delegation {
+  display: none;
+}
+.state-target {
+  display: block;
+  /* A #state= landing scrolls here; keep the heading and finder above it in view. */
+  scroll-margin-top: 40vh;
+}
+.state-target:target + .server-delegation {
+  display: block;
+}
+/* Once the app runs, the class set by ServerPaint decides instead of :target. */
+.server-paint .state-target:target + .server-delegation {
+  display: none;
+}
+.server-paint .state-target.server-chosen + .server-delegation {
+  display: block;
+}

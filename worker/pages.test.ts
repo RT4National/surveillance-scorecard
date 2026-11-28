@@ -241,6 +241,19 @@ describe("server-rendered first paint with no publication (fictional demo)", () 
       expect(root).toContain(escapeHtml(groupCountLabel(g, n)));
     }
     expect(root).toContain(escapeHtml(browseAllLabel(active.length)));
+    // One-tap state links: full name as the accessible name, the state in the fragment.
+    for (const state of new Set(active.map((m) => m.state))) {
+      const fragment = new URLSearchParams({ state }).toString();
+      expect(root).toContain(
+        `href="#${escapeHtml(fragment)}" aria-label="${escapeHtml(state)}"`,
+      );
+      // Without JavaScript the same fragment shows the delegation (CSS :target).
+      const target = root.indexOf(`id="${escapeHtml(fragment)}"`);
+      expect(target, state).toBeGreaterThan(-1);
+      const block = root.slice(target, root.indexOf("</ul></div>", target));
+      for (const m of active.filter((m) => m.state === state))
+        expect(block).toContain(`<strong>${escapeHtml(m.name)}</strong>`);
+    }
     expect(root).toContain(escapeHtml(bannerCopy.preview));
     expect(root).toContain(escapeHtml(bannerCopy.fictional));
     expect(root).not.toContain("Loading the published scorecard");

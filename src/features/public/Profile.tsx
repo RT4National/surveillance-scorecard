@@ -35,9 +35,12 @@ const newestFirst = (list: EvidenceEntry[]) =>
 export function Profile({
   member,
   copy,
+  serverPainted = false,
 }: {
   member: Member;
   copy: (text: string) => Promise<void>;
+  /** The Worker already painted the split bars at full width: do not grow them again. */
+  serverPainted?: boolean;
 }) {
   const { score, dataset, rubric, publication, linkId } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
@@ -147,7 +150,7 @@ export function Profile({
           className="button"
           onClick={() => void copy(window.location.href)}
         >
-          <Copy size={15} /> Copy profile link
+          <Copy size={15} /> {profileCopy.copyLink}
         </button>
       </div>
       <div className="profile-layout">
@@ -185,16 +188,14 @@ export function Profile({
           <span className={`category ${s.group}`}>{groupLabels[s.group]}</span>
           <p>{s.reason}</p>
           <hr />
-          <h3>Committees & caucuses</h3>
+          <h3>{profileCopy.memberships}</h3>
           <p>
             {[...member.committees, ...member.caucuses].join(" · ") ||
-              "No current memberships listed"}
+              profileCopy.noMemberships}
           </p>
           <p className="muted">
-            Service begins {member.since}.{" "}
-            {fictional(dataset)
-              ? "Demonstration record."
-              : "See the publication sources for verification."}
+            {profileCopy.serviceBegins(member.since)}{" "}
+            {fictional(dataset) ? profileCopy.demoRecord : profileCopy.verify}
           </p>
         </aside>
         <div className="profile-main">
@@ -208,7 +209,7 @@ export function Profile({
               <>
                 <div
                   ref={barsRef}
-                  className={`split-bars${barsSeen ? " motion-grow-x" : ""}`}
+                  className={`split-bars${barsSeen && !serverPainted ? " motion-grow-x" : ""}`}
                 >
                   {(
                     [

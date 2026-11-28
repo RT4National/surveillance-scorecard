@@ -1,4 +1,11 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -31,6 +38,7 @@ import type { Dataset, Publication } from "./core/publication";
 import { publishedScore } from "./core/publication-scores";
 import { publicationUrl } from "./core/navigation";
 import { matchRoute } from "./core/routes";
+import { stateFragment } from "./core/states";
 import {
   LegislationPage,
   ComparePage,
@@ -52,7 +60,9 @@ import {
   readAsOf,
   readFragment,
   readState,
+  readStoredState,
   writeFragment,
+  writeStoredState,
   writeState,
 } from "./features/public/helpers";
 import { EditorPage } from "./features/editor/EditorPage";
@@ -74,12 +84,13 @@ type Filters = typeof defaults;
 // `state` is read from the URL fragment (or an old ?state= link), never written to the query.
 const readBrowse = () => readFragment("browse") === "all";
 const groupOrder: Group[] = ["reformer", "mixed", "surveillance", "unproven"];
-const readFilters = (): Filters =>
+// On the home page, with no state in the address, the visitor's stored pick fills it in memory.
+const readFilters = (home = false): Filters =>
   ({
     ...Object.fromEntries(
       Object.entries(defaults).map(([k, v]) => [k, query().get(k) ?? v]),
     ),
-    state: readState(),
+    state: readState() || (home ? readStoredState() : ""),
     q: readFragment("q"),
   }) as Filters;
 function saveFile(name: string, value: string, type: string) {
@@ -293,10 +304,13 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
  */
 function ServerPaint({
   html,
+  state,
   onState,
   onName,
 }: {
   html: string;
+  /** The current state, whose no-script delegation block stays shown (see worker/render.ts). */
+  state: string;
   onState: (state: string) => void;
   onName: (name: string) => void;
 }) {
@@ -318,6 +332,15 @@ function ServerPaint({
       el.removeEventListener("input", listener);
     };
   }, []);
+  // :target stops tracking once React re-creates this markup, and replaceState never moves it, so
+  // mark the current state's block with a class before paint instead (styles.css, .server-chosen).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const id = state ? stateFragment(state) : null;
+    for (const t of el.querySelectorAll(".state-target"))
+      t.classList.toggle("server-chosen", t.id === id);
+  }, [state, html]);
   // The markup is the Worker's own, built from escaped text (worker/render.ts).
   return (
     <div
@@ -339,14 +362,15 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
   const path = window.location.pathname.replace(/\/$/, "");
   const route = matchRoute(window.location.pathname);
   const isFormer = route.name === "former";
-  const [filters, setFilters] = useState<Filters>(readFilters);
+  const home = route.name === "home";
+  const [filters, setFilters] = useState<Filters>(() => readFilters(home));
   // The home directory opens in place ("Browse all"); the open state lives in the fragment.
   const [browse, setBrowse] = useState(readBrowse);
   const [notice, setNotice] = useState("");
   useEffect(() => {
     migrateLegacyFragment();
     const listener = () => {
-      setFilters(readFilters());
+      setFilters(readFilters(home));
       setBrowse(readBrowse());
     };
     window.addEventListener("popstate", listener);
@@ -376,6 +400,8 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
     setFilters(next);
     if (key === "state" || key === "q") {
       writeFragment(key, value);
+      // A pick (or a clear) in the finder is remembered in this browser only.
+      if (key === "state") writeStoredState(value);
       return;
     }
     const params = query();
@@ -404,6 +430,7 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
       window.location.pathname + (p.size ? `?${p}` : "") + window.location.hash,
     );
     writeState("");
+    writeStoredState("");
     writeFragment("q", "");
   }
   // A state that is not in the data (stale link) filters nothing and selects nothing.
@@ -478,7 +505,10 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
           </div>
         )}
         <Directory
-          filters={effectiveFilters}
+          // Home: the finder owns the state; "Browse all" is the whole roster.
+          filters={
+            isFormer ? effectiveFilters : { ...effectiveFilters, state: "" }
+          }
           setFilter={changeFilter}
           reset={reset}
           archive={isFormer}
@@ -529,7 +559,15 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
       case "former":
         return directoryPage;
       case "member":
-        return member ? <Profile member={member} copy={copy} /> : notFoundPage;
+        return member ? (
+          <Profile
+            member={member}
+            copy={copy}
+            serverPainted={serverHtml !== undefined}
+          />
+        ) : (
+          notFoundPage
+        );
       case "research":
         return <ReportsPage dataset={dataset} publication={publication} />;
       case "compare":
@@ -572,6 +610,7 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
     return (
       <ServerPaint
         html={serverHtml}
+        state={knownState}
         onState={(s) => changeFilter("state", s)}
         onName={(q) => changeFilter("q", q)}
       />

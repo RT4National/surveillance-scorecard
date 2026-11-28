@@ -1,9 +1,11 @@
-import { useId } from "react";
+import { useId, useRef } from "react";
 import { useScorecard } from "../../data/context";
 import { publicationUrl } from "../../core/navigation";
 import {
+  changeStateLabel,
   districtLabel,
   finderCopy,
+  stateGridLabel,
   finderHeading,
   showingFirst,
 } from "../../core/copy";
@@ -11,6 +13,7 @@ import type { Member } from "../../core/types";
 import { Avatar, Grade } from "./member";
 import { base, delegation, fmt, normalize } from "./helpers";
 import { useFilterClass } from "./motion";
+import { stateAbbreviation, stateFragment } from "../../core/states";
 
 const searchLimit = 10;
 
@@ -75,6 +78,7 @@ export function Finder({
 }) {
   const { members } = useScorecard();
   const id = useId();
+  const select = useRef<HTMLSelectElement>(null);
   const active = members.filter((m) => m.status === "active");
   const states = [...new Set(active.map((m) => m.state))].sort();
   const chosen = states.includes(state) ? state : "";
@@ -99,6 +103,7 @@ export function Finder({
         <label>
           <span>{finderCopy.state}</span>
           <select
+            ref={select}
             name="state"
             value={chosen}
             onChange={(e) => onState(e.target.value)}
@@ -121,6 +126,23 @@ export function Finder({
           />
         </label>
       </div>
+      <nav className="state-grid" aria-label={stateGridLabel}>
+        {states.map((s) => (
+          <a
+            key={s}
+            href={`#${stateFragment(s)}`}
+            aria-label={s}
+            title={s}
+            aria-current={s === chosen ? "true" : undefined}
+            onClick={(e) => {
+              e.preventDefault();
+              onState(s);
+            }}
+          >
+            {stateAbbreviation(s)}
+          </a>
+        ))}
+      </nav>
       <p className="finder-note">{finderCopy.privacy}</p>
       <p className="finder-note">
         {finderCopy.districtHelp}{" "}
@@ -146,6 +168,19 @@ export function Finder({
         )}
         {chosen && (
           <>
+            <p className="finder-chosen">
+              <strong>{chosen}</strong> ·{" "}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  onState("");
+                  select.current?.focus();
+                }}
+              >
+                {changeStateLabel}
+              </button>
+            </p>
             <Group
               label={finderCopy.senate}
               list={list.filter((m) => m.chamber === "Senate")}

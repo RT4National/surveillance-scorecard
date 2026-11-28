@@ -320,4 +320,14 @@ export const profileCopy = {
     `${fictional ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} · ${status.toUpperCase()}`,
   alignment: (percent: string) => `${percent} reform alignment`,
   splitHeading: "Principles across presidencies",
+  copyLink: "Copy profile link",
+  memberships: "Committees & caucuses",
+  noMemberships: "No current memberships listed",
+  serviceBegins: (since: number | string) => `Service begins ${since}.`,
+  demoRecord: "Demonstration record.",
+  verify: "See the publication sources for verification.",
 } as const;
+
+/** Finder extras: the one-tap state links and the remembered-state line. */
+export const stateGridLabel = "States";
+export const changeStateLabel = "Change";
