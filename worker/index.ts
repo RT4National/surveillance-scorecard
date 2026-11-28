@@ -2,7 +2,15 @@ import type { Dataset, Publication } from "../src/core/publication";
 import { authenticate, HttpError, type Actor } from "./auth";
 import { digest, validateDataset } from "./validation";
 import { research } from "./ai";
-import { createPublicationScoring } from "../src/core/publication-scores";
+import {
+  createPublicationScoring,
+  verifyPublicationScoring,
+} from "../src/core/publication-scores";
+import {
+  buildMemberSlice,
+  buildPublicationIndex,
+  groupByMember,
+} from "../src/core/publication-index";
 import { demoDataset } from "../src/data/demo-dataset";
 import { renderHome, renderMember, type PageData } from "./render";
 import {
@@ -130,6 +138,29 @@ async function loadPublication(
 async function publication(env: Env, id?: string): Promise<Publication | null> {
   return (await loadPublication(env, id)).memo?.publication ?? null;
 }
+/**
+ * Slim views are derived on the server, so the server checks the publication first: the same
+ * dataset digest and frozen-scoring verification the browser runs on the full publication. Once
+ * per publication per isolate. A failure is a 503 and nothing is derived.
+ */
+async function verified(memo: Memo): Promise<void> {
+  try {
+    await derive(memo, "verified", async () => {
+      const p = memo.publication;
+      if ((await digest(p.dataset)) !== p.digest)
+        throw new Error("Dataset digest mismatch");
+      await verifyPublicationScoring(p);
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "publication-verification-failed",
+        error: error instanceof Error ? error.name : "unknown",
+      }),
+    );
+    throw new HttpError(503, "Publication integrity check failed");
+  }
+}
 /** The complete publication, byte for byte what `Response.json(publication)` produced before. */
 async function fullPublication(
   request: Request,
@@ -165,6 +196,50 @@ async function api(
     ).all();
     return json({
       publications: rows.results,
+    });
+  }
+  const slim =
+    method === "GET"
+      ? path.match(/^\/publications\/([^/]+)\/(?:(index)|members\/([^/]+))$/)
+      : null;
+  if (slim) {
+    const latest = slim[1] === "latest";
+    const { memo, hit } = await loadPublication(
+      env,
+      latest ? undefined : slim[1],
+    );
+    if (!memo) throw new HttpError(404, "No publication yet");
+    await verified(memo);
+    const p = memo.publication;
+    let body: string;
+    let etag: string;
+    if (slim[2]) {
+      body = derive(memo, "index", () =>
+        JSON.stringify(buildPublicationIndex(p)),
+      );
+      etag = await derive(memo, "index-etag", () => etagFor(body));
+    } else {
+      let memberId: string;
+      try {
+        memberId = decodeURIComponent(slim[3]);
+      } catch {
+        throw new HttpError(404, "Member not found in this publication");
+      }
+      const slice = buildMemberSlice(
+        p,
+        memberId,
+        derive(memo, "groups", () => groupByMember(p.dataset)),
+      );
+      if (!slice)
+        throw new HttpError(404, "Member not found in this publication");
+      body = JSON.stringify(slice);
+      etag = await etagFor(body);
+    }
+    return cachedResponse(request, body, {
+      etag,
+      cacheControl: latest ? SHORT : IMMUTABLE,
+      contentType: "application/json",
+      hit,
     });
   }
   if (method === "GET" && path.startsWith("/publications/")) {
@@ -654,6 +729,7 @@ async function renderPage(
     noindex: demo || route.name === "editor",
     canonical: canonical.href,
     root: rootHtml,
+    publication: p ? { id: p.id, digest: p.digest } : undefined,
   });
 }
 /** The app shell with a 404 status. The app itself renders "Page not found". */
@@ -677,6 +753,11 @@ async function shell(
     status?: number;
     /** Escaped markup for #root (worker/render.ts) and the page kind for data-server. */
     root?: { kind: string; html: string };
+    /**
+     * The publication this page shows. The app loads its slim index by this ID and checks the
+     * digest matches (src/data/context.tsx), so the page and its data cannot silently diverge.
+     */
+    publication?: { id: string; digest: string };
   },
 ): Promise<Response> {
   const { title, description, noindex, canonical } = meta;
@@ -738,6 +819,10 @@ async function shell(
     })
     .on("div#root", {
       element(e) {
+        if (meta.publication) {
+          e.setAttribute("data-publication", meta.publication.id);
+          e.setAttribute("data-digest", meta.publication.digest);
+        }
         if (!meta.root) return;
         e.setAttribute("data-server", meta.root.kind);
         e.setInnerContent(meta.root.html, { html: true });

@@ -110,6 +110,12 @@ export function gradeTone(
   if (bands.length > 1 && index === bands.length - 1) return "poor";
   return index < Math.floor(bands.length / 2) ? "good" : "mixed";
 }
-/** Demo datasets without sources are the fictional preview; others hold real records with placeholder scoring. */
-export const fictional = (dataset: { demo: boolean; sources: unknown[] }) =>
-  dataset.demo && !dataset.sources.length;
+/**
+ * Demo datasets without sources are the fictional preview; others hold real records with placeholder
+ * scoring. Slim views (the publication index) carry `sourceCount` instead of the source captures.
+ */
+export const fictional = (dataset: {
+  demo: boolean;
+  sources: unknown[];
+  sourceCount?: number;
+}) => dataset.demo && !(dataset.sourceCount ?? dataset.sources.length);

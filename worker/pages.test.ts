@@ -24,6 +24,12 @@ import {
 import { escapeHtml } from "./render";
 import { encodeStoredJson } from "./storage";
 import { digest } from "./validation";
+import { gzipSync } from "node:zlib";
+import { congressionalFixture } from "../scripts/qualification/fixtures";
+import type {
+  MemberSlice,
+  PublicationIndex,
+} from "../src/core/publication-index";
 import type { Dataset, Publication } from "../src/core/publication";
 import type { Member } from "../src/core/types";
 
@@ -548,5 +554,167 @@ describe("caching", () => {
     );
     const old = await get("/scorecard/api/publications/cache-pub-1");
     expect(((await old.json()) as Publication).id).toBe("cache-pub-1");
+  });
+});
+
+// The slim index (landing, finder, directory) and the per-member evidence slice (profiles).
+describe("slim publication views", () => {
+  let mf: Miniflare;
+  // Congressional scale: 535 members, 80 roll calls, portraits named like the real cache.
+  const scale = congressionalFixture(80);
+  const big: Dataset = {
+    ...scale,
+    id: "scale-80",
+    members: scale.members.map((m, i) => ({
+      ...m,
+      status: i % 50 === 49 ? ("inactive" as const) : m.status,
+      portrait: {
+        url: `/scorecard/portraits/${m.id}-${(i * 2654435761 + 1)
+          .toString(16)
+          .padStart(8, "0")
+          .repeat(8)
+          .slice(0, 64)}.jpg`,
+        attribution: "Photo: U.S. House Office of Photography, public domain",
+        rights: "public-domain" as const,
+        rightsSource: `https://commons.wikimedia.org/wiki/File:${m.id}.jpg`,
+        reviewedBy: "wikimedia-commons-metadata; user-directed 2026-10-15",
+      },
+    })),
+  };
+  let p: Publication;
+  beforeAll(async () => {
+    mf = await startWorker();
+    const broken = await publish(
+      "slim-broken",
+      { ...demoDataset, id: "broken" },
+      null,
+      "2026-09-01T00:00:00Z",
+    );
+    await store(mf, { ...broken, digest: "f".repeat(64) });
+    // Stored last, so it is the latest.
+    p = await publish("slim-pub", big, "slim-broken", "2026-09-02T00:00:00Z");
+    await store(mf, p);
+  }, 60_000);
+  afterAll(async () => {
+    await mf?.dispose();
+  });
+  const get = (path: string) =>
+    mf.dispatchFetch(`https://scorecard.example/scorecard/api${path}`);
+  it("serves an index with active members, frozen headline scores and its binding", async () => {
+    const r = await get("/publications/slim-pub/index");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("cache-control")).toBe(
+      "public, max-age=31536000, immutable",
+    );
+    expect(r.headers.get("etag")).toMatch(/^"[^"]+"$/);
+    const index = (await r.json()) as PublicationIndex;
+    expect(index.format).toBe(1);
+    expect(index.publication).toMatchObject({
+      id: "slim-pub",
+      digest: p.digest,
+      scoringDigest: p.scoring!.digest,
+      createdAt: p.createdAt,
+    });
+    expect(index.dataset).toMatchObject({
+      id: big.id,
+      asOf: big.asOf,
+      demo: big.demo,
+      sourceCount: big.sources.length,
+    });
+    expect(index.dataset.votes).toEqual(big.votes);
+    const active = big.members.filter((m) => m.status === "active");
+    expect(index.members).toEqual(active);
+    expect(Object.keys(index.scores!).sort()).toEqual(
+      active.map((m) => m.id).sort(),
+    );
+    for (const m of active.slice(0, 20)) {
+      const { evidence, ...frozen } = publishedScore(p, m);
+      const s = index.scores![m.id];
+      expect(s).toEqual({
+        ...frozen,
+        actions: {
+          votes: evidence.filter((e) => e.scored).length,
+          cosponsorships: 0,
+        },
+      });
+      expect(s).not.toHaveProperty("evidence");
+    }
+    // No evidence rows, records or affiliations in the index.
+    const text = JSON.stringify(index);
+    expect(text).not.toContain('"partyAtVote"');
+    expect(text).not.toContain('"records"');
+    expect(text).not.toContain('"affiliations"');
+  });
+  it("keeps the index within its size budget", async () => {
+    const text = await (await get("/publications/slim-pub/index")).text();
+    const full = await (await get("/publications/slim-pub")).text();
+    const gz = gzipSync(text).byteLength;
+    // Tens of KB gzipped at congressional scale, and a small fraction of the full publication.
+    expect(gz).toBeLessThan(60_000);
+    expect(gz * 4).toBeLessThan(gzipSync(full).byteLength);
+  });
+  it("gives the latest index a short TTL", async () => {
+    const r = await get("/publications/latest/index");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("cache-control")).toBe("public, max-age=60");
+    expect(((await r.json()) as PublicationIndex).publication.id).toBe(
+      "slim-pub",
+    );
+  });
+  it("refuses slim views of a publication whose digest does not verify", async () => {
+    for (const path of [
+      "/publications/slim-broken/index",
+      `/publications/slim-broken/members/${demoDataset.members[0].id}`,
+    ]) {
+      const r = await get(path);
+      expect(r.status, path).toBe(503);
+      expect(r.headers.get("cache-control"), path).toBe("no-store");
+      await r.text();
+    }
+  });
+  it("serves one member's evidence with its binding, including a former member", async () => {
+    for (const m of [
+      big.members[3],
+      big.members.find((m) => m.status !== "active")!,
+    ]) {
+      const r = await get(`/publications/slim-pub/members/${m.id}`);
+      expect(r.status).toBe(200);
+      expect(r.headers.get("cache-control")).toBe(
+        "public, max-age=31536000, immutable",
+      );
+      const slice = (await r.json()) as MemberSlice;
+      expect(slice.publication).toEqual({
+        id: "slim-pub",
+        digest: p.digest,
+        scoringDigest: p.scoring!.digest,
+      });
+      expect(slice.member).toEqual(m);
+      expect(slice.records).toEqual(
+        big.records.filter((r) => r.memberId === m.id),
+      );
+      expect(slice.score).toEqual(p.scoring!.scores[m.id]);
+    }
+  });
+  it("returns 404, never cached, for an unknown member or publication", async () => {
+    for (const path of [
+      "/publications/slim-pub/members/no-such-member",
+      "/publications/no-such-pub/members/x",
+      "/publications/no-such-pub/index",
+    ]) {
+      const r = await get(path);
+      expect(r.status, path).toBe(404);
+      expect(r.headers.get("cache-control"), path).toBe("no-store");
+      await r.text();
+    }
+  });
+  it("names the publication and digest on the page root for the app to check", async () => {
+    const html = await (
+      await mf.dispatchFetch(
+        "https://scorecard.example/scorecard/?publication=slim-pub",
+      )
+    ).text();
+    expect(html).toContain(
+      `<div id="root" data-publication="slim-pub" data-digest="${p.digest}"`,
+    );
   });
 });

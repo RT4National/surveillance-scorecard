@@ -47,25 +47,27 @@ Rollback selects an existing publication ID using the current pointer revision a
 
 All responses are JSON. Failures include `{error}` and validation errors include `errors`. Important status codes: 401 identity required/invalid; 403 role or independent review failure; 409 stale edit/pointer/state; 422 invalid dataset; 429 correction limit; 503 unavailable dependencies/configuration.
 
-| Method and suffix                | Contract                                                                                  |
-| -------------------------------- | ----------------------------------------------------------------------------------------- |
-| GET `/publications/latest`       | Full Publication; 404 when none exists                                                    |
-| GET `/publications`              | `{publications:[{id,createdAt,summary,digest,datasetId,previousId}]}`, newest 200         |
-| GET `/publications/:id`          | Complete immutable Publication                                                            |
-| POST `/corrections`              | `{publicationId,memberId?,voteId?,message}`; requires matching evidence, returns `{id}`   |
-| GET `/staff/session`             | Verified email and role                                                                   |
-| GET `/staff/drafts`              | Latest 100 lightweight draft summaries, without Dataset payloads                          |
-| GET `/staff/drafts/:id`          | One complete draft with decoded Dataset                                                   |
-| POST `/staff/drafts`             | `{dataset,summary,basePublicationId}` → `{id,version}`                                    |
-| PUT `/staff/drafts/:id`          | `{dataset,summary,version,basePublicationId}` → new version; clears review                |
-| POST `/staff/drafts/:id/rebase`  | `{version,basePublicationId}` → retained content on explicit current base, review cleared |
-| POST `/staff/drafts/:id/review`  | `{version}`; independent reviewer                                                         |
-| POST `/staff/drafts/:id/publish` | `{version}` → immutable Publication                                                       |
-| POST `/staff/rollback`           | `{publicationId,revision,reason}`                                                         |
-| GET `/staff/status`              | Current pointer/revision, demo status, dataset cutoff, source ages                        |
-| GET `/staff/audit`               | Most recent 200 audit events                                                              |
-| GET `/staff/corrections`         | Most recent 200 corrections                                                               |
-| PATCH `/staff/corrections/:id`   | `{status:'resolved'                                                                       | 'dismissed',resolution}`; audited |
+| Method and suffix                         | Contract                                                                                  |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------- |
+| GET `/publications/latest`                | Full Publication; 404 when none exists                                                    |
+| GET `/publications`                       | `{publications:[{id,createdAt,summary,digest,datasetId,previousId}]}`, newest 200         |
+| GET `/publications/:id`                   | Complete immutable Publication                                                            |
+| GET `/publications/:id/index`             | Slim index (below); `:id` may be `latest`. 503 if the publication fails verification      |
+| GET `/publications/:id/members/:memberId` | One member's evidence slice (below); 404 for a member not in the publication              |
+| POST `/corrections`                       | `{publicationId,memberId?,voteId?,message}`; requires matching evidence, returns `{id}`   |
+| GET `/staff/session`                      | Verified email and role                                                                   |
+| GET `/staff/drafts`                       | Latest 100 lightweight draft summaries, without Dataset payloads                          |
+| GET `/staff/drafts/:id`                   | One complete draft with decoded Dataset                                                   |
+| POST `/staff/drafts`                      | `{dataset,summary,basePublicationId}` → `{id,version}`                                    |
+| PUT `/staff/drafts/:id`                   | `{dataset,summary,version,basePublicationId}` → new version; clears review                |
+| POST `/staff/drafts/:id/rebase`           | `{version,basePublicationId}` → retained content on explicit current base, review cleared |
+| POST `/staff/drafts/:id/review`           | `{version}`; independent reviewer                                                         |
+| POST `/staff/drafts/:id/publish`          | `{version}` → immutable Publication                                                       |
+| POST `/staff/rollback`                    | `{publicationId,revision,reason}`                                                         |
+| GET `/staff/status`                       | Current pointer/revision, demo status, dataset cutoff, source ages                        |
+| GET `/staff/audit`                        | Most recent 200 audit events                                                              |
+| GET `/staff/corrections`                  | Most recent 200 corrections                                                               |
+| PATCH `/staff/corrections/:id`            | `{status:'resolved'                                                                       | 'dismissed',resolution}`; audited |
 
 ### Caching
 
@@ -73,13 +75,24 @@ Published publications are immutable (database triggers refuse updates), so `wor
 
 | Response                                                                            | `Cache-Control`                       | Notes                                                                                |
 | ----------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------ |
-| GET `/publications/:id` (a specific ID)                                             | `public, max-age=31536000, immutable` | Strong `ETag`; `If-None-Match` answers 304. Also stored in the edge cache on a zone. |
-| GET `/publications/latest`                                                          | `public, max-age=60`                  | The pointer is read from D1 on every request; a new publication shows within 60 s.   |
+| GET `/publications/:id`, `/:id/index`, `/:id/members/:memberId` (a specific ID)     | `public, max-age=31536000, immutable` | Strong `ETag`; `If-None-Match` answers 304. Also stored in the edge cache on a zone. |
+| GET `/publications/latest`, `/latest/index`                                         | `public, max-age=60`                  | The pointer is read from D1 on every request; a new publication shows within 60 s.   |
 | Public HTML pages (home, profiles, other app routes)                                | `public, max-age=60`                  | `ETag` over the rendered page. Rendered HTML never depends on identity.              |
 | Hashed build assets and portraits under `/scorecard/`                               | `public, max-age=31536000, immutable` | Their file names change with their content.                                          |
 | Staff routes, the editor page, drafts, corrections, research, 404s and other errors | `no-store`                            | Never cached anywhere.                                                               |
 
 Inside one Worker isolate the decoded publication is memoized by ID (at most three, least recently used first), together with values derived from it (the serialized response, rendered HTML up to about 4 MB). "latest" is never a memo key: it is resolved to an ID first. Unknown IDs and failures are not memoized. The `Server-Timing` header reports `memo;desc="hit"` or `"miss"` (`edge;desc="hit"` from the edge cache). The Cache API does nothing on `*.workers.dev`, which staging uses, so the isolate memo is what makes staging fast; on the production zone the edge cache additionally shares immutable responses between isolates.
+
+### Slim views and their integrity
+
+The full publication is several megabytes. The home page, finder and directory read only the slim index; a profile reads the index plus one member's evidence slice (`src/core/publication-index.ts`). Archive, reports, research, compare, legislation, methodology, former members (whose date control recalculates) and the editor still load the full publication and verify it in the browser exactly as before: dataset digest, then `verifyPublicationScoring`.
+
+- **Derived on the server from the verified publication.** Before building either view, the Worker checks `SHA-256(JSON.stringify(dataset)) === digest` and runs `verifyPublicationScoring`, once per publication per isolate. A publication that fails returns 503 and no view.
+- **Contents.** The index holds the active roster (complete `Member` objects), all votes, the rubric, coverage, the number of source captures (so placeholder data on real records is still labelled as such, not as the fictional preview) and, per active member, the frozen headline score from `publishedScore` without evidence rows, plus the scored action counts (`scoredActionCounts`) its label needs. No records, evidence, source captures or affiliations. The member slice holds the member, their records and affiliations, and their frozen score with evidence. A legacy publication without frozen scores has `scores: null`, and the app then loads the full publication and recalculates as before.
+- **Bound to a publication.** Both views state `publication: {id, digest, scoringDigest}`. The Worker writes the page's publication ID and digest on `#root` (`data-publication`, `data-digest`); the app requests the views by that ID and refuses to show an index, member slice or full publication whose ID or digest differs from the page's, or a slice whose binding differs from the index's (`src/data/context.tsx`). A pinned `?publication=` visit must get that ID back.
+- **What this does and does not prove.** The browser cannot recompute the dataset digest from a slim view; it trusts the server's verification and checks the binding. Anyone who wants to verify the evidence end to end loads the full publication (the archive page, or `GET /publications/:id`), which is unchanged.
+- **Frozen scores.** At the publication's own cutoff the app shows the frozen published score from the index (or slice). Another date, on a profile timeline, recalculates that member from their records with the current engine and is labelled "Recalculated" as before; any recalculation that would need other members' records goes through the full publication.
+- **Format changes.** View responses for an ID are cached as immutable, so a change to either shape must bump `INDEX_FORMAT` and change the endpoint path.
 
 Corrections collect no name, email, or address. They are tied to an immutable publication and require at least one member or vote; paired evidence must actually exist. Message limits are 10–4000 characters; a D1 counter caps submissions at five per IP-derived hourly bucket, retained for approximately 24 hours. These pseudonymous abuse counters are not guaranteed anonymization. Shared IPs share limits. Add edge WAF/rate rules for high-volume attacks; application counters alone do not protect bandwidth or D1 capacity. Review staff should redact personal information accidentally included in freeform reports according to the organization's retention policy; no self-service deletion is currently implemented.
 

@@ -10,6 +10,9 @@ import {
 import { createHash, webcrypto } from "node:crypto";
 import { DataProvider, demoDataset } from "./data/context";
 import { appPaths } from "./core/routes";
+import { fakeApi } from "./test/fake-api";
+import type { Publication } from "./core/publication";
+import { createPublicationScoring } from "./core/publication-scores";
 import App from "./App";
 afterEach(() => {
   cleanup();
@@ -22,18 +25,21 @@ async function show(path: string) {
   vi.stubGlobal("crypto", webcrypto);
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue(
-      Response.json({
-        id: "archive-1",
-        createdAt: "2026-09-07",
-        publishedBy: "fixture",
-        previousId: null,
-        summary: "Test archive",
-        dataset: demoDataset,
-        digest: createHash("sha256")
-          .update(JSON.stringify(demoDataset))
-          .digest("hex"),
-      }),
+    vi.fn(
+      fakeApi([
+        {
+          id: "archive-1",
+          createdAt: "2026-09-07",
+          publishedBy: "fixture",
+          previousId: null,
+          summary: "Test archive",
+          dataset: demoDataset,
+          digest: createHash("sha256")
+            .update(JSON.stringify(demoDataset))
+            .digest("hex"),
+          scoring: await createPublicationScoring(demoDataset),
+        } as Publication,
+      ]),
     ),
   );
   render(
