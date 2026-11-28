@@ -1940,3 +1940,104 @@ input[type="date"] {
     padding: 16px;
   }
 }
+
+/* Freshness line under the header. */
+.freshness {
+  background: #fffefa;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--muted);
+}
+.freshness p {
+  margin: 0;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.freshness a {
+  color: var(--blue-text);
+}
+
+/* Under 700 px the directory table becomes a list of cards. */
+@media (max-width: 699px) {
+  .table-scroll {
+    overflow-x: visible;
+  }
+  .member-table,
+  .member-table tbody {
+    display: block;
+    white-space: normal;
+  }
+  .member-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .member-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "name grade"
+      "party value"
+      "category category";
+    gap: 6px 12px;
+    align-items: center;
+    margin: 10px 14px;
+    padding: 14px;
+    background: #fffefa;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .member-table tbody tr.not-graded-group {
+    display: block;
+    margin: 18px 14px 0;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+  .member-table tbody tr.not-graded-group th {
+    display: block;
+    padding: 0;
+    font-size: 13px;
+  }
+  .member-table td,
+  .member-table td:first-child {
+    display: block;
+    padding: 0;
+    border: 0;
+    font-size: 14px;
+  }
+  .member-table td:nth-child(1) {
+    grid-area: name;
+  }
+  .member-table td:nth-child(2) {
+    grid-area: party;
+  }
+  .member-table td:nth-child(3) {
+    grid-area: grade;
+  }
+  .member-table td:nth-child(4) {
+    grid-area: value;
+    text-align: right;
+  }
+  .member-table td:nth-child(5) {
+    grid-area: category;
+  }
+  .member-table td:nth-child(6) {
+    display: none;
+  }
+  .member-table .member-name strong {
+    font-size: 16px;
+  }
+  .member-table small,
+  .alignment-text {
+    font-size: 13px;
+  }
+  .member-table tbody tr:hover {
+    background: #fffefa;
+  }
+}

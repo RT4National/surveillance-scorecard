@@ -88,3 +88,15 @@ export const districtLabel = (district: number | undefined) =>
   district === undefined ? "House" : `District ${district}`;
 /** Shown when a name search has more matches than it lists. */
 export const showingFirst = (n: number) => `First ${n}`;
+
+/** Freshness line shown under the header on every page. */
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "7 Sep 2026" from an ISO date or timestamp (UTC); the input unchanged if it is not a date. */
+export function shortDate(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+export const updatedLabel = (date: string) => `Updated ${shortDate(date)}`;
+export const publicationNumberLabel = (n: number) => `Publication ${n}`;
+export const methodologyLinkLabel = "Methodology";

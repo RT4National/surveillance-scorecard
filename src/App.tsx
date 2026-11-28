@@ -33,6 +33,7 @@ import {
 } from "./features/public";
 import { Profile } from "./features/public/Profile";
 import { Finder } from "./features/public/Finder";
+import { Freshness } from "./features/public/Freshness";
 import { Avatar, Grade } from "./features/public/member";
 import {
   base,
@@ -593,6 +594,7 @@ export default function App() {
           </a>
         </div>
       </header>
+      <Freshness />
       <main id="main">
         {route.name === "editor" ? (
           <EditorPage dataset={dataset} />
