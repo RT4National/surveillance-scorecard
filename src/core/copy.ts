@@ -6,19 +6,17 @@ import type { Vote } from "./types";
  */
 export const methodologyCopy = {
   definition:
-    "Reform-aligned weighted actions divided by the weight of all scored actions, multiplied by 100. Not voting and Not eligible records are excluded.",
+    "Score: the share of scored actions, by weight, that matched the reform position. Missed votes and votes outside a member's term don't count.",
   cosponsorships:
-    "Cosponsorships are scored. A bill-support item records a Yes for its sponsor and cosponsors, and it counts like a Yes vote on that item.",
-  oneSided:
-    "Members who did not cosponsor a bill get no record for it, so cosponsoring a reform bill can only raise a score, cosponsoring an anti-reform bill can only lower it, and not cosponsoring changes nothing.",
+    "Cosponsoring a reform bill raises a score. Cosponsoring an anti-reform bill lowers it. Not cosponsoring has no effect.",
 } as const;
 
 export const hasCosponsorships = (votes: Pick<Vote, "kind">[]) =>
   votes.some((v) => v.kind === "cosponsorship");
 
-/** Noun for scored items: "scored actions" when cosponsorships are among them, else "scored votes". */
+/** Noun for scored items: "actions" when cosponsorships are among them, else "votes". */
 export const scoredNoun = (cosponsorships: boolean) =>
-  cosponsorships ? "scored actions" : "scored votes";
+  cosponsorships ? "actions" : "votes";
 
 export interface ActionCounts {
   votes: number;
@@ -45,14 +43,14 @@ export const scoredLabel = (
   votes: Pick<Vote, "id" | "kind">[],
 ) => scoredActionsLabel(scoredActionCounts(score, votes), hasCosponsorships(votes));
 
-const plural =(n: number, one: string, many: string) =>
+const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
-/** "15 scored actions (12 votes, 3 cosponsorships)", or "4 scored votes" where no cosponsorships are in the dataset. */
+/** "12 votes · 3 cosponsorships", or "4 votes" where the dataset has no cosponsorships. */
 export function scoredActionsLabel(
   counts: ActionCounts,
   cosponsorships: boolean,
 ): string {
-  const total = counts.votes + counts.cosponsorships;
-  if (!cosponsorships) return `${total} scored votes`;
-  return `${total} scored actions (${plural(counts.votes, "vote", "votes")}, ${plural(counts.cosponsorships, "cosponsorship", "cosponsorships")})`;
+  const votes = plural(counts.votes, "vote", "votes");
+  if (!cosponsorships) return votes;
+  return `${votes} · ${plural(counts.cosponsorships, "cosponsorship", "cosponsorships")}`;
 }

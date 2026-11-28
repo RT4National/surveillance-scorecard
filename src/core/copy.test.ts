@@ -29,13 +29,12 @@ describe("methodology copy", () => {
     expect(text).toMatch(/cosponsor/i);
     expect(text).not.toMatch(/co-?sponsorship is not counted/i);
     expect(text).not.toMatch(/not counted as a vote/i);
-    expect(methodologyCopy.cosponsorships).toMatch(/scored/i);
   });
   it("states the one-sided rule", () => {
-    const text = methodologyCopy.oneSided;
-    expect(text).toMatch(/only raise/i);
-    expect(text).toMatch(/only lower/i);
-    expect(text).toMatch(/not cosponsoring changes nothing/i);
+    const text = methodologyCopy.cosponsorships;
+    expect(text).toMatch(/reform bill raises/i);
+    expect(text).toMatch(/anti-reform bill lowers/i);
+    expect(text).toMatch(/not cosponsoring has no effect/i);
   });
 });
 
@@ -44,17 +43,17 @@ describe("scored action counts", () => {
     const s = scoreMember(member, votes, records);
     expect(scoredActionCounts(s, votes)).toEqual({ votes: 3, cosponsorships: 2 });
   });
-  it("labels counts as scored actions with separate counts when cosponsorships exist", () => {
+  it("shows separate counts when cosponsorships exist", () => {
     expect(scoredActionsLabel({ votes: 12, cosponsorships: 3 }, true)).toBe(
-      "15 scored actions (12 votes, 3 cosponsorships)",
+      "12 votes · 3 cosponsorships",
     );
     expect(scoredActionsLabel({ votes: 1, cosponsorships: 1 }, true)).toBe(
-      "2 scored actions (1 vote, 1 cosponsorship)",
+      "1 vote · 1 cosponsorship",
     );
   });
-  it("keeps 'scored votes' for datasets without cosponsorships", () => {
-    expect(scoredActionsLabel({ votes: 4, cosponsorships: 0 }, false)).toBe("4 scored votes");
-    expect(scoredNoun(false)).toBe("scored votes");
-    expect(scoredNoun(true)).toBe("scored actions");
+  it("shows only votes for datasets without cosponsorships", () => {
+    expect(scoredActionsLabel({ votes: 4, cosponsorships: 0 }, false)).toBe("4 votes");
+    expect(scoredNoun(false)).toBe("votes");
+    expect(scoredNoun(true)).toBe("actions");
   });
 });

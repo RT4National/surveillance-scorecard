@@ -59,10 +59,10 @@ describe("grade colour with custom bands", () => {
 });
 
 describe("count labels", () => {
-  it("profile says scored actions with separate counts", () => {
+  it("profile shows separate vote and cosponsorship counts", () => {
     const { container } = render(<Profile member={members[3]} copy={vi.fn()} />);
     const t = container.textContent!;
-    expect(t).toMatch(/scored actions \(\d+ votes?, \d+ cosponsorships?\)/);
+    expect(t).toMatch(/\d+ votes? · \d+ cosponsorships?/);
     expect(t).not.toMatch(/scored votes|cast votes/);
   });
   it("methodology does not claim cosponsorships are excluded", () => {
@@ -70,6 +70,6 @@ describe("count labels", () => {
     const t = container.textContent!;
     expect(t).not.toMatch(/co-?sponsorship is not counted/i);
     expect(t).toMatch(/cosponsor/i);
-    expect(t).toMatch(/only raise/i);
+    expect(t).toMatch(/not cosponsoring has no effect/i);
   });
 });
