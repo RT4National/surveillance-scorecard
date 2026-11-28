@@ -871,10 +871,19 @@ export default {
   async fetch(request: Request, env: Env, ctx?: ExecutionContext) {
     try {
       const url = new URL(request.url);
-      if (url.pathname.startsWith(prefix + "/"))
-        return await edgeCached(request, url, ctx, () =>
-          api(request, env, url.pathname.slice(prefix.length)),
+      if (url.pathname.startsWith(prefix + "/")) {
+        // HEAD reads answer like GET without a body, so monitors and link checkers see the real status.
+        const read =
+          request.method === "HEAD"
+            ? new Request(request, { method: "GET" })
+            : request;
+        const response = await edgeCached(read, url, ctx, () =>
+          api(read, env, url.pathname.slice(prefix.length)),
         );
+        return request.method === "HEAD"
+          ? new Response(null, response)
+          : response;
+      }
       if (url.pathname === "/scorecard")
         return Response.redirect(`${url.origin}/scorecard/${url.search}`, 308);
       const moved = redirectFor(url.pathname);

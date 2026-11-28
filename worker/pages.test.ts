@@ -600,6 +600,25 @@ describe("slim publication views", () => {
   });
   const get = (path: string) =>
     mf.dispatchFetch(`https://scorecard.example/scorecard/api${path}`);
+  it("answers HEAD on public API reads like GET, with no body", async () => {
+    for (const path of [
+      "/publications/slim-pub/index",
+      "/publications/latest/index",
+      "/publications/latest",
+    ]) {
+      const head = await mf.dispatchFetch(
+        `https://scorecard.example/scorecard/api${path}`,
+        { method: "HEAD" },
+      );
+      const getR = await get(path);
+      expect(head.status, path).toBe(200);
+      expect(head.headers.get("cache-control"), path).toBe(
+        getR.headers.get("cache-control"),
+      );
+      expect((await head.text()).length, path).toBe(0);
+      await getR.text();
+    }
+  });
   it("serves an index with active members, frozen headline scores and its binding", async () => {
     const r = await get("/publications/slim-pub/index");
     expect(r.status).toBe(200);
