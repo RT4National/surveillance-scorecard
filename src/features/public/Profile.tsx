@@ -218,8 +218,8 @@ export function Profile({
                       </span>
                       {e.scored && (
                         <span>
-                          Counts toward: president of{" "}
-                          {e.ownParty ? "their own party" : "another party"}
+                          Counts toward:{" "}
+                          {e.ownParty ? "own-party" : "other-party"} president
                         </span>
                       )}
                     </p>

@@ -44,7 +44,7 @@ describe("profile evidence rows", () => {
     expected(3).forEach((e, i) => {
       const own = e.partyAtVote === e.vote.presidentParty;
       expect(text(shown[i])).toContain(
-        `Counts toward: president of ${own ? "their own party" : "another party"}`,
+        `Counts toward: ${own ? "own-party" : "other-party"} president`,
       );
     });
   });
