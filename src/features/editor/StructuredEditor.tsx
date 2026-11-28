@@ -1,3 +1,4 @@
+import { ItemImpactPreview } from "./ItemImpactPreview";
 import { useId, useState } from "react";
 import type { Dataset } from "../../core/publication";
 import type { Member, Outcome, Party, Rubric, Vote } from "../../core/types";
@@ -36,6 +37,9 @@ export function VotesPanel({
   const [recordMember, setRecordMember] = useState("");
   const [outcome, setOutcome] = useState<Outcome>("Yes");
   const [party, setParty] = useState<Party>("Democratic");
+  const [previousPosition, setPreviousPosition] =
+    useState<Pick<Vote, "id" | "reformVote" | "weight">>();
+  const [retiringId, setRetiringId] = useState("");
   const topicsId = useId();
   const v = d.votes.find((v) => v.id === voteId) ?? d.votes[0];
   const vote = (patch: Partial<Vote>) =>
@@ -43,6 +47,37 @@ export function VotesPanel({
       ...d,
       votes: d.votes.map((x) => (x.id === v?.id ? { ...x, ...patch } : x)),
     });
+  const changeScoring = (
+    patch: Partial<Pick<Vote, "reformVote" | "weight">>,
+  ) => {
+    if (!v) return;
+    setPreviousPosition((previous) =>
+      previous?.id === v.id
+        ? previous
+        : { id: v.id, reformVote: v.reformVote, weight: v.weight },
+    );
+    vote(patch);
+  };
+  const beforeEdit =
+    v &&
+    previousPosition?.id === v.id &&
+    (previousPosition.weight !== v.weight ||
+      previousPosition.reformVote !== v.reformVote)
+      ? {
+          ...d,
+          votes: d.votes.map((item) =>
+            item.id === v.id ? { ...item, ...previousPosition } : item,
+          ),
+        }
+      : null;
+  const afterRetirement =
+    v && retiringId === v.id
+      ? {
+          ...d,
+          votes: d.votes.filter((item) => item.id !== v.id),
+          records: d.records.filter((record) => record.voteId !== v.id),
+        }
+      : null;
   const addImported = (draft: Dataset, id: string) => {
     onChange(draft);
     setVoteId(id);
@@ -137,7 +172,7 @@ export function VotesPanel({
               { label: "No", value: "No" as const },
             ]}
             value={v.reformVote}
-            onChange={(reformVote) => vote({ reformVote })}
+            onChange={(reformVote) => changeScoring({ reformVote })}
           />
           <ChoiceButtons
             label="How much should it count?"
@@ -147,13 +182,16 @@ export function VotesPanel({
               value: o.value as number,
             }))}
             value={v.weight}
-            onChange={(weight) => vote({ weight })}
+            onChange={(weight) => changeScoring({ weight })}
             extra={
               custom ? (
                 <span className="gr-custom">Custom ({v.weight})</span>
               ) : null
             }
           />
+          {beforeEdit && !afterRetirement && (
+            <ItemImpactPreview before={beforeEdit} after={d} voteId={v.id} />
+          )}
           <div className="editor-grid">
             <div>
               <label>
@@ -412,24 +450,37 @@ export function VotesPanel({
               </table>
             </div>
           </details>
-          <button
-            type="button"
-            className="editor-danger"
-            onClick={() => {
-              onChange({
-                ...d,
-                votes: d.votes.filter((x) => x.id !== v.id),
-                records: d.records.filter((r) => r.voteId !== v.id),
-              });
-              setVoteId("");
-            }}
-          >
-            Stop scoring this vote
-          </button>
-          <p className="gr-help">
-            Removes the vote and its recorded votes from this draft only.
-            Published versions are not changed.
-          </p>
+          {afterRetirement ? (
+            <section aria-label="Review retirement">
+              <p>
+                Retiring this item removes its records from the draft. Published
+                versions keep their records.
+              </p>
+              <ItemImpactPreview
+                before={d}
+                after={afterRetirement}
+                voteId={v.id}
+              />
+              <button type="button" onClick={() => setRetiringId("")}>
+                Cancel retirement
+              </button>
+              <button
+                type="button"
+                className="editor-danger"
+                onClick={() => {
+                  onChange(afterRetirement);
+                  setRetiringId("");
+                  setVoteId("");
+                }}
+              >
+                Retire item from draft
+              </button>
+            </section>
+          ) : (
+            <button type="button" onClick={() => setRetiringId(v.id)}>
+              Preview retirement
+            </button>
+          )}
         </article>
       )}
     </div>

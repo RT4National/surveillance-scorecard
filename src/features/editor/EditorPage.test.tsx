@@ -211,6 +211,7 @@ describe("Staff editing workflow", () => {
     ).toBe("true");
     fireEvent.click(within(importance()).getByRole("button", { name: "Less" }));
     expect(raw().votes[0].weight).toBe(0.5);
+    expect(screen.getByText(/Per-legislator impact/)).toBeTruthy();
     fireEvent.click(
       within(importance()).getByRole("button", { name: "Normal" }),
     );
@@ -232,6 +233,23 @@ describe("Staff editing workflow", () => {
       target: { value: "Unrelated edit" },
     });
     expect(raw().votes[0].weight).toBe(3);
+  });
+  it("previews retirement and removes the item only after confirmation", async () => {
+    render(<EditorPage dataset={fixture} />);
+    await openDraft();
+    const current = (): typeof fixture => raw();
+    const id = current().votes[0].id;
+    fireEvent.click(screen.getByRole("button", { name: "Preview retirement" }));
+    expect(screen.getByText(/Per-legislator impact/)).toBeTruthy();
+    expect(current().votes.some((vote) => vote.id === id)).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel retirement" }));
+    expect(current().votes.some((vote) => vote.id === id)).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Preview retirement" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retire item from draft" }),
+    );
+    expect(current().votes.some((vote) => vote.id === id)).toBe(false);
+    expect(current().records.some((record) => record.voteId === id)).toBe(false);
   });
   it("explains why a draft cannot be approved by its author", async () => {
     draft = { ...draft, author: "publisher@example.org" };

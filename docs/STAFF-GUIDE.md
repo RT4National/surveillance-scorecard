@@ -13,6 +13,10 @@ Open `/scorecard/staff` and sign in with your staff identity. Start a draft from
 
 Open **Add bill support from Congress.gov** under **Votes to score**, and enter the Congress and bill number, such as **119** and **H.R. 2**. Read the bill, check the supporter count, and enter the editorial details. Choose **Yes** if sponsorship supports reform, or **No** if it counts against reform. The sponsor and current cosponsors receive records. Withdrawn cosponsors are excluded. Save and submit the draft through the same review process.
 
+## Adjust or retire an item
+
+Select an item under **Votes to score**. When you change its weight or reform position, open **Per-legislator impact** to compare grades and alignment within the draft. To retire an item, choose **Preview retirement** and inspect the proposed impact. Confirm to remove the item and its records from the draft. Save and submit the draft through **Review & publish**.
+
 ## Environment setup
 
 The intake endpoint requires real staff authentication. Configure Cloudflare Access and `STAFF_ROLES` before enabling the staff workflow. Never set `STAFF_OPEN_STAGING` in production.
