@@ -1,43 +1,108 @@
 .editor-workspace {
   max-width: 1100px;
   margin: auto;
-  padding: 32px 20px;
+  padding: 32px 16px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.editor-workspace h1 {
+  margin: 4px 0 8px;
+}
+.editor-workspace h2 {
+  margin: 28px 0 10px;
+}
+.editor-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+.editor-lede {
+  color: var(--muted);
+  max-width: 62ch;
+}
+.editor-who {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  align-self: flex-start;
+}
+.editor-who span {
+  color: var(--muted);
+  font-size: 14px;
 }
 .editor-workspace fieldset {
-  border: 1px solid #c9d0d7;
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 20px;
   margin: 24px 0;
+  min-width: 0;
+}
+.editor-workspace fieldset.editor-plain {
+  border: 0;
+  padding: 0;
+  margin: 0;
 }
 .editor-workspace label {
   display: block;
   margin: 16px 0;
+  font-weight: 600;
 }
-.editor-workspace input,
+.editor-workspace input:not([type="range"]):not([type="file"]),
 .editor-workspace textarea,
 .editor-workspace select {
   display: block;
   width: 100%;
+  margin-top: 6px;
   padding: 10px;
   border: 1px solid #9da9b4;
   border-radius: 6px;
-  color: #162332;
+  color: var(--ink);
   background: white;
+  font: inherit;
+  font-weight: 400;
 }
-.editor-workspace textarea {
+.editor-workspace input[type="file"] {
+  display: block;
+  margin-top: 6px;
+  max-width: 100%;
+}
+.editor-devtools textarea {
   font-family: monospace;
   font-size: 13px;
 }
 .editor-workspace button {
   padding: 10px 14px;
-  margin: 5px;
-  border: 1px solid #36526c;
+  margin: 5px 5px 5px 0;
+  border: 1px solid var(--blue-text);
   border-radius: 7px;
+  background: #fff;
+  color: var(--blue-text);
+  font-weight: 600;
   cursor: pointer;
+}
+.editor-workspace button.editor-primary {
+  background: var(--blue-text);
+  color: #fff;
+}
+.editor-workspace button.editor-danger {
+  border-color: var(--orange-text);
+  color: var(--orange-text);
 }
 .editor-workspace button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.editor-workspace button:focus-visible,
+.editor-workspace input:focus-visible,
+.editor-workspace select:focus-visible,
+.editor-workspace textarea:focus-visible,
+.editor-workspace summary:focus-visible,
+.editor-panel:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
 }
 .editor-workspace table {
   width: 100%;
@@ -47,12 +112,35 @@
 .editor-workspace th {
   text-align: left;
   padding: 10px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--line);
 }
+.editor-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.editor-card,
 .editor-workspace article {
-  padding: 15px;
-  border: 1px solid #ddd;
-  margin: 12px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 16px 0;
+  background: #fff;
+}
+.editor-draftbar {
+  background: var(--paper);
+}
+.editor-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0 12px;
+}
+.editor-row > label {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.editor-row > button {
+  margin-bottom: 16px;
 }
 .editor-workspace pre {
   white-space: pre-wrap;
@@ -60,24 +148,149 @@
   font-size: 12px;
 }
 .editor-workspace .editor-error {
-  border-left: 4px solid #b42318;
+  border-left: 4px solid var(--orange-text);
   padding: 12px;
   background: #fff1ed;
+}
+.editor-notice {
+  border-left: 4px solid var(--blue);
+  padding: 12px;
+  background: var(--paper);
+}
+.editor-note {
+  border-left: 4px solid var(--orange);
+  padding: 4px 12px;
+  margin: 12px 0;
+  background: #fff8f4;
+}
+.editor-empty {
+  padding: 24px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
 }
 .editor-workspace code {
   overflow-wrap: anywhere;
 }
 .editor-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 0 16px;
+}
+.editor-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: 6px;
+  margin: 24px 0 0;
+  border-bottom: 2px solid var(--line);
+}
+.editor-workspace .editor-tabs button[role="tab"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+}
+.editor-workspace .editor-tabs button[aria-selected="true"] {
+  background: #fff;
+  border-color: var(--blue-text);
+  box-shadow: inset 0 -3px 0 var(--blue);
+}
+.editor-tab-num,
+.editor-step-num {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--brown);
+  color: #fff;
+  font-size: 13px;
+}
+.editor-tabs {
+  overflow-wrap: normal;
+}
+.editor-badge {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--orange-text);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.editor-panel {
+  padding: 8px 0 24px;
+}
+.editor-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 16px 0;
+  list-style: none;
+}
+.editor-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+}
+.editor-steps li.done .editor-step-num {
+  background: var(--blue-text);
+}
+.editor-steps li[aria-current="step"] {
+  border-color: var(--blue-text);
+  color: var(--ink);
+  font-weight: 700;
+}
+.editor-steps li[aria-current="step"] .editor-step-num {
+  background: var(--orange-text);
+}
+.editor-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 0;
+  list-style: none;
+  font-size: 18px;
+}
+.editor-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 12px;
 }
-.structured-editor h2 {
-  margin-top: 32px;
+.editor-action {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
 }
-.structured-editor table {
-  display: block;
-  overflow-x: auto;
+.editor-details,
+.editor-devtools details {
+  margin: 16px 0;
+}
+.editor-workspace summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--blue-text);
+}
+.editor-devtools {
+  margin-top: 40px;
+  padding: 12px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+.structured-editor h2 {
+  margin-top: 8px;
 }
 .structured-editor details {
   margin: 16px 0;

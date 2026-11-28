@@ -34,7 +34,10 @@ function scoreShape(v: unknown, memberId: string): v is PublicationScore {
     !v.grade ||
     typeof v.reason !== "string" ||
     typeof v.version !== "string" ||
-    !["reformer", "conditional", "surveillance"].includes(String(v.group)) ||
+    // "conditional" is the pre-split value frozen in older publications.
+    !["reformer", "mixed", "unproven", "surveillance", "conditional"].includes(
+      String(v.group),
+    ) ||
     ![v.counted, v.ownCount, v.otherCount].every(integer) ||
     ![v.earned, v.possible].every(finite) ||
     !Array.isArray(v.sharedTopics) ||
@@ -162,8 +165,16 @@ export function publishedScore(
       throw new Error("Invalid published scoring snapshot");
     const stored = snapshot.scores[member.id];
     const votes = new Map(publication.dataset.votes.map((v) => [v.id, v]));
+    // Older publications froze one "conditional" group; their reason tells the two apart.
+    const group =
+      (stored.group as string) === "conditional"
+        ? stored.reason.startsWith("Unproven")
+          ? "unproven"
+          : "mixed"
+        : stored.group;
     return {
       ...stored,
+      group,
       evidence: stored.evidence.map((e) => {
         const vote = votes.get(e.voteId);
         if (!vote)

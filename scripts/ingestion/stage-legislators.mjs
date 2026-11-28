@@ -7,14 +7,11 @@ import { resolve } from "node:path";
 import { capture, readSource } from "../../src/ingestion/members.ts";
 import {
   LEGISLATORS_MAX_BYTES,
-  buildLisCrosswalk,
-  candidateMembers,
-  checkHouseCoverage,
+  identitySupplement,
   isLegislatorsUrl,
   legislatorsUrl,
   parseLegislators,
   senateVoteDate,
-  termAffiliations,
 } from "../../src/ingestion/legislators.ts";
 
 // gh-pages build of main@d5af3d2d2490f8c6532c9490b1f47a76cacca699, September 24, 2026.
@@ -48,7 +45,6 @@ for (const file of ["current", "historical"]) {
 }
 const current = parseLegislators(raw.current),
   historical = parseLegislators(raw.historical);
-const records = [...current, ...historical];
 parseLegislators(raw.current, raw.historical); // rejects identities duplicated across files
 
 const senateBallots = manifest.senatePending.flatMap((vote) => {
@@ -64,69 +60,27 @@ const houseBallots = manifest.houseStages.flatMap((stage) =>
   })),
 );
 
-const { crosswalk, discrepancies: senateDiscrepancies } = buildLisCrosswalk(
-  records,
-  senateBallots,
-);
-const needed = [
-  ...new Set([
-    ...houseBallots.map((b) => b.memberId),
-    ...Object.values(crosswalk),
-  ]),
-].sort();
-const inCurrent = new Set(current.map((r) => r.bioguide)),
-  inHistorical = new Set(historical.map((r) => r.bioguide));
-const currentTerms = termAffiliations(
-  current,
-  needed.filter((id) => inCurrent.has(id)),
-  legislatorsUrl(snapshot, "current"),
-);
-const historicalTerms = termAffiliations(
-  historical,
-  needed.filter((id) => inHistorical.has(id)),
-  legislatorsUrl(snapshot, "historical"),
-);
-const absent = needed
-  .filter((id) => !inCurrent.has(id) && !inHistorical.has(id))
-  .map((memberId) => ({
-    kind: "missing-bioguide",
-    memberId,
-    detail: "No supplemental record for this Bioguide ID",
-  }));
-const allTerms = [...currentTerms.rows, ...historicalTerms.rows];
-const houseDiscrepancies = checkHouseCoverage(records, allTerms, houseBallots);
 const rosterIds = new Set(roster.members.map((m) => m.id));
-const candidates = candidateMembers(
-  records,
-  needed.filter((id) => !rosterIds.has(id)),
+const identity = identitySupplement({
+  current,
+  historical,
+  currentUrl: legislatorsUrl(snapshot, "current"),
+  historicalUrl: legislatorsUrl(snapshot, "historical"),
+  rosterIds,
+  senateBallots,
+  houseBallots,
+});
+const { crosswalk, affiliations } = identity;
+const candidates = { members: identity.candidateMembers };
+const discrepancies = identity.discrepancies.map((d) =>
+  d.kind === "withheld-terms"
+    ? {
+        ...d,
+        houseBallots: houseBallots.filter((b) => b.memberId === d.memberId)
+          .length,
+      }
+    : d,
 );
-// Term rows are importable only for members the dataset will contain.
-const importable = new Set([
-  ...rosterIds,
-  ...candidates.members.map((m) => m.id),
-]);
-const affiliations = allTerms.filter((row) => importable.has(row.memberId));
-const withheld = [
-  ...new Set(
-    allTerms.filter((r) => !importable.has(r.memberId)).map((r) => r.memberId),
-  ),
-].map((memberId) => ({
-  kind: "withheld-terms",
-  memberId,
-  supplemental: String(allTerms.filter((r) => r.memberId === memberId).length),
-  houseBallots: houseBallots.filter((b) => b.memberId === memberId).length,
-  detail:
-    "Term rows withheld because this member has no roster or candidate record; their ballots cannot be imported until an editor resolves it",
-}));
-const discrepancies = [
-  ...senateDiscrepancies,
-  ...currentTerms.discrepancies,
-  ...historicalTerms.discrepancies,
-  ...absent,
-  ...houseDiscrepancies,
-  ...candidates.discrepancies,
-  ...withheld,
-];
 const count = (list) =>
   list.reduce((acc, d) => ({ ...acc, [d.kind]: (acc[d.kind] ?? 0) + 1 }), {});
 

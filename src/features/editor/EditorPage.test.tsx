@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { EditorPage } from "./EditorPage";
 import { dataset, members, votes, records } from "../../data/demo";
@@ -38,6 +39,7 @@ beforeEach(() => {
     dataset: structuredClone(fixture),
     status: "draft",
     version: 1,
+    author: "author@example.org",
     base_publication_id: null,
   };
   vi.stubGlobal(
@@ -69,6 +71,27 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
+const raw = () =>
+  JSON.parse(
+    (screen.getByLabelText("Raw scorecard data (JSON)") as HTMLTextAreaElement)
+      .value,
+  );
+const openTab = (name: string) =>
+  fireEvent.click(screen.getByRole("tab", { name: new RegExp(name) }));
+async function openDraft(label = /Review fixture/) {
+  const option = await screen.findByRole("option", { name: label });
+  fireEvent.change(screen.getByLabelText("Open a saved draft"), {
+    target: { value: (option as HTMLOptionElement).value },
+  });
+  await screen.findByRole("button", { name: "Discard unsaved changes" });
+}
+const gradeRow = (name: string) => {
+  const table = screen.getByRole("table", { name: "Grade changes" });
+  return within(table)
+    .getByRole("cell", { name })
+    .closest("tr")!
+    .querySelectorAll("td");
+};
 describe("Staff editing workflow", () => {
   it("compares drafts to verified frozen grades, not recalculated historical grades", async () => {
     const scoring = await createPublicationScoring(fixture);
@@ -97,35 +120,26 @@ describe("Staff editing workflow", () => {
       return original(...args);
     });
     render(<EditorPage dataset={fixture} />);
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Review fixture · draft · v1",
-      }),
-    );
-    const heading = await screen.findByRole("heading", {
-      name: "Grade impact preview",
-    });
+    await openDraft();
+    openTab("Review & publish");
     await waitFor(() => {
-      const cells = heading.nextElementSibling?.nextElementSibling
-        ?.querySelector("tbody tr")
-        ?.querySelectorAll("td");
-      expect(cells?.[1].textContent).toBe("D");
-      expect(cells?.[2].textContent).toBe("A+");
+      const cells = gradeRow(members[0].name);
+      expect(cells[1].textContent).toBe("D");
+      expect(cells[2].textContent).toBe("A+");
     });
+    expect(screen.getByText(/grades? go(es)? up/).textContent).toMatch(/^1 /);
   });
   it("loads draft summaries first and fetches only the selected dataset", async () => {
     render(<EditorPage dataset={fixture} />);
-    const open = await screen.findByRole("button", {
-      name: "Review fixture · draft · v1",
-    });
+    await screen.findByRole("option", { name: /Review fixture/ });
     const fetcher = vi.mocked(fetch);
     expect(
       fetcher.mock.calls.some(([url]) =>
         String(url).endsWith("/drafts/draft-1"),
       ),
     ).toBe(false);
-    fireEvent.click(open);
-    await screen.findByLabelText("Scoring weight");
+    await openDraft();
+    await screen.findByRole("group", { name: "How much should it count?" });
     expect(
       fetcher.mock.calls.filter(([url]) =>
         String(url).endsWith("/drafts/draft-1"),
@@ -134,29 +148,29 @@ describe("Staff editing workflow", () => {
   });
   it("updates structured evidence and grade impact and refuses review of unsaved edits", async () => {
     render(<EditorPage dataset={fixture} />);
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Review fixture · draft · v1",
-      }),
-    );
-    const review = (await screen.findByRole("button", {
-      name: "Approve reviewed draft",
-    })) as HTMLButtonElement;
+    await openDraft();
+    openTab("Review & publish");
+    const review = screen.getByRole("button", {
+      name: "Approve this draft",
+    }) as HTMLButtonElement;
     expect(review.disabled).toBe(false);
-    fireEvent.change(screen.getByLabelText("Scoring weight"), {
-      target: { value: "100" },
+    openTab("Votes to score");
+    const privacy = screen.getByRole("group", {
+      name: "Is a YES vote good for privacy?",
     });
-    expect(review.disabled).toBe(true);
-    const advanced = screen.getByLabelText(
-      "Dataset and scoring policy",
-    ) as HTMLTextAreaElement;
-    const edited = JSON.parse(advanced.value);
-    expect(edited.votes[0].weight).toBe(100);
-    const heading = screen.getByRole("heading", {
-      name: "Grade impact preview",
-    });
-    const table = heading.nextElementSibling?.nextElementSibling;
-    const changed = fixture.members.findIndex(
+    fireEvent.click(within(privacy).getByRole("button", { name: "No" }));
+    const edited = raw();
+    expect(edited.votes[0].reformVote).toBe("No");
+    openTab("Review & publish");
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Approve this draft",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(screen.getByText("Save your changes first.")).toBeTruthy();
+    const changed = fixture.members.find(
       (m) =>
         scoreMember(
           m,
@@ -168,88 +182,144 @@ describe("Staff editing workflow", () => {
         scoreMember(m, edited.votes, edited.records, edited.rubric, edited.asOf)
           .grade,
     );
-    expect(changed).toBeGreaterThanOrEqual(0);
-    const row = table?.querySelectorAll("tbody tr")[changed];
-    expect(row?.querySelectorAll("td")[2].textContent).toBe(
+    expect(changed).toBeTruthy();
+    expect(gradeRow(changed!.name)[2].textContent).toBe(
       scoreMember(
-        fixture.members[changed],
+        changed!,
         edited.votes,
         edited.records,
         edited.rubric,
         edited.asOf,
       ).grade,
     );
-    fireEvent.change(
-      screen.getByLabelText("Why this position advances surveillance reform"),
-      { target: { value: "New reviewed rationale" } },
+    openTab("Votes to score");
+    fireEvent.change(screen.getByLabelText("Why it matters"), {
+      target: { value: "New reviewed rationale" },
+    });
+    expect(raw().votes[0].rationale).toBe("New reviewed rationale");
+  });
+  it("maps importance buttons to vote weights and preserves custom weights", async () => {
+    render(<EditorPage dataset={fixture} />);
+    await openDraft();
+    const importance = () =>
+      screen.getByRole("group", { name: "How much should it count?" });
+    // The first demo vote has weight 2
+    expect(
+      within(importance())
+        .getByRole("button", { name: "More" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    fireEvent.click(within(importance()).getByRole("button", { name: "Less" }));
+    expect(raw().votes[0].weight).toBe(0.5);
+    fireEvent.click(
+      within(importance()).getByRole("button", { name: "Normal" }),
     );
-    expect(JSON.parse(advanced.value).votes[0].rationale).toBe(
-      "New reviewed rationale",
-    );
+    expect(raw().votes[0].weight).toBe(1);
+    fireEvent.click(within(importance()).getByRole("button", { name: "More" }));
+    expect(raw().votes[0].weight).toBe(2);
+    const data = raw();
+    data.votes[0].weight = 3;
+    fireEvent.change(screen.getByLabelText("Raw scorecard data (JSON)"), {
+      target: { value: JSON.stringify(data, null, 2) },
+    });
+    expect(within(importance()).getByText("Custom (3)")).toBeTruthy();
+    expect(
+      within(importance())
+        .getAllByRole("button")
+        .every((b) => b.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+    fireEvent.change(screen.getByLabelText("Why it matters"), {
+      target: { value: "Unrelated edit" },
+    });
+    expect(raw().votes[0].weight).toBe(3);
+  });
+  it("explains why a draft cannot be approved by its author", async () => {
+    draft = { ...draft, author: "publisher@example.org" };
+    render(<EditorPage dataset={fixture} />);
+    await openDraft();
+    openTab("Review & publish");
+    const approve = screen.getByRole("button", {
+      name: "Approve this draft",
+    }) as HTMLButtonElement;
+    expect(approve.disabled).toBe(true);
+    expect(
+      screen.getByText(
+        "Someone other than the author must approve this draft.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByText("Waiting for review")
+        .closest("li")
+        ?.getAttribute("aria-current"),
+    ).toBe("step");
   });
   it("clones an immutable publication into an editable correction draft", async () => {
     render(<EditorPage dataset={fixture} />);
-    await screen.findByText("Signed in as publisher@example.org · publisher");
+    await screen.findByText(/publisher@example.org/);
+    openTab("History");
     fireEvent.change(
-      screen.getByLabelText("Clone a published snapshot (publication ID)"),
+      screen.getByLabelText("ID of the published version to correct"),
       { target: { value: "pub-1" } },
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Start correction draft" }),
+      screen.getByRole("button", { name: "Start a correction draft" }),
     );
     await screen.findByText(
-      "Publication cloned into an unsaved correction draft.",
+      "The published version was copied into a new, unsaved correction draft.",
     );
     expect(
-      (screen.getByLabelText("Change summary") as HTMLInputElement).value,
-    ).toBe("Correction to publication pub-1");
-    const edited = JSON.parse(
-      (
-        screen.getByLabelText(
-          "Dataset and scoring policy",
-        ) as HTMLTextAreaElement
-      ).value,
-    );
+      (screen.getByLabelText("Describe your changes") as HTMLInputElement)
+        .value,
+    ).toBe("Correction to published version pub-1");
+    const edited = raw();
     expect(edited.id).not.toBe(fixture.id);
     expect(edited.votes).toEqual(fixture.votes);
+    openTab("Votes to score");
     fireEvent.click(screen.getByRole("button", { name: "Add a vote" }));
-    expect(
-      JSON.parse(
-        (
-          screen.getByLabelText(
-            "Dataset and scoring policy",
-          ) as HTMLTextAreaElement
-        ).value,
-      ).votes,
-    ).toHaveLength(votes.length + 1);
+    expect(raw().votes).toHaveLength(votes.length + 1);
     expect(fixture.votes).toHaveLength(votes.length);
   });
   it("blocks publishing after editing an approved rubric", async () => {
     draft = { ...draft, status: "review" };
     render(<EditorPage dataset={fixture} />);
+    await openDraft(/Review fixture/);
+    openTab("Review & publish");
+    expect(
+      (screen.getByRole("button", { name: "Publish" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+    openTab("Grading rules");
+    fireEvent.change(
+      screen.getByLabelText("Votes needed before we give a grade"),
+      { target: { value: "10" } },
+    );
+    await waitFor(() => expect(raw().rubric.minVotes).toBe(10));
     fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Review fixture · review · v1",
+      screen.getByRole("button", {
+        name: "Increase: Votes needed before we give a grade",
       }),
     );
-    const publish = (await screen.findByRole("button", {
-      name: "Publish approved snapshot",
-    })) as HTMLButtonElement;
-    expect(publish.disabled).toBe(false);
-    fireEvent.change(screen.getByLabelText("Minimum scored votes"), {
-      target: { value: "40" },
+    expect(raw().rubric.minVotes).toBe(11);
+    openTab("Review & publish");
+    expect(
+      (screen.getByRole("button", { name: "Publish" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
+  it("keeps grade cutoffs in order and never asks for JSON outside developer tools", async () => {
+    render(<EditorPage dataset={fixture} />);
+    await openDraft();
+    openTab("Grading rules");
+    fireEvent.change(screen.getByLabelText("Lowest score for a B"), {
+      target: { value: "99" },
     });
-    expect(publish.disabled).toBe(true);
-    await waitFor(() =>
-      expect(
-        JSON.parse(
-          (
-            screen.getByLabelText(
-              "Dataset and scoring policy",
-            ) as HTMLTextAreaElement
-          ).value,
-        ).rubric.minVotes,
-      ).toBe(40),
-    );
+    const bands = raw().rubric.gradeBands;
+    expect(bands[2]).toEqual({ label: "B", minimum: 89 });
+    expect(bands.map((b: { minimum: number }) => b.minimum)).toEqual([
+      97, 90, 89, 65, 50, 0,
+    ]);
+    const workspace = screen.getByRole("tabpanel");
+    expect(within(workspace).queryByText(/JSON/)).toBeNull();
   });
 });

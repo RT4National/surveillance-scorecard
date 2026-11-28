@@ -16,3 +16,6 @@ export const readAsOf = (dataset: Dataset) => {
 };
 export const fmt = (n: number | null) =>
   n === null ? "Not yet rated" : `${Math.round(n)}%`;
+/** Demo datasets without sources are the fictional preview; others hold real records with placeholder scoring. */
+export const fictional = (dataset: { demo: boolean; sources: unknown[] }) =>
+  dataset.demo && !dataset.sources.length;

@@ -5,7 +5,8 @@ import { groupLabels } from "../../core/scoring";
 import { publicationUrl } from "../../core/navigation";
 import type { Member, Party } from "../../core/types";
 import { CorrectionForm, Source } from ".";
-import { base, fmt, query, readAsOf } from "./helpers";
+import { evidenceLabel } from "../../core/evidence";
+import { base, fictional, fmt, query, readAsOf } from "./helpers";
 import { Avatar, Grade } from "./member";
 
 /** How a member of each party is named in running text ("a Democrat at the time"). */
@@ -36,10 +37,19 @@ export function Profile({
         <ArrowLeft size={16} /> All legislators
       </a>
       <div className="profile-heading">
-        <Avatar member={member} large />
+        <figure className="profile-portrait">
+          <Avatar member={member} large />
+          {member.portrait?.url.startsWith("/scorecard/portraits/") && (
+            <figcaption>
+              <a href={member.portrait.rightsSource} rel="noreferrer">
+                {member.portrait.attribution}
+              </a>
+            </figcaption>
+          )}
+        </figure>
         <div>
           <div className="eyebrow">
-            {dataset.demo ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} ·{" "}
+            {fictional(dataset) ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} ·{" "}
             {member.status.toUpperCase()}
           </div>
           <h1>{member.name}</h1>
@@ -75,7 +85,7 @@ export function Profile({
           </p>
           <p className="muted">
             Service begins {member.since}.{" "}
-            {dataset.demo
+            {fictional(dataset)
               ? "Demonstration record."
               : "See the publication sources for verification."}
           </p>
@@ -238,7 +248,7 @@ export function Profile({
                     </small>
                   </div>
                   <div className="vote-result">
-                    <strong>{e.outcome}</strong>
+                    <strong>{evidenceLabel(e.vote, e.outcome)}</strong>
                     <small>
                       {e.scored
                         ? `${Number((e.aligned ? e.effectiveWeight : 0).toFixed(2))} / ${Number(e.effectiveWeight.toFixed(2))} points`
@@ -252,7 +262,9 @@ export function Profile({
             {!s.evidence.length && <p>No evidence before this date.</p>}
             <p className="footnote">
               {dataset.demo
-                ? "Fictional evidence is not an official source."
+                ? fictional(dataset)
+                  ? "Fictional evidence is not an official source."
+                  : "Official records; the vote directions used for scoring are unreviewed placeholders."
                 : `Publication ${publication?.id} · rubric ${rubric.version}.`}{" "}
               {dataset.coverage.join(" ")}
             </p>

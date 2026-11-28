@@ -159,6 +159,51 @@ describe("D1 editorial workflow", () => {
     expect(validateDataset({ ...fixture, demo: false })).not.toEqual([]);
     expect(validateDataset({ ...fixture, asOf: "2000-01-01" })).not.toEqual([]);
   });
+  it("accepts one-sided bill-support items and rejects malformed kinds or outcomes", () => {
+    const item = {
+      ...votes[0],
+      id: "cosponsor-117-s-1265",
+      kind: "cosponsorship" as const,
+      chamber: members[0].chamber,
+    };
+    const supported = {
+      ...fixture,
+      votes: [...fixture.votes, item],
+      records: [
+        ...fixture.records,
+        {
+          memberId: members[0].id,
+          voteId: item.id,
+          outcome: "Yes" as const,
+          partyAtVote: members[0].party,
+        },
+      ],
+    };
+    expect(validateDataset(supported)).toEqual([]);
+    expect(
+      validateDataset({
+        ...supported,
+        votes: [...fixture.votes, { ...item, kind: "petition" }],
+      }),
+    ).toContain("Invalid vote or missing rationale/source: cosponsor-117-s-1265");
+    expect(
+      validateDataset({
+        ...supported,
+        records: [
+          ...fixture.records,
+          { ...supported.records.at(-1)!, outcome: "No" as const },
+        ],
+      }),
+    ).toContain(
+      `Bill support records only sponsors and cosponsors: ${members[0].id}/cosponsor-117-s-1265`,
+    );
+    expect(
+      validateDataset({
+        ...fixture,
+        votes: fixture.votes.map((v) => ({ ...v, kind: "rollcall" as const })),
+      }),
+    ).toEqual([]);
+  });
   it("requires matching official captures for every live vote and accepts local reviewed portraits", () => {
     const source = "https://clerk.house.gov/evs/2026/roll003.xml";
     const live = {
@@ -290,6 +335,23 @@ describe("D1 editorial workflow", () => {
     ).toContain(
       `Recorded party contradicts exact-day affiliation: ${m.id}/${v.id}`,
     );
+  });
+  it("keeps open staging drafts demo-only", async () => {
+    const identity = vi.spyOn(auth, "authenticate").mockResolvedValue({
+      email: "ada@staging.invalid",
+      role: "publisher",
+      open: true,
+    });
+    const response = await send("/staff/drafts", "POST", {
+      dataset: { ...fixture, demo: false },
+      summary: "Open staging attempt",
+      basePublicationId: null,
+    });
+    expect(response.status).toBe(422);
+    expect(JSON.stringify(await response.json())).toContain(
+      "Open staging access can only save demo datasets",
+    );
+    identity.mockRestore();
   });
   it("requires independent review, rejects stale edits, publishes immutable snapshots and audits rollback", async () => {
     const identity = vi

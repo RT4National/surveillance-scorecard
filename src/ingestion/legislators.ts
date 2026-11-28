@@ -151,13 +151,19 @@ export function termAffiliations(records: readonly LegislatorRecord[], memberIds
 }
 
 export interface HouseBallot { memberId: string; voteId: string; date: string; partyAtVote: Party }
+/** Evidence for a member in a given chamber on a given day, e.g. a ballot or a bill sign-on. */
+export interface ChamberEvidence extends HouseBallot { chamber: Member['chamber'] }
 export function checkHouseCoverage(records: readonly LegislatorRecord[], rows: readonly DatedAffiliation[], ballots: readonly HouseBallot[]): Discrepancy[] {
+  return checkTermCoverage(records, rows, ballots.map(b => ({ ...b, chamber: 'House' as const })));
+}
+export function checkTermCoverage(records: readonly LegislatorRecord[], rows: readonly DatedAffiliation[], evidence: readonly ChamberEvidence[]): Discrepancy[] {
   const byId = new Map(records.map(r => [r.bioguide, r]));
   const discrepancies: Discrepancy[] = [];
-  for (const ballot of ballots) {
-    const covered = rows.some(r => r.memberId === ballot.memberId && r.name === 'House of Representatives' && r.start <= ballot.date && (!r.end || r.end >= ballot.date));
-    const record = byId.get(ballot.memberId), term = record && termOn(record, 'rep', ballot.date);
-    if (!covered || !term) { discrepancies.push({ kind: 'no-house-term', memberId: ballot.memberId, voteId: ballot.voteId, date: ballot.date, detail: 'No exact-day House term covers this ballot' }); continue; }
+  for (const ballot of evidence) {
+    const house = ballot.chamber === 'House', name = house ? 'House of Representatives' : 'Senate';
+    const covered = rows.some(r => r.memberId === ballot.memberId && r.name === name && r.start <= ballot.date && (!r.end || r.end >= ballot.date));
+    const record = byId.get(ballot.memberId), term = record && termOn(record, house ? 'rep' : 'sen', ballot.date);
+    if (!covered || !term) { discrepancies.push({ kind: house ? 'no-house-term' : 'no-senate-term', memberId: ballot.memberId, voteId: ballot.voteId, date: ballot.date, detail: house ? 'No exact-day House term covers this ballot' : 'No exact-day Senate term covers this evidence' }); continue; }
     const label = partyLabelOn(term, ballot.date), supplemental = supportedParty(label);
     if (!supplemental) discrepancies.push({ kind: 'unsupported-party', memberId: ballot.memberId, voteId: ballot.voteId, date: ballot.date, official: ballot.partyAtVote, supplemental: label ?? 'none', detail: 'Supplemental party label is outside the publication schema' });
     else if (supplemental !== ballot.partyAtVote) discrepancies.push({ kind: 'party-mismatch', memberId: ballot.memberId, voteId: ballot.voteId, date: ballot.date, official: ballot.partyAtVote, supplemental, detail: 'Ballot party differs from supplemental party on the vote date' });
@@ -183,4 +189,53 @@ export function candidateMembers(records: readonly LegislatorRecord[], memberIds
       status: 'inactive', committees: [], caucuses: [], since: Number(latest.start.slice(0, 4)) });
   }
   return { members, discrepancies };
+}
+
+export interface IdentityInput {
+  current: readonly LegislatorRecord[];
+  historical: readonly LegislatorRecord[];
+  currentUrl: string;
+  historicalUrl: string;
+  rosterIds: Iterable<string>;
+  senateBallots: readonly SenateBallot[];
+  houseBallots: readonly HouseBallot[];
+  /** Non-ballot evidence such as bill sponsorship, checked against exact-day terms like ballots. */
+  supporters?: readonly ChamberEvidence[];
+  /** A previously staged supplement: its mappings, term rows and candidates are reused, never re-emitted. */
+  existing?: { crosswalk: Readonly<Record<string, string>>; affiliations: readonly DatedAffiliation[]; candidateMembers: readonly Member[] };
+}
+/**
+ * The identity packet behind stage-legislators.mjs, generalized to extend an existing packet with
+ * extra ballots and bill supporters. Returns only new crosswalk entries, term rows and candidates.
+ */
+export function identitySupplement(input: IdentityInput) {
+  const records = [...input.current, ...input.historical], existing = input.existing ?? { crosswalk: {}, affiliations: [], candidateMembers: [] };
+  const supporters = input.supporters ?? [];
+  const { crosswalk: mapped, discrepancies: senateDiscrepancies } = buildLisCrosswalk(records, input.senateBallots);
+  const crosswalk: Record<string, string> = {};
+  for (const [lis, id] of Object.entries(mapped)) {
+    if (existing.crosswalk[lis] !== undefined && existing.crosswalk[lis] !== id) throw new Error(`LIS ${lis} conflicts with the existing crosswalk`);
+    if (existing.crosswalk[lis] === undefined) crosswalk[lis] = id;
+  }
+  const needed = [...new Set([...input.houseBallots.map(b => b.memberId), ...Object.values(mapped), ...supporters.map(s => s.memberId)])].sort();
+  const covered = new Set(existing.affiliations.filter(a => a.kind === 'term').map(a => a.memberId));
+  const fresh = needed.filter(id => !covered.has(id));
+  const inCurrent = new Set(input.current.map(r => r.bioguide)), inHistorical = new Set(input.historical.map(r => r.bioguide));
+  const currentTerms = termAffiliations(input.current, fresh.filter(id => inCurrent.has(id)), input.currentUrl);
+  const historicalTerms = termAffiliations(input.historical, fresh.filter(id => inHistorical.has(id)), input.historicalUrl);
+  const absent: Discrepancy[] = fresh.filter(id => !inCurrent.has(id) && !inHistorical.has(id))
+    .map(memberId => ({ kind: 'missing-bioguide', memberId, detail: 'No supplemental record for this Bioguide ID' }));
+  const newTerms = [...currentTerms.rows, ...historicalTerms.rows], allTerms = [...existing.affiliations, ...newTerms];
+  const coverage = [...checkHouseCoverage(records, allTerms, input.houseBallots), ...checkTermCoverage(records, allTerms, supporters)];
+  const rosterIds = new Set(input.rosterIds), existingCandidates = new Set(existing.candidateMembers.map(m => m.id));
+  const candidates = candidateMembers(records, needed.filter(id => !rosterIds.has(id) && !existingCandidates.has(id)));
+  // Term rows are importable only for members the dataset will contain.
+  const importable = new Set([...rosterIds, ...existingCandidates, ...candidates.members.map(m => m.id)]);
+  const affiliations = newTerms.filter(row => importable.has(row.memberId));
+  const withheld = [...new Set(newTerms.filter(r => !importable.has(r.memberId)).map(r => r.memberId))].map((memberId): Discrepancy => ({
+    kind: 'withheld-terms', memberId, supplemental: String(newTerms.filter(r => r.memberId === memberId).length),
+    detail: 'Term rows withheld because this member has no roster or candidate record; their evidence cannot be imported until an editor resolves it',
+  }));
+  const discrepancies = [...senateDiscrepancies, ...currentTerms.discrepancies, ...historicalTerms.discrepancies, ...absent, ...coverage, ...candidates.discrepancies, ...withheld];
+  return { crosswalk, mappedLisIds: Object.keys(mapped).length, affiliations, candidateMembers: candidates.members, discrepancies };
 }

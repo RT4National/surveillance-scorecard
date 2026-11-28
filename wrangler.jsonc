@@ -17,6 +17,7 @@
         "ACCESS_ISSUER": "",
         "ACCESS_AUDIENCE": "",
         "STAFF_ROLES": "{}",
+        "STAFF_OPEN_STAGING": "true",
         "AI_MODEL": "",
       },
       "d1_databases": [

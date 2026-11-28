@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ingestCurrentMembers, publishablePortrait, reconcileRoster, readSource, type RosterRun } from './members';
-import { parseHouseRollcall, parseSenateRollcall, reviewRollcall } from './rollcalls';
+import { parseHouseRollcall, parseSenateRollcall, reviewRollcall, senateBallots } from './rollcalls';
 import { sheetValuesFromCsv, stageLegacySheet } from './legacy';
 import { stageAffiliations, affiliationsOn, reconcileAffiliations } from './affiliations';
 import { cachePortrait } from './portraits';
@@ -92,6 +92,11 @@ describe('Official roll calls', () => {
     expect(stage.records[0].outcome).toBe('No'); expect(stage.records[0].partyAtVote).toBe('Independent');
     expect(stage.date).toBe('2025-01-09');
   });
+  it('lists Senate ballots by LIS ID for an identity crosswalk, before any mapping exists', () => {
+    const named = senate.replace('<lis_member_id>', '<member_full>Sanders (I-VT)</member_full><state>VT</state><lis_member_id>');
+    expect(senateBallots(named)).toEqual([{ lisId: 'S123', name: 'Sanders (I-VT)', state: 'VT', party: 'I', date: '2025-01-09' }]);
+    expect(() => senateBallots(senate)).toThrow();
+  });
   it('identifies Senate amendment votes, whose document name is empty, by amendment and target document', async () => {
     const amendment = senate.replace('<document><document_name>S. 5</document_name></document>',
       '<document><document_type>S.Amdt.</document_type><document_name/></document><amendment><amendment_number>S.Amdt. 1583</amendment_number><amendment_to_document_number>H.R. 6172</amendment_to_document_number></amendment>');
@@ -179,6 +184,15 @@ describe('Reviewed portrait caching', () => {
     const result = await cachePortrait(manifest, (async () => new Response(jpeg, { headers: { 'Content-Type': 'image/jpeg' } })) as typeof fetch);
     expect(result.portrait.url).toMatch(/^\/scorecard\/portraits\/A000001-[a-f0-9]{64}\.jpg$/);
     expect(result.source.url).toBe(manifest.url); expect(result.portrait.rightsSource).toBe(manifest.rightsSource);
+  });
+  it('accepts Wikimedia Commons uploads and identifies itself to the host', async () => {
+    let agent = '';
+    const commons = { ...manifest, url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Example.jpg/400px-Example.jpg' };
+    const result = await cachePortrait(commons, (async (_url: string, init: RequestInit) => { agent = new Headers(init.headers).get('User-Agent') ?? ''; return new Response(jpeg, { headers: { 'Content-Type': 'image/jpeg' } }); }) as unknown as typeof fetch);
+    expect(result.source.url).toBe(commons.url);
+    expect(agent).toMatch(/scorecard/i);
+    for (const url of ['https://upload.wikimedia.org/wikipedia/en/a/ab/Fair_use.jpg', 'https://commons.wikimedia.org/wiki/File:Example.jpg', 'https://upload.wikimedia.org.evil.example/wikipedia/commons/a.jpg'])
+      await expect(cachePortrait({ ...manifest, url })).rejects.toThrow('official');
   });
   it('refuses unreviewed assets, remote hosts, SVG, and mismatched MIME', async () => {
     await expect(cachePortrait({ ...manifest, rights: 'unreviewed' })).rejects.toThrow('rights');

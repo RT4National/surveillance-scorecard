@@ -7,12 +7,10 @@ import {
   validateRubric,
 } from "../core/scoring";
 import type { Rubric } from "../core/types";
+import { GradingRulesControls } from "./GradingRules";
 
 export function PolicyLab({ dataset }: { dataset: Dataset }) {
   const [proposal, setProposal] = useState<Rubric>(dataset.rubric);
-  const [bands, setBands] = useState(
-    JSON.stringify(dataset.rubric.gradeBands ?? defaultGradeBands, null, 2),
-  );
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(dataset.members[0]?.id ?? "");
   const comparison = useMemo(
@@ -38,7 +36,7 @@ export function PolicyLab({ dataset }: { dataset: Dataset }) {
   );
   const current = comparison.find((r) => r.member.id === selected);
   function update(change: Partial<Rubric>) {
-    const next = { ...proposal, ...change };
+    const next: Rubric = { ...proposal, ...change };
     try {
       validateRubric(next);
       setProposal(next);
@@ -224,7 +222,9 @@ export function PolicyLab({ dataset }: { dataset: Dataset }) {
             <h2>Sources, corrections and reuse</h2>
             <p>
               {dataset.demo
-                ? "This dataset is fictional."
+                ? dataset.sources.length
+                  ? "Real records with unreviewed placeholder vote directions."
+                  : "This dataset is fictional."
                 : "Each published observation carries a source and a reviewable interpretation."}{" "}
               {dataset.coverage.join(" ")}
             </p>
@@ -256,136 +256,39 @@ export function PolicyLab({ dataset }: { dataset: Dataset }) {
           </div>
         </div>
         <aside>
-          <div className="panel rubric-lab">
+          <section
+            className="panel rubric-lab"
+            aria-labelledby="rubric-lab-title"
+          >
             <div className="eyebrow">RUBRIC LAB</div>
-            <h2>Test an explicit policy.</h2>
+            <h2 id="rubric-lab-title">Try your own grading rules.</h2>
+            <p className="footnote">
+              Move the sliders to see how grades would change. Nothing here
+              changes the published scorecard.
+            </p>
             <label className="policy-field">
-              Version
+              Name for this set of rules
               <input
                 value={proposal.version}
                 onChange={(e) => update({ version: e.target.value })}
               />
             </label>
-            <label className="policy-field">
-              Minimum cast votes
-              <input
-                type="number"
-                min="1"
-                max="100"
-                value={proposal.minVotes}
-                onChange={(e) => update({ minVotes: Number(e.target.value) })}
-              />
-            </label>
-            <label className="policy-field">
-              Minimum votes per party context
-              <input
-                type="number"
-                min="1"
-                max="100"
-                value={proposal.minPerContext}
-                onChange={(e) =>
-                  update({ minPerContext: Number(e.target.value) })
-                }
-              />
-            </label>
-            <label className="policy-field">
-              Reformer consistency threshold (%)
-              <input
-                type="number"
-                min="51"
-                max="100"
-                value={proposal.consistencyThreshold}
-                onChange={(e) =>
-                  update({ consistencyThreshold: Number(e.target.value) })
-                }
-              />
-            </label>
-            <label className="policy-field">
-              Lookback years (blank = all)
-              <input
-                type="number"
-                min="1"
-                value={proposal.lookbackYears ?? ""}
-                onChange={(e) =>
-                  update({
-                    lookbackYears: e.target.value
-                      ? Number(e.target.value)
-                      : undefined,
-                  })
-                }
-              />
-            </label>
-            <label className="policy-field">
-              Recency half-life years (blank = none)
-              <input
-                type="number"
-                min="1"
-                value={proposal.halfLifeYears ?? ""}
-                onChange={(e) =>
-                  update({
-                    halfLifeYears: e.target.value
-                      ? Number(e.target.value)
-                      : undefined,
-                  })
-                }
-              />
-            </label>
-            <label className="policy-field">
-              Minimum shared issue topics
-              <input
-                type="number"
-                min="0"
-                value={proposal.minSharedTopics ?? 0}
-                onChange={(e) =>
-                  update({ minSharedTopics: Number(e.target.value) })
-                }
-              />
-            </label>
-            <label className="policy-field">
-              Grade bands (descending JSON)
-              <textarea
-                rows={10}
-                value={bands}
-                onChange={(e) => setBands(e.target.value)}
-              />
-            </label>
-            <button
-              className="button"
-              onClick={() => {
-                try {
-                  const parsed = JSON.parse(bands);
-                  if (!Array.isArray(parsed))
-                    throw Error("Grade bands must be an array");
-                  update({ gradeBands: parsed });
-                } catch {
-                  setError("Grade bands must be valid JSON.");
-                }
-              }}
-            >
-              Apply grade bands
-            </button>
+            <GradingRulesControls rubric={proposal} onChange={update} />
             <p role="alert">{error}</p>
             <button
               className="button"
               onClick={() => {
                 setProposal(dataset.rubric);
-                setBands(
-                  JSON.stringify(
-                    dataset.rubric.gradeBands ?? defaultGradeBands,
-                    null,
-                    2,
-                  ),
-                );
                 setError("");
               }}
             >
-              Reset to published policy
+              Reset to the published rules
             </button>
             <p className="footnote">
               Changing this lab never alters published grades. Staff can apply
               the same settings to a reviewed draft.
             </p>
-          </div>
+          </section>
         </aside>
       </div>
     </section>

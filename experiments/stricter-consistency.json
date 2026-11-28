@@ -1,0 +1,4 @@
+{
+  "name": "Stricter consistency, recent votes weigh more",
+  "rubric": { "consistencyThreshold": 85, "halfLifeYears": 8 }
+}
