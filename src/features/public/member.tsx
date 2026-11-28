@@ -1,7 +1,9 @@
 // Components shared by the scorecard directory (App.tsx) and the member profile.
 // Plain helpers live in helpers.ts so this module exports only components (Vite Fast Refresh).
 import { useScorecard } from "../../data/context";
+import { defaultGradeBands } from "../../core/scoring";
 import type { Member } from "../../core/types";
+import { gradeTone } from "./helpers";
 export function Avatar({
   member,
   large = false,
@@ -36,11 +38,11 @@ export function Avatar({
   );
 }
 export function Grade({ member, asOf }: { member: Member; asOf?: string }) {
-  const { score } = useScorecard();
+  const { score, rubric } = useScorecard();
   const s = score(member, asOf);
   return (
     <span
-      className={`grade ${s.value === null ? "unrated" : s.value >= 80 ? "good" : s.value >= 50 ? "mixed" : "poor"}`}
+      className={`grade ${gradeTone(s.grade, s.value, rubric.gradeBands ?? defaultGradeBands)}`}
       aria-label={`Grade ${s.grade === "—" ? "not yet rated" : s.grade}`}
     >
       {s.grade}
