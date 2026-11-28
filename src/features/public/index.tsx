@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dataset, Publication } from "../../core/publication";
-import type { Outcome } from "../../core/types";
+import type { Outcome, Party } from "../../core/types";
+import { splitDisplay, voteCount, type SplitInput } from "./split";
 import { publicationUrl } from "../../core/navigation";
 import { evidenceLabel } from "../../core/evidence";
 import {
@@ -305,6 +306,28 @@ function useReport(
     }
   }, [dataset, query, includeUnrated]);
 }
+/** The own-party / other-party split on a compare card, gated by the scorer's verdict. */
+function SplitSummary({ score, party }: { score: SplitInput; party: Party }) {
+  const split = splitDisplay(score, party);
+  if (split.kind === "not-applicable") return <p>{split.message}</p>;
+  if (split.kind === "unproven")
+    return (
+      <>
+        <p>{split.counts}</p>
+        <p>{split.message}</p>
+      </>
+    );
+  return (
+    <>
+      <p>
+        Same party: {split.own.percent}% ({voteCount(split.own.count)})
+      </p>
+      <p>
+        Other party: {split.other.percent}% ({voteCount(split.other.count)})
+      </p>
+    </>
+  );
+}
 export function ComparePage({ dataset, publication }: Props) {
   const [ids, setIds] = useState<string[]>(
     dataset.members.slice(0, 2).map((m) => m.id),
@@ -376,20 +399,7 @@ export function ComparePage({ dataset, publication }: Props) {
             </p>
             <p>{score.reason}</p>
             {score.topicCoverageWarning && <p>{score.topicCoverageWarning}</p>}
-            <p>
-              Same party:{" "}
-              {score.ownScore === null
-                ? "No scored evidence"
-                : `${Math.round(score.ownScore)}%`}{" "}
-              ({score.ownCount} votes)
-            </p>
-            <p>
-              Other party:{" "}
-              {score.otherScore === null
-                ? "No scored evidence"
-                : `${Math.round(score.otherScore)}%`}{" "}
-              ({score.otherCount} votes)
-            </p>
+            <SplitSummary score={score} party={member.party} />
             <details>
               <summary>Inspect evidence</summary>
               {score.evidence.map((e) => (
