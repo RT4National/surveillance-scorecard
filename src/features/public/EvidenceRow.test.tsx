@@ -97,6 +97,16 @@ describe("evidence row", () => {
     expect(text(co)).toContain("Cosponsored");
     expect(text(co)).not.toContain("Voted");
     expect(text(co)).toContain("Cosponsoring was the pro-reform action.");
+    cleanup();
+    // Only a Yes record on a cosponsorship item is a sign-on, as in evidenceLabel.
+    const no = row(entry("No", { v: { ...vote, kind: "cosponsorship" } }));
+    expect(text(no)).not.toContain("Cosponsored");
+  });
+
+  it("is a plain block, so page card styles for article never match a row", () => {
+    const r = row(entry("Yes"));
+    expect(r.tagName).toBe("DIV");
+    expect(r.querySelector("article, header, section")).toBeNull();
   });
 
   it("never states a party for a not eligible record", () => {

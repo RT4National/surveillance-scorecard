@@ -85,7 +85,7 @@ export const reformLine = (vote: Pick<Vote, "kind" | "reformVote">) =>
 /** The member's own action, or null when nothing was cast (the state word already says so). */
 export const memberAction = (vote: Pick<Vote, "kind">, outcome: Outcome) =>
   outcome === "Yes" || outcome === "No"
-    ? vote.kind === "cosponsorship"
+    ? vote.kind === "cosponsorship" && outcome === "Yes"
       ? "Cosponsored"
       : `Voted ${outcome}`
     : null;

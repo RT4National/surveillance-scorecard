@@ -51,11 +51,11 @@ export function EvidenceRow({
   const state = alignmentState(e);
   const action = memberAction(e.vote, e.outcome);
   return (
-    <article className="evidence-row" data-vote-id={e.voteId} data-state={state}>
-      <header className="evidence-top">
+    <div className="evidence-row" data-vote-id={e.voteId} data-state={state}>
+      <div className="evidence-top">
         <StateMark state={state} />
         <span className="evidence-weight">{weightLabel(e)}</span>
-      </header>
+      </div>
       <div className="evidence-title">
         <strong>{e.vote.title}</strong>
         <time dateTime={e.vote.date}>{e.vote.date}</time>
@@ -84,6 +84,6 @@ export function EvidenceRow({
         </a>
         {actions}
       </p>
-    </article>
+    </div>
   );
 }
