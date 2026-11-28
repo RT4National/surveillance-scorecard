@@ -208,6 +208,9 @@ describe("profile split panel", () => {
     expect(shown()).toEqual(ids((e) => e.scored && !e.ownParty));
     expect(shown()).toHaveLength(s.otherCount);
 
+    fireEvent.click(chip("Not aligned"));
+    expect(shown()).toEqual(ids((e) => e.scored && !e.aligned));
+
     fireEvent.click(chip(splitCopy.chipAll));
     expect(shown()).toEqual(ids(() => true));
   });
@@ -476,7 +479,7 @@ function withOldEvidence(published: boolean) {
       dataset: ds,
       ...ds,
       publication: published
-        ? { id: "pub-1", scoring: { version: "scorer-test" } }
+        ? { id: "pub-1", dataset: ds, scoring: { version: "scorer-test", scores: {} } }
         : undefined,
       score: (m: any, asOf = ds.asOf) =>
         scoreMember(m, ds.votes, ds.records, ds.rubric, asOf),

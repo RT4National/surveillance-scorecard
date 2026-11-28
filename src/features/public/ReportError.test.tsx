@@ -19,7 +19,11 @@ vi.mock("../../data/context", async (importOriginal) => {
       return {
         ...real,
         dataset,
-        publication: { id: "pub-7", dataset },
+        publication: {
+          id: "pub-7",
+          dataset,
+          scoring: { version: "1", digest: "fixture", scores: {} },
+        },
         score: (m: any, asOf = dataset.asOf) =>
           scoreMember(m, dataset.votes, dataset.records, dataset.rubric, asOf),
       };
@@ -57,7 +61,9 @@ describe("per-row error report", () => {
     expect(text(form)).toContain(`${member.name} · ${vote.title}`);
     expect(text(form)).toContain(correctionCopy.next);
     expect(
-      document.querySelectorAll(".profile-main .evidence-row + form.public-correction"),
+      document.querySelectorAll(
+        ".profile-main .evidence-row + form.public-correction",
+      ),
     ).toHaveLength(1);
   });
 

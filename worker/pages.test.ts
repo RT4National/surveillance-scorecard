@@ -22,6 +22,7 @@ import {
   updatedLabel,
 } from "../src/core/copy";
 import { escapeHtml } from "./render";
+import { memberShareMeta } from "./meta";
 import { encodeStoredJson } from "./storage";
 import { digest } from "./validation";
 import { gzipSync } from "node:zlib";
@@ -176,6 +177,20 @@ describe("public page routing in the Worker", () => {
     expect(text, path).toContain('<div id="root">');
     expect(r.headers.get("x-robots-tag"), path).toBe("noindex, nofollow");
   }
+  it("requires staff authentication before requesting roll-call sources", async () => {
+    const response = await mf.dispatchFetch(
+      "https://scorecard.example/scorecard/api/staff/stage/rollcall",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: "https://clerk.house.gov/evs/2025/roll002.xml",
+        }),
+      },
+    );
+    expect(response.status).toBe(401);
+    await response.text();
+  });
   it("serves a valid member profile with 200 and its meta", async () => {
     const r = await get(`/scorecard/members/${members[0].id}`);
     expect(r.status).toBe(200);
@@ -394,6 +409,86 @@ describe("server-rendered first paint from stored publications", () => {
       await (await get(`/scorecard/members/${latest.members[0].id}`)).text(),
     );
     expect(profile).toContain(escapeHtml(tricky));
+  });
+  it("adds escaped frozen grades and a same-origin share image only to eligible publications", async () => {
+    const member = latest.members[0];
+    const route = `/scorecard/members/${member.id}`;
+    const published = await (await get(route)).text();
+    const grade = publishedScore(p2, member).grade;
+    expect(published).toContain(
+      `property="og:title" content="${escapeHtml(tricky)}: ${grade} on surveillance reform`,
+    );
+    expect(published).toMatch(/<title>Ada &lt;b&gt;Bold/);
+    expect(published).toContain(
+      'property="og:image" content="https://scorecard.example/scorecard/share/',
+    );
+    expect(published).toContain('property="og:image:alt"');
+    expect(published).toContain(
+      'name="twitter:card" content="summary_large_image"',
+    );
+    const demo = await (await get(`${route}?publication=pub-older`)).text();
+    expect(demo).not.toContain('property="og:image"');
+    expect(demo).not.toContain(`: ${grade} on surveillance reform`);
+  });
+  it("uses the generic image for custom bands and hides metadata for legacy or placeholder snapshots", () => {
+    const member = latest.members[0];
+    const url = new URL("https://scorecard.example/scorecard/members/fixture");
+    const custom = structuredClone(p2);
+    custom.scoring!.scores[member.id].grade = "Special band";
+    expect(memberShareMeta(custom, member, url)).toMatchObject({
+      title: expect.stringContaining("Special band"),
+      image: "https://scorecard.example/scorecard/share/generic.png",
+    });
+    expect(
+      memberShareMeta({ ...p2, scoring: undefined }, member, url),
+    ).toBeUndefined();
+    expect(
+      memberShareMeta(
+        {
+          ...p2,
+          dataset: { ...p2.dataset, id: "PLACEHOLDER-unreviewed" },
+        },
+        member,
+        url,
+      ),
+    ).toBeUndefined();
+  });
+  it("includes a source-backed summary in the initial HTML for published grades", async () => {
+    const member = latest.members[0];
+    const route = `/scorecard/members/${member.id}`;
+    const response = await get(route);
+    const html = await response.text();
+    expect(html).toContain("data-frozen-summary");
+    expect(html).toContain('href="https://clerk.house.gov/"');
+    expect(html).toContain("Publication pub-latest");
+    const repeat = await get(route);
+    expect(repeat.headers.get("server-timing")).toContain("hit");
+    expect(await repeat.text()).toBe(html);
+    const preview = await (await get(`${route}?publication=pub-older`)).text();
+    expect(preview).not.toContain("data-frozen-summary");
+  });
+  it("accepts corrections only for publishable evidence and preserves rate limits", async () => {
+    const record = latest.records[0];
+    const send = (publicationId: string, memberId = record.memberId) =>
+      mf.dispatchFetch("https://scorecard.example/scorecard/api/corrections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicationId,
+          memberId,
+          voteId: record.voteId,
+          message:
+            "Please verify the recorded ballot against the official source.",
+        }),
+      });
+    expect((await send("pub-older")).status).toBe(403);
+    expect((await send(p2.id, "missing")).status).toBe(400);
+    for (let i = 0; i < 5; i++) {
+      const accepted = await send(p2.id);
+      expect(accepted.status).toBe(201);
+      expect(await accepted.json()).toHaveProperty("id");
+    }
+    expect((await send(p2.id)).status).toBe(429);
   });
   it("renders the latest publication with the published banner and clean links", async () => {
     const m = latest.members[1];

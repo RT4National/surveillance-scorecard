@@ -9,6 +9,7 @@ export function publicationUrl(
   if (url.pathname !== "/scorecard" && !url.pathname.startsWith("/scorecard/"))
     return path;
   if (
+    url.pathname === "/scorecard/staff" ||
     url.pathname === "/scorecard/editor" ||
     url.pathname.startsWith("/scorecard/editor/")
   ) {
@@ -19,4 +20,11 @@ export function publicationUrl(
     if (asOf) url.searchParams.set("asOf", asOf);
   }
   return url.pathname + url.search + url.hash;
+}
+
+export function compareMemberUrl(memberId: string, publicationId?: string) {
+  return publicationUrl(
+    `/scorecard/compare?${new URLSearchParams({ m: memberId })}`,
+    publicationId,
+  );
 }

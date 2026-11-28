@@ -1,4 +1,7 @@
+import type { RosterRun } from "../../ingestion/members";
+import type { BillSupportStage } from "../../ingestion/cosponsors";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import type { RollcallStage } from "../../ingestion/rollcalls";
 import type { Dataset, Publication } from "../../core/publication";
 import { defaultGradeBands, scoreMember } from "../../core/scoring";
 import { publishedScore } from "../../core/publication-scores";
@@ -365,7 +368,28 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
             new draft to make further changes.
           </p>
         )}
-        <Panel dataset={preview} onChange={setDataset} />
+        <Panel
+          key={active?.id}
+          dataset={preview}
+          onChange={setDataset}
+          loadRoster={
+            session?.open ? undefined : () => call<RosterRun>("stage/roster")
+          }
+          stageBillSupport={
+            session?.open
+              ? undefined
+              : (bill, congress) =>
+                  call<BillSupportStage>("stage/bill-support", "POST", {
+                    bill,
+                    congress,
+                  })
+          }
+          stageRollcall={
+            session?.open
+              ? undefined
+              : (url) => call<RollcallStage>("stage/rollcall", "POST", { url })
+          }
+        />
       </fieldset>
     );
 
@@ -678,14 +702,20 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
                         <summary>
                           See every grade that changes ({changed.length})
                         </summary>
-                        <div className="editor-scroll">
-                          <table aria-label="Grade changes">
+                        <div
+                          className="editor-scroll"
+                          role="region"
+                          aria-label="Grade changes"
+                          tabIndex={0}
+                        >
+                          <table>
+                            <caption>Grade changes</caption>
                             <thead>
                               <tr>
-                                <th>Legislator</th>
-                                <th>Live grade</th>
-                                <th>Draft grade</th>
-                                <th>Change</th>
+                                <th scope="col">Legislator</th>
+                                <th scope="col">Live grade</th>
+                                <th scope="col">Draft grade</th>
+                                <th scope="col">Change</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -953,14 +983,20 @@ export function EditorPage({ dataset }: { dataset?: Dataset }) {
                 <h2>Activity log</h2>
                 {!audit.length && <p>No activity recorded yet.</p>}
                 {audit.length > 0 && (
-                  <div className="editor-scroll">
-                    <table aria-label="Activity log">
+                  <div
+                    className="editor-scroll"
+                    role="region"
+                    aria-label="Activity log"
+                    tabIndex={0}
+                  >
+                    <table>
+                      <caption>Activity log</caption>
                       <thead>
                         <tr>
-                          <th>When</th>
-                          <th>Who</th>
-                          <th>What</th>
-                          <th>Item</th>
+                          <th scope="col">When</th>
+                          <th scope="col">Who</th>
+                          <th scope="col">What</th>
+                          <th scope="col">Item</th>
                         </tr>
                       </thead>
                       <tbody>

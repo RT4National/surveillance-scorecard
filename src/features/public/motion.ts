@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 // Hooks that decide when to apply the shared motion classes (src/styles/motion.css).
 // They only add class names; values and text are always final in the DOM.
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
@@ -8,6 +9,44 @@ const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
   typeof window.matchMedia === "function" &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let activeFilter:
+  { transition: ViewTransition; commit: () => void } | undefined;
+
+/** Let the browser animate old and new row snapshots without retaining old rows in the DOM. */
+export function filterChange(update: () => void) {
+  if (activeFilter) {
+    activeFilter.transition.skipTransition();
+    activeFilter.commit();
+  }
+  if (
+    prefersReducedMotion() ||
+    !document.startViewTransition ||
+    !globalThis.CSS?.supports("view-transition-name", "match-element") ||
+    !document.querySelector("[data-filter-list]")
+  ) {
+    update();
+    return;
+  }
+
+  let updated = false;
+  const commit = () => {
+    if (updated) return;
+    updated = true;
+    flushSync(update);
+  };
+  const root = document.documentElement;
+  root.classList.add("motion-filter-transition");
+  const transition = document.startViewTransition(commit);
+  activeFilter = { transition, commit };
+  void transition.ready.catch(() => undefined);
+  const cleanup = () => {
+    if (activeFilter?.transition !== transition) return;
+    activeFilter = undefined;
+    root.classList.remove("motion-filter-transition");
+  };
+  void transition.finished.then(cleanup, cleanup);
+}
 
 /**
  * True once the element has been in the viewport. Checked before first paint, so an element that
@@ -64,7 +103,12 @@ export function useFilterClass(key: string, rows: number): string {
     previous.current = key;
     changes.current++;
   }
-  if (!changes.current || rows > filterMotionLimit || prefersReducedMotion())
+  if (
+    !changes.current ||
+    rows > filterMotionLimit ||
+    prefersReducedMotion() ||
+    document.documentElement.classList.contains("motion-filter-transition")
+  )
     return "";
   return changes.current % 2 ? "motion-filter-a" : "motion-filter-b";
 }

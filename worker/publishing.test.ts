@@ -104,7 +104,12 @@ describe("D1 editorial workflow", () => {
     const db = await mf.getD1Database("DB", "test");
     const sql = (
       await Promise.all(
-        ["0001_editorial.sql", "0002_draft_base.sql"].map((file) =>
+        [
+          "0001_editorial.sql",
+          "0002_draft_base.sql",
+          "0003_staged_roster.sql",
+          "0004_publication_changelog.sql",
+        ].map((file) =>
           readFile(new URL(`../migrations/${file}`, import.meta.url), "utf8"),
         ),
       )
@@ -153,6 +158,135 @@ describe("D1 editorial workflow", () => {
       ).status,
     ).toBe(401);
   });
+  it("rejects demo and placeholder drafts in production and refuses open staff mode", async () => {
+    const read = (path: string, payload?: unknown, open?: string) =>
+      worker.fetch(
+        new Request(`https://scorecard.example/scorecard/api/staff/${path}`, {
+          method: payload ? "POST" : "GET",
+          headers: { "Content-Type": "application/json" },
+          body: payload ? JSON.stringify(payload) : undefined,
+        }),
+        {
+          ...env,
+          DEPLOYMENT_TIER: "production",
+          STAFF_OPEN_STAGING: open,
+        } as Env,
+      );
+    expect((await read("session", undefined, "true")).status).toBe(503);
+    const identity = vi
+      .spyOn(auth, "authenticate")
+      .mockResolvedValue({ email: "editor@example.org", role: "editor" });
+    try {
+      const payload = {
+        dataset: fixture,
+        summary: "Test",
+        basePublicationId: null,
+      };
+      const demo = await read("drafts", payload);
+      expect(JSON.stringify(await demo.json())).toContain(
+        "Production requires reviewed evidence without placeholders.",
+      );
+      const placeholder = await read("drafts", {
+        ...payload,
+        dataset: {
+          ...fixture,
+          demo: false,
+          votes: fixture.votes.map((vote) => ({
+            ...vote,
+            source: "https://clerk.house.gov/",
+            rationale: "PLACEHOLDER-review this direction",
+          })),
+        },
+      });
+      expect(placeholder.status).toBe(422);
+      expect(JSON.stringify(await placeholder.json())).toContain(
+        "Production requires reviewed evidence without placeholders.",
+      );
+    } finally {
+      identity.mockRestore();
+    }
+  });
+  it("stores complete roster captures for review without creating drafts or publications", async () => {
+    const capture = {
+      asOf: "2025-01-10T00:00:00.000Z",
+      pages: [
+        {
+          url: "https://api.congress.gov/v3/member?currentMember=true&format=json&limit=250&offset=0",
+          body: JSON.stringify({
+            pagination: { count: 1 },
+            members: [
+              {
+                bioguideId: "A000001",
+                name: "Approved fixture",
+                state: "California",
+                partyName: "Democratic",
+                terms: { item: [{ chamber: "Senate", startYear: 2025 }] },
+              },
+            ],
+          }),
+        },
+      ],
+    };
+    const sendCapture = (data: typeof capture, credential: string) =>
+      worker.fetch(
+        new Request(
+          "https://scorecard.example/scorecard/api/ingestion/roster",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${credential}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+          },
+        ),
+        { ...env, ROSTER_INGESTION_TOKEN: "fixture-roster-token" } as Env,
+      );
+    expect((await sendCapture(capture, "wrong-credential")).status).toBe(401);
+    expect(
+      (await sendCapture({ ...capture, pages: [] }, "fixture-roster-token"))
+        .status,
+    ).toBe(422);
+    const first = await sendCapture(capture, "fixture-roster-token");
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({
+      stored: true,
+      capturedAt: capture.asOf,
+    });
+    const older = await sendCapture(
+      { ...capture, asOf: "2025-01-09T00:00:00.000Z" },
+      "fixture-roster-token",
+    );
+    expect(await older.json()).toMatchObject({ stored: false });
+    expect((await send("/staff/stage/roster")).status).toBe(401);
+    const identity = vi
+      .spyOn(auth, "authenticate")
+      .mockResolvedValue({ email: "editor@example.org", role: "editor" });
+    try {
+      const result = await send("/staff/stage/roster");
+      expect(result.status).toBe(200);
+      expect(await result.json()).toMatchObject({
+        asOf: capture.asOf,
+        members: [{ id: "A000001" }],
+        sources: [
+          {
+            url: capture.pages[0].url,
+            sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+          },
+        ],
+      });
+    } finally {
+      identity.mockRestore();
+    }
+    const raw = await env.DB.prepare(
+      "SELECT capture FROM staged_roster_capture WHERE singleton=1",
+    ).first<{ capture: string }>();
+    expect(JSON.parse(raw!.capture)).toEqual(capture);
+    const counts = await env.DB.prepare(
+      "SELECT (SELECT count(*) FROM drafts) AS drafts, (SELECT count(*) FROM publications) AS publications",
+    ).first();
+    expect(counts).toEqual({ drafts: 0, publications: 0 });
+  });
   it("rejects invalid datasets and live promotion of demo records", () => {
     expect(validateDataset(fixture)).toEqual([]);
     expect(validateDataset({ ...fixture, members: [null] })).not.toEqual([]);
@@ -185,7 +319,9 @@ describe("D1 editorial workflow", () => {
         ...supported,
         votes: [...fixture.votes, { ...item, kind: "petition" }],
       }),
-    ).toContain("Invalid vote or missing rationale/source: cosponsor-117-s-1265");
+    ).toContain(
+      "Invalid vote or missing rationale/source: cosponsor-117-s-1265",
+    );
     expect(
       validateDataset({
         ...supported,
@@ -399,6 +535,24 @@ describe("D1 editorial workflow", () => {
     expect(published.status).toBe(201);
     const p = (await published.json()) as { id: string; digest: string };
     expect(p.digest).toMatch(/^[a-f0-9]{64}$/);
+    const productionRollback = await worker.fetch(
+      new Request("https://scorecard.example/scorecard/api/staff/rollback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicationId: p.id,
+          revision: 1,
+          reason: "Production rollback fixture",
+        }),
+      }),
+      { ...env, DEPLOYMENT_TIER: "production" },
+    );
+    expect(productionRollback.status).toBe(422);
+    const changelog = await send("/publications");
+    expect(changelog.status).toBe(200);
+    expect(await changelog.json()).toMatchObject({
+      publications: [{ id: p.id, changeReasons: ["initial"] }],
+    });
     expect(
       (await send(`/staff/drafts/${d.id}/publish`, "POST", { version: 2 }))
         .status,
@@ -436,13 +590,7 @@ describe("D1 editorial workflow", () => {
       memberId: fixture.members[0].id,
       message: "Please inspect this member evidence.",
     };
-    for (let i = 0; i < 5; i++)
-      expect((await send("/corrections", "POST", c)).status).toBe(201);
-    expect((await send("/corrections", "POST", c)).status).toBe(429);
-    expect(
-      (await send("/corrections", "POST", { ...c, memberId: "missing" }))
-        .status,
-    ).toBe(400);
+    expect((await send("/corrections", "POST", c)).status).toBe(403);
     identity.mockRestore();
   });
   it("rejects publishing and editing across an intervening publication until explicit rebase and new review", async () => {
@@ -532,6 +680,23 @@ describe("D1 editorial workflow", () => {
     expect(rebased?.dataset).toBe(JSON.stringify(fixture));
     expect(rebased?.reviewer).toBeNull();
     expect(rebased?.base_publication_id).toBe(current.id);
+    const pointer = await env.DB.prepare(
+      "SELECT revision FROM current_publication WHERE singleton=1",
+    ).first<{ revision: number }>();
+    const rollback = await send("/staff/rollback", "POST", {
+      publicationId: base.id,
+      revision: pointer!.revision,
+      reason: "Verify the archive follows the live pointer",
+    });
+    expect(rollback.status).toBe(200);
+    const archive = await send("/publications");
+    expect(await archive.json()).toMatchObject({
+      currentId: base.id,
+      publications: [
+        { id: current.id, sequence: 2 },
+        { id: base.id, sequence: 1 },
+      ],
+    });
     identity.mockRestore();
   });
   it("bounds UTF8 uploads and publishes compressible snapshots beyond the old raw-row limit", async () => {

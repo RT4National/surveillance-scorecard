@@ -24,7 +24,7 @@ Constraints that apply even with placeholders:
 - **Two real sign-ins are required for step 4.** Review must be by a different identity than the editor (the server returns 403 otherwise), and placeholder addresses cannot sign in through Access. Map at least two real Access identities before the dry run.
 - **Staging datasets that use placeholder directions set `demo: true`.** Validation accepts real Bioguide IDs with `demo: true`. The UI then shows its fictional-data banner and disables corrections and AI questions. This keeps placeholder grades for real legislators from presenting as editorial positions.
 - **Never promote a placeholder dataset.** `reconcileRoster` carries the prior `demo` flag forward and the rubric version is frozen into every publication. Build the launch dataset from the staged artifacts, not by cloning a placeholder publication.
-- **Production gate:** `grep -rn --exclude=LAUNCH-RUNBOOK.md 'PLACEHOLDER-' cloudflare.config.ts wrangler.jsonc docs src <LAUNCH_DRAFT>.json` must return nothing before step 6. The launch draft JSON is where the rubric version and rationales live.
+- **Production gate:** `rg -n 'PLACEHOLDER-' cloudflare.config.ts wrangler.jsonc <LAUNCH_DRAFT>.json` must return nothing before step 6. The launch draft JSON is where the rubric version and rationales live. The production Worker also rejects demo and placeholder drafts and rollback targets, and refuses staff access if open staging mode is enabled.
 
 ## 1. Tooling and credentials
 
@@ -37,7 +37,7 @@ Deploys use Wrangler; account and D1 operations use the Cloudflare CLI ([`cf`](h
    npx wrangler login
    ```
 
-2. **Congress API key.** Locally it lives in the gitignored `.env.ingestion` (not `.env`, which Wrangler would load into the local Worker); run importers with `node --env-file=.env.ingestion`. It is set as the `CONGRESS_API_KEY` secret on `RT4National/surveillance-scorecard` for the daily ingestion workflow. The repository is public, so roster artifacts (official public data, never the key) are downloadable by any signed-in GitHub user for 14 days.
+2. **Congress API key.** Locally it lives in the gitignored `.env.ingestion` (not `.env`, which Wrangler would load into the local Worker); run importers with `node --env-file=.env.ingestion`. It is set as the `CONGRESS_API_KEY` secret on `RT4National/surveillance-scorecard` for the daily ingestion workflow. The repository is public, so roster artifacts (official public data, never the key) are downloadable by any signed-in GitHub user for 14 days. Configure scheduled D1 roster storage and staff intake using the [staff guide](STAFF-GUIDE.md).
 
 `cf` resource commands take database IDs, not names. Find commands with `cf cli search "<task>"`. It has no D1 export command, so backups use `wrangler d1 export`.
 
@@ -130,3 +130,5 @@ This is the critical path. Commands are in [DATA-PIPELINE](DATA-PIPELINE.md).
 4. **Route.** Route only `restorethe4th.com/scorecard` and `restorethe4th.com/scorecard/*` to the Worker.
 5. **Publish.** Publish the first reviewed publication through the editor, then rerun the step 5 API checks against production.
 6. **Back up.** Take a post-launch D1 export to a protected operator location.
+
+After staff confirm the data reuse licence, record it in the reviewed draft’s `reuseLicence` field. Supported values are `CC-BY-4.0`, `CC0-1.0`, and `ODbL-1.0`. Publishing that draft enables the new vote and publication downloads. Confirm the text and portrait reuse terms separately.

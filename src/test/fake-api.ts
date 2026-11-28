@@ -20,6 +20,7 @@ export function fakeApi(
   publications: Publication[],
   options: {
     list?: PublicationSummary[] | null;
+    currentId?: string | null;
     hold?: (path: string) => boolean;
   } = {},
 ): FakeApi & { release: () => void } {
@@ -30,6 +31,10 @@ export function fakeApi(
     if (path === "/scorecard/api/publications") {
       if (options.list === null) throw new Error("offline");
       return Response.json({
+        currentId:
+          options.currentId === undefined
+            ? (publications[0]?.id ?? null)
+            : options.currentId,
         publications:
           options.list ??
           publications.map((p) => ({

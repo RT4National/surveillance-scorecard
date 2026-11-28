@@ -13,6 +13,7 @@ export interface Member {
   committees: string[];
   caucuses: string[];
   since: number;
+  contactUrl?: string;
   portrait?: {
     url: string;
     attribution: string;
@@ -25,6 +26,7 @@ export interface Vote {
   id: string;
   bill: string;
   title: string;
+  commonName?: string;
   date: string;
   administration: string;
   presidentParty: Party;
@@ -52,4 +54,13 @@ export interface Rubric {
   lookbackYears?: number;
   halfLifeYears?: number;
   minSharedTopics?: number;
+}
+
+/** Staff-selected roll calls that ask the same question in one chamber. */
+export interface VoteSeries {
+  id: string;
+  name: string;
+  rationale: string;
+  chamber: Vote["chamber"];
+  voteIds: string[];
 }

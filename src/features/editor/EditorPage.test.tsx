@@ -211,6 +211,7 @@ describe("Staff editing workflow", () => {
     ).toBe("true");
     fireEvent.click(within(importance()).getByRole("button", { name: "Less" }));
     expect(raw().votes[0].weight).toBe(0.5);
+    expect(screen.getByText(/Per-legislator impact/)).toBeTruthy();
     fireEvent.click(
       within(importance()).getByRole("button", { name: "Normal" }),
     );
@@ -232,6 +233,69 @@ describe("Staff editing workflow", () => {
       target: { value: "Unrelated edit" },
     });
     expect(raw().votes[0].weight).toBe(3);
+  });
+  it("lets staff add an explicitly selected repeated-vote series to a draft", async () => {
+    render(<EditorPage dataset={fixture} />);
+    await openDraft();
+    fireEvent.click(screen.getByText("Repeated-vote series"));
+    fireEvent.change(screen.getByLabelText("Series name"), {
+      target: { value: "Warrant requirement" },
+    });
+    fireEvent.change(screen.getByLabelText("Why these votes are comparable"), {
+      target: { value: "Both votes test the same warrant requirement." },
+    });
+    const options = within(
+      screen.getByRole("group", { name: "Roll calls in this series" }),
+    ).getAllByRole("checkbox");
+    fireEvent.click(options[0]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add series to draft" }),
+    );
+    expect(screen.getByRole("alert").textContent).toMatch(
+      /at least two distinct roll calls/,
+    );
+    fireEvent.click(options[1]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add series to draft" }),
+    );
+    expect(raw().voteSeries).toMatchObject([
+      {
+        name: "Warrant requirement",
+        chamber: "House",
+        rationale: "Both votes test the same warrant requirement.",
+        voteIds: [expect.any(String), expect.any(String)],
+      },
+    ]);
+  });
+  it("lets staff add and clear the office contact link in a draft", async () => {
+    render(<EditorPage dataset={fixture} />);
+    await openDraft();
+    openTab("Legislators");
+    const field = screen.getByLabelText("Official office contact page");
+    const url = "https://example.house.gov/contact";
+    fireEvent.change(field, { target: { value: url } });
+    expect(raw().members[0].contactUrl).toBe(url);
+    fireEvent.change(field, { target: { value: "" } });
+    expect(raw().members[0].contactUrl).toBeUndefined();
+  });
+  it("previews retirement and removes the item only after confirmation", async () => {
+    render(<EditorPage dataset={fixture} />);
+    await openDraft();
+    const current = (): typeof fixture => raw();
+    const id = current().votes[0].id;
+    fireEvent.click(screen.getByRole("button", { name: "Preview retirement" }));
+    expect(screen.getByText(/Per-legislator impact/)).toBeTruthy();
+    expect(current().votes.some((vote) => vote.id === id)).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel retirement" }));
+    expect(current().votes.some((vote) => vote.id === id)).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Preview retirement" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retire item from draft" }),
+    );
+    expect(current().votes.some((vote) => vote.id === id)).toBe(false);
+    expect(current().records.some((record) => record.voteId === id)).toBe(
+      false,
+    );
   });
   it("explains why a draft cannot be approved by its author", async () => {
     draft = { ...draft, author: "publisher@example.org" };

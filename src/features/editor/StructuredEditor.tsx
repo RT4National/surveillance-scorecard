@@ -1,12 +1,26 @@
+import { VoteSeriesEditor } from "./VoteSeriesEditor";
+import { removeVoteFromSeries } from "../../core/voteSeries";
+import { RosterIntake } from "./RosterIntake";
+import type { RosterRun } from "../../ingestion/members";
+import { ItemImpactPreview } from "./ItemImpactPreview";
 import { useId, useState } from "react";
 import type { Dataset } from "../../core/publication";
 import type { Member, Outcome, Party, Rubric, Vote } from "../../core/types";
 import { ChoiceButtons, GradingRulesControls } from "../GradingRules";
+import { EvidenceIntake } from "./EvidenceIntake";
+import type { BillSupportStage } from "../../ingestion/cosponsors";
+import type { RollcallStage } from "../../ingestion/rollcalls";
 import { importanceLabel, importanceOptions } from "./plain";
 
 type PanelProps = {
   dataset: Dataset;
   onChange: (d: Dataset) => void;
+  stageBillSupport?: (
+    bill: string,
+    congress: number,
+  ) => Promise<BillSupportStage>;
+  loadRoster?: () => Promise<RosterRun>;
+  stageRollcall?: (url: string) => Promise<RollcallStage>;
 };
 
 const partyOptions = (
@@ -18,11 +32,19 @@ const partyOptions = (
 );
 
 /** Tab 1: which votes we score, which side is pro-privacy, and how much each counts. */
-export function VotesPanel({ dataset: d, onChange }: PanelProps) {
+export function VotesPanel({
+  dataset: d,
+  onChange,
+  stageRollcall,
+  stageBillSupport,
+}: PanelProps) {
   const [voteId, setVoteId] = useState("");
   const [recordMember, setRecordMember] = useState("");
   const [outcome, setOutcome] = useState<Outcome>("Yes");
   const [party, setParty] = useState<Party>("Democratic");
+  const [previousPosition, setPreviousPosition] =
+    useState<Pick<Vote, "id" | "reformVote" | "weight">>();
+  const [retiringId, setRetiringId] = useState("");
   const topicsId = useId();
   const v = d.votes.find((v) => v.id === voteId) ?? d.votes[0];
   const vote = (patch: Partial<Vote>) =>
@@ -30,6 +52,42 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
       ...d,
       votes: d.votes.map((x) => (x.id === v?.id ? { ...x, ...patch } : x)),
     });
+  const changeScoring = (
+    patch: Partial<Pick<Vote, "reformVote" | "weight">>,
+  ) => {
+    if (!v) return;
+    setPreviousPosition((previous) =>
+      previous?.id === v.id
+        ? previous
+        : { id: v.id, reformVote: v.reformVote, weight: v.weight },
+    );
+    vote(patch);
+  };
+  const beforeEdit =
+    v &&
+    previousPosition?.id === v.id &&
+    (previousPosition.weight !== v.weight ||
+      previousPosition.reformVote !== v.reformVote)
+      ? {
+          ...d,
+          votes: d.votes.map((item) =>
+            item.id === v.id ? { ...item, ...previousPosition } : item,
+          ),
+        }
+      : null;
+  const afterRetirement =
+    v && retiringId === v.id
+      ? {
+          ...d,
+          votes: d.votes.filter((item) => item.id !== v.id),
+          voteSeries: removeVoteFromSeries(d.voteSeries, v.id),
+          records: d.records.filter((record) => record.voteId !== v.id),
+        }
+      : null;
+  const addImported = (draft: Dataset, id: string) => {
+    onChange(draft);
+    setVoteId(id);
+  };
   const topics = [...new Set(d.votes.map((x) => x.topic).filter(Boolean))];
   const custom = v ? importanceLabel(v.weight) === null : false;
   return (
@@ -38,6 +96,22 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
         Pick a vote to review. For each one, say which side protects privacy and
         how much it should count toward grades.
       </p>
+      {stageRollcall && (
+        <EvidenceIntake
+          mode="rollcall"
+          dataset={d}
+          load={stageRollcall}
+          onAdd={addImported}
+        />
+      )}
+      {stageBillSupport && (
+        <EvidenceIntake
+          mode="bill"
+          dataset={d}
+          load={stageBillSupport}
+          onAdd={addImported}
+        />
+      )}
       <div className="editor-row">
         <label>
           Choose a vote
@@ -82,6 +156,7 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
           Add a vote
         </button>
       </div>
+      <VoteSeriesEditor dataset={d} onChange={onChange} />
       {!v && <p>No votes yet. Use “Add a vote” to start.</p>}
       {v && (
         <article className="editor-card">
@@ -89,14 +164,22 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
             {v.bill || "New vote"} – {v.title || "untitled"}
           </h2>
           <ChoiceButtons
-            label="Is a YES vote good for privacy?"
-            help="Members who vote this way are counted as voting for privacy."
+            label={
+              v.kind === "cosponsorship"
+                ? "Does supporting this bill count for reform?"
+                : "Is a YES vote good for privacy?"
+            }
+            help={
+              v.kind === "cosponsorship"
+                ? "Only sponsors and current cosponsors receive a record."
+                : "Members who vote this way are counted as voting for privacy."
+            }
             options={[
               { label: "Yes", value: "Yes" as const },
               { label: "No", value: "No" as const },
             ]}
             value={v.reformVote}
-            onChange={(reformVote) => vote({ reformVote })}
+            onChange={(reformVote) => changeScoring({ reformVote })}
           />
           <ChoiceButtons
             label="How much should it count?"
@@ -106,13 +189,16 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
               value: o.value as number,
             }))}
             value={v.weight}
-            onChange={(weight) => vote({ weight })}
+            onChange={(weight) => changeScoring({ weight })}
             extra={
               custom ? (
                 <span className="gr-custom">Custom ({v.weight})</span>
               ) : null
             }
           />
+          {beforeEdit && !afterRetirement && (
+            <ItemImpactPreview before={beforeEdit} after={d} voteId={v.id} />
+          )}
           <div className="editor-grid">
             <div>
               <label>
@@ -144,6 +230,15 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
               <input
                 value={v.title}
                 onChange={(e) => vote({ title: e.target.value })}
+              />
+            </label>
+            <label>
+              Common name (optional)
+              <input
+                value={v.commonName ?? ""}
+                onChange={(e) =>
+                  vote({ commonName: e.target.value || undefined })
+                }
               />
             </label>
             <label>
@@ -290,14 +385,20 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
             >
               Save this legislator's vote
             </button>
-            <div className="editor-scroll">
-              <table aria-label="Recorded votes">
+            <div
+              className="editor-scroll"
+              role="region"
+              aria-label="Recorded votes"
+              tabIndex={0}
+            >
+              <table>
+                <caption>Recorded votes</caption>
                 <thead>
                   <tr>
-                    <th>Legislator</th>
-                    <th>Vote</th>
-                    <th>Party then</th>
-                    <th>
+                    <th scope="col">Legislator</th>
+                    <th scope="col">Vote</th>
+                    <th scope="col">Party then</th>
+                    <th scope="col">
                       <span className="sr-only">Actions</span>
                     </th>
                   </tr>
@@ -356,24 +457,38 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
               </table>
             </div>
           </details>
-          <button
-            type="button"
-            className="editor-danger"
-            onClick={() => {
-              onChange({
-                ...d,
-                votes: d.votes.filter((x) => x.id !== v.id),
-                records: d.records.filter((r) => r.voteId !== v.id),
-              });
-              setVoteId("");
-            }}
-          >
-            Stop scoring this vote
-          </button>
-          <p className="gr-help">
-            Removes the vote and its recorded votes from this draft only.
-            Published versions are not changed.
-          </p>
+          {afterRetirement ? (
+            <section aria-label="Review retirement">
+              <p>
+                Retiring this item removes its records from the draft. Published
+                versions keep their records. Any series left with fewer than two
+                votes is removed from this draft.
+              </p>
+              <ItemImpactPreview
+                before={d}
+                after={afterRetirement}
+                voteId={v.id}
+              />
+              <button type="button" onClick={() => setRetiringId("")}>
+                Cancel retirement
+              </button>
+              <button
+                type="button"
+                className="editor-danger"
+                onClick={() => {
+                  onChange(afterRetirement);
+                  setRetiringId("");
+                  setVoteId("");
+                }}
+              >
+                Retire item from draft
+              </button>
+            </section>
+          ) : (
+            <button type="button" onClick={() => setRetiringId(v.id)}>
+              Preview retirement
+            </button>
+          )}
         </article>
       )}
     </div>
@@ -381,7 +496,11 @@ export function VotesPanel({ dataset: d, onChange }: PanelProps) {
 }
 
 /** Tab 2: legislators' names, party, committees and photos. */
-export function LegislatorsPanel({ dataset: d, onChange }: PanelProps) {
+export function LegislatorsPanel({
+  dataset: d,
+  onChange,
+  loadRoster,
+}: PanelProps) {
   const [memberId, setMemberId] = useState("");
   const m = d.members.find((m) => m.id === memberId) ?? d.members[0];
   const member = (patch: Partial<Member>) =>
@@ -395,6 +514,9 @@ export function LegislatorsPanel({ dataset: d, onChange }: PanelProps) {
         Correct how a legislator appears on the scorecard. Their votes are
         edited under “Votes to score”.
       </p>
+      {loadRoster && (
+        <RosterIntake dataset={d} load={loadRoster} onApply={onChange} />
+      )}
       <label>
         Choose a legislator
         <select
@@ -440,6 +562,24 @@ export function LegislatorsPanel({ dataset: d, onChange }: PanelProps) {
                 {partyOptions}
               </select>
             </label>
+            <div>
+              <label>
+                Official office contact page
+                <input
+                  type="url"
+                  value={m.contactUrl ?? ""}
+                  onChange={(event) =>
+                    member({
+                      contactUrl: event.target.value.trim() || undefined,
+                    })
+                  }
+                />
+              </label>
+              <p className="gr-help">
+                Use the office’s official HTTPS contact page. Leave blank to
+                omit the link from the profile.
+              </p>
+            </div>
             <label>
               Committees (one per line)
               <textarea

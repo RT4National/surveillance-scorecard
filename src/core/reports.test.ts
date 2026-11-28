@@ -154,13 +154,25 @@ describe("reproducible reports", () => {
       records: [
         ...data.records,
         // Not serving on this date; partyAtVote is a placeholder with no source.
-        { memberId: "c", voteId: "v1", outcome: "Not eligible", partyAtVote: "Democratic" },
+        {
+          memberId: "c",
+          voteId: "v1",
+          outcome: "Not eligible",
+          partyAtVote: "Democratic",
+        },
       ],
     };
-    const notEligible = { kind: "intersection", conditions: [{ voteId: "v1", outcome: "Not eligible" }] };
-    expect(executeReport(withIneligible, notEligible).rows.map((r) => r.member.id)).toEqual(["c"]);
+    const notEligible = {
+      kind: "intersection",
+      conditions: [{ voteId: "v1", outcome: "Not eligible" }],
+    };
+    expect(
+      executeReport(withIneligible, notEligible).rows.map((r) => r.member.id),
+    ).toEqual(["c"]);
     for (const context of ["same", "opposing"] as const)
-      expect(executeReport(withIneligible, { ...notEligible, context }).rows).toEqual([]);
+      expect(
+        executeReport(withIneligible, { ...notEligible, context }).rows,
+      ).toEqual([]);
     expect(membershipSemantics).toMatch(/Not eligible records .*excluded/);
   });
   it("validates arbitrary external queries and prevents false empty results from mismatched scope", () => {
@@ -195,6 +207,14 @@ describe("reproducible reports", () => {
     expect(svg).toContain("&lt;Bob &amp; Co&gt;");
     expect(svg).not.toContain("<Bob");
   });
+  it("labels real records with placeholder directions accurately in exports", () => {
+    const preview = { ...data, sources: [{} as Dataset["sources"][number]] };
+    for (const exportReport of [reportCsv, reportTsv, reportSvg]) {
+      const output = exportReport(preview, { kind: "ranking" }, "pub1");
+      expect(output).toContain("UNREVIEWED VOTE DIRECTIONS");
+      expect(output).not.toContain("FICTIONAL DEMO");
+    }
+  });
   it("separates rubric changes from evidence corrections", () => {
     const updated = structuredClone(data);
     updated.rubric.minVotes = 3;
@@ -212,6 +232,20 @@ describe("reproducible reports", () => {
       publicationChanges(publication(data), publication(updated), "a")
         .evidenceChanged,
     ).toBe(true);
+  });
+  it("classifies publication changes and identifies updated evidence rows", () => {
+    const updated = structuredClone(data);
+    updated.rubric.minVotes = 3;
+    updated.asOf = "2026-10-01";
+    updated.records[0].outcome = "No";
+    const result = publicationChanges(
+      publication(data),
+      publication(updated),
+      "a",
+    );
+    expect(result.reasons).toEqual(["rubric", "evidence", "cutoff"]);
+    expect(result.changedVoteIds).toEqual([updated.records[0].voteId]);
+    expect(result.gradeChanged).toBe(true);
   });
   it("never scores records after the publication cutoff even when a future end date is supplied", () => {
     const result = executeReport(

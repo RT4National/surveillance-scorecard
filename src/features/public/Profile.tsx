@@ -2,6 +2,8 @@ import { Fragment, useState } from "react";
 import { ArrowLeft, Copy, History, Info, ShieldCheck } from "lucide-react";
 import { useScorecard } from "../../data/context";
 import { defaultGradeBands, groupLabels } from "../../core/scoring";
+import { frozenShareScore } from "../../core/publication";
+import { usePublicationChange } from "./GradeChange";
 import { bandRange, profileSummary } from "../../core/summary";
 import {
   bandLine,
@@ -15,7 +17,7 @@ import {
   scoredNoun,
   splitCopy,
 } from "../../core/copy";
-import { publicationUrl } from "../../core/navigation";
+import { compareMemberUrl, publicationUrl } from "../../core/navigation";
 import type { Member } from "../../core/types";
 import { CorrectionForm } from ".";
 import { base, fictional, fmt, query, readAsOf } from "./helpers";
@@ -23,6 +25,7 @@ import { Avatar, Grade } from "./member";
 import { splitDisplay } from "./split";
 import { EvidenceRow, type EvidenceEntry } from "./EvidenceRow";
 import { Legend } from "./Legend";
+import { SharePanel } from "./SharePanel";
 import { useChangeClass, useSeenOnce } from "./motion";
 
 const newestFirst = (list: EvidenceEntry[]) =>
@@ -42,7 +45,8 @@ export function Profile({
   /** The Worker already painted the split bars at full width: do not grow them again. */
   serverPainted?: boolean;
 }) {
-  const { score, dataset, rubric, publication, linkId } = useScorecard();
+  const { score, dataset, rubric, publication, publications, linkId } =
+    useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
   // Motion (src/styles/motion.css): the grade and evidence restart a short change animation on each
   // timeline date change, and the split bars grow once on first view. Values are final either way.
@@ -80,12 +84,35 @@ export function Profile({
   // Only the publication's own as-of date carries the frozen published grade.
   const frozen = (d: string) =>
     Boolean(publication?.scoring) && d === dataset.asOf;
+  const frozenGrade = frozenShareScore(publication, member.id)?.grade;
+  const reasons = publications?.find(
+    (entry) => entry.id === publication?.id,
+  )?.changeReasons;
+  const publicationChange = usePublicationChange({
+    memberId: member.id,
+    grade: asOf === dataset.asOf ? frozenGrade : undefined,
+    publicationId: publication?.id,
+    previousId: publication?.previousId,
+    records:
+      !reasons || reasons.includes("correction") ? dataset.records : undefined,
+    votes: dataset.votes,
+  });
   const noun = scoredNoun(hasCosponsorships(dataset.votes));
   const count = (n: number) => `${n} ${n === 1 ? noun.slice(0, -1) : noun}`;
-  // Evidence filter from the split chips. A side shows only items scored on that side.
-  const [side, setSide] = useState<"all" | "own" | "other">("all");
+  const [side, setSide] = useState<"all" | "own" | "other" | "unaligned">(
+    "all",
+  );
+  const filter =
+    split.kind === "not-applicable" && (side === "own" || side === "other")
+      ? "all"
+      : side;
   const shownEvidence = s.evidence.filter(
-    (e) => side === "all" || (e.scored && e.ownParty === (side === "own")),
+    (e) =>
+      filter === "all" ||
+      (e.scored &&
+        (filter === "unaligned"
+          ? !e.aligned
+          : e.ownParty === (filter === "own"))),
   );
   const unscored = shownEvidence.filter((e) => !e.scored);
   const row = (e: EvidenceEntry) => (
@@ -146,6 +173,9 @@ export function Profile({
               : ""}
           </p>
         </div>
+        <a className="button" href={compareMemberUrl(member.id, linkId)}>
+          {profileCopy.compare}
+        </a>
         <button
           className="button"
           onClick={() => void copy(window.location.href)}
@@ -153,6 +183,12 @@ export function Profile({
           <Copy size={15} /> {profileCopy.copyLink}
         </button>
       </div>
+      <SharePanel
+        member={member}
+        publication={publication}
+        publications={publications}
+        copy={copy}
+      />
       <div className="profile-layout">
         <aside className="profile-sidebar">
           <div className={`profile-grade ${changeClass}`.trim()}>
@@ -163,6 +199,11 @@ export function Profile({
                 : profileCopy.alignment(fmt(s.value))}
             </h2>
           </div>
+          {publicationChange?.type === "grade" && (
+            <p>
+              <a href={publicationChange.href}>{publicationChange.label}</a>
+            </p>
+          )}
           <ul className="headline-lines">
             <li>
               {headlineCopy.aligned(
@@ -262,12 +303,17 @@ export function Profile({
                     ["all", splitCopy.chipAll, null],
                     ["own", splitCopy.chipOwn, s.ownCount],
                     ["other", splitCopy.chipOther, s.otherCount],
+                    [
+                      "unaligned",
+                      splitCopy.chipUnaligned,
+                      summary.scored - summary.aligned,
+                    ],
                   ] as const
                 ).map(([value, label, n]) => (
                   <button
                     type="button"
                     key={value}
-                    aria-pressed={side === value}
+                    aria-pressed={filter === value}
                     onClick={() => setSide(value)}
                   >
                     {label}
@@ -326,6 +372,28 @@ export function Profile({
                 {scoredLabel(s, dataset.votes)}
               </span>
             </div>
+            {split.kind === "not-applicable" && (
+              <div
+                className="split-chips"
+                role="group"
+                aria-label={splitCopy.chipsLabel}
+              >
+                <button
+                  type="button"
+                  aria-pressed={filter === "all"}
+                  onClick={() => setSide("all")}
+                >
+                  {splitCopy.chipAll}
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={filter === "unaligned"}
+                  onClick={() => setSide("unaligned")}
+                >
+                  {splitCopy.chipUnaligned} · {summary.scored - summary.aligned}
+                </button>
+              </div>
+            )}
             <div className={`evidence-lists ${changeClass}`.trim()}>
               <div className="evidence-scored">
                 {newestFirst(shownEvidence.filter((e) => e.scored)).map(row)}
@@ -338,7 +406,15 @@ export function Profile({
               )}
             </div>
             {!s.evidence.length && <p>No evidence before this date.</p>}
+            {s.evidence.length > 0 && !shownEvidence.length && (
+              <p>No actions match this filter.</p>
+            )}
             <Legend />
+            {publicationChange?.type === "evidence" && (
+              <p>
+                <a href={publicationChange.href}>{publicationChange.label}</a>
+              </p>
+            )}
             <p className="footnote">
               {dataset.demo
                 ? fictional(dataset)

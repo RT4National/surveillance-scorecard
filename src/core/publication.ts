@@ -1,4 +1,6 @@
-import type { Member, RecordEntry, Rubric, Vote } from "./types";
+import type { ChangelogReason } from "./changelog";
+import type { ReuseLicenceId } from "./dataExports";
+import type { Member, RecordEntry, Rubric, Vote, VoteSeries } from "./types";
 import { publicationNumberLabel } from "./copy";
 import type { scoreMember } from "./scoring";
 
@@ -26,6 +28,8 @@ export interface Dataset {
   demo: boolean;
   members: Member[];
   votes: Vote[];
+  voteSeries?: VoteSeries[];
+  reuseLicence?: ReuseLicenceId;
   records: RecordEntry[];
   rubric: Rubric;
   sources: SourceCapture[];
@@ -57,14 +61,11 @@ export interface PublicationSummary {
   createdAt: string;
   summary: string;
   previousId: string | null;
+  changeReasons?: ChangelogReason[];
+  sequence?: number;
 }
 
-/**
- * Human label for a publication: its 1-based position in the chain of `previousId`
- * links, e.g. "Publication 12". Stable for a given list and unchanged when newer
- * publications are added. Null when the list is missing or the chain does not reach
- * its first publication (unknown id, list cut off), so callers fall back to the date.
- */
+/** Stable publication ordinal. Legacy lists fall back to the parent chain. */
 export function publicationLabel(
   list: PublicationSummary[] | null | undefined,
   id: string,
@@ -73,6 +74,12 @@ export function publicationLabel(
   const byId = new Map(list.map((p) => [p.id, p]));
   let current = byId.get(id);
   if (!current) return null;
+  if (
+    typeof current.sequence === "number" &&
+    Number.isSafeInteger(current.sequence) &&
+    current.sequence > 0
+  )
+    return publicationNumberLabel(current.sequence);
   let position = 1;
   while (current.previousId !== null) {
     current = byId.get(current.previousId);
@@ -82,11 +89,28 @@ export function publicationLabel(
   return publicationNumberLabel(position);
 }
 
-/** The latest publication when `id` is an older one in the list, else null. */
-export function newerPublication(
-  list: PublicationSummary[] | null | undefined,
-  id: string,
-): PublicationSummary | null {
-  const index = list ? list.findIndex((p) => p.id === id) : -1;
-  return list && index > 0 ? list[0] : null;
+export const isPreviewDataset = (dataset: Pick<Dataset, "id" | "demo">) =>
+  dataset.demo || /^placeholder-/i.test(dataset.id);
+
+/** Public grade claims and corrections require a reviewed, frozen publication. */
+export function isPublishable(
+  publication: Publication | null | undefined,
+): publication is Publication & { scoring: PublicationScoring } {
+  return Boolean(
+    publication?.scoring &&
+    !isPreviewDataset(publication.dataset) &&
+    !/^placeholder-/i.test(publication.id),
+  );
+}
+
+export function frozenShareScore(
+  publication: Publication | null | undefined,
+  memberId: string,
+) {
+  if (
+    !isPublishable(publication) ||
+    !Object.hasOwn(publication.scoring.scores, memberId)
+  )
+    return undefined;
+  return publication.scoring.scores[memberId];
 }

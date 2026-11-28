@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  newerPublication,
-  publicationLabel,
-  type PublicationSummary,
-} from "./publication";
+import { publicationLabel, type PublicationSummary } from "./publication";
 
 const row = (id: string, previousId: string | null): PublicationSummary => ({
   id,
@@ -24,7 +20,9 @@ describe("publicationLabel", () => {
     expect(publicationLabel([...list].reverse(), "b")).toBe("Publication 2");
   });
   it("does not change an older label when a newer publication is added", () => {
-    expect(publicationLabel([row("d", "c"), ...list], "b")).toBe("Publication 2");
+    expect(publicationLabel([row("d", "c"), ...list], "b")).toBe(
+      "Publication 2",
+    );
   });
   it("gives no label when the list is missing or the chain is cut off", () => {
     expect(publicationLabel(null, "a")).toBeNull();
@@ -37,13 +35,13 @@ describe("publicationLabel", () => {
   });
 });
 
-describe("newerPublication", () => {
-  it("returns the latest when the id is older", () => {
-    expect(newerPublication(list, "a")?.id).toBe("c");
-  });
-  it("returns null for the latest, an unknown id, or no list", () => {
-    expect(newerPublication(list, "c")).toBeNull();
-    expect(newerPublication(list, "zzz")).toBeNull();
-    expect(newerPublication(null, "a")).toBeNull();
-  });
+it("keeps unique sequence labels when a publication branches after rollback", () => {
+  const rolledBack = [
+    { ...row("d", "a"), sequence: 4 },
+    { ...row("c", "b"), sequence: 3 },
+    { ...row("b", "a"), sequence: 2 },
+    { ...row("a", null), sequence: 1 },
+  ];
+  expect(publicationLabel(rolledBack, "d")).toBe("Publication 4");
+  expect(publicationLabel(rolledBack, "b")).toBe("Publication 2");
 });

@@ -1,4 +1,17 @@
-import type { Dataset, Publication } from "../src/core/publication";
+import { isChangelogReason, publicationReasons } from "../src/core/changelog";
+import {
+  authorizeRosterCapture,
+  normalizeRosterCapture,
+} from "./roster-intake";
+import { stageBillSupport } from "./bill-intake";
+import { stageOfficialRollcall } from "./rollcall-intake";
+import { memberShareMeta } from "./meta";
+import {
+  isPreviewDataset,
+  isPublishable,
+  type Dataset,
+  type Publication,
+} from "../src/core/publication";
 import { authenticate, HttpError, type Actor } from "./auth";
 import { digest, validateDataset } from "./validation";
 import { research } from "./ai";
@@ -92,10 +105,21 @@ interface Draft {
   base_publication_id: string | null;
 }
 /** Open staging access may not save or publish anything presented as real scoring. */
-function checkDataset(dataset: unknown, actor: Actor) {
+function containsUnreviewedEvidence(dataset: unknown) {
+  return (
+    (dataset as Partial<Dataset> | null)?.demo !== false ||
+    /\bplaceholder-/i.test(JSON.stringify(dataset))
+  );
+}
+function checkDataset(dataset: unknown, actor: Actor, env: Env) {
   const errors = validateDataset(dataset);
   if (actor.open && (dataset as { demo?: unknown } | null)?.demo !== true)
     errors.push("Open staging access can only save demo datasets");
+  if (
+    env.DEPLOYMENT_TIER === "production" &&
+    containsUnreviewedEvidence(dataset)
+  )
+    errors.push("Production requires reviewed evidence without placeholders.");
   return errors;
 }
 async function buildPublication(
@@ -192,10 +216,30 @@ async function api(
   if (method === "POST" && path === "/research") return research(request, env);
   if (method === "GET" && path === "/publications") {
     const rows = await env.DB.prepare(
-      "SELECT id,json_extract(snapshot,'$.createdAt') AS createdAt,json_extract(snapshot,'$.summary') AS summary,json_extract(snapshot,'$.digest') AS digest,COALESCE(json_extract(snapshot,'$.datasetId'),json_extract(snapshot,'$.dataset.id')) AS datasetId,json_extract(snapshot,'$.previousId') AS previousId FROM publications ORDER BY created_at DESC LIMIT 200",
+      `WITH recent AS (
+        SELECT id,ROW_NUMBER() OVER (ORDER BY rowid) AS sequence
+        FROM publications ORDER BY sequence DESC LIMIT 200
+      )
+      SELECT publications.id,json_extract(snapshot,'$.createdAt') AS createdAt,
+        json_extract(snapshot,'$.summary') AS summary,json_extract(snapshot,'$.digest') AS digest,
+        COALESCE(json_extract(snapshot,'$.datasetId'),json_extract(snapshot,'$.dataset.id')) AS datasetId,
+        json_extract(snapshot,'$.previousId') AS previousId,change_reasons,sequence,
+        (SELECT publication_id FROM current_publication WHERE singleton=1) AS currentId
+      FROM recent JOIN publications ON publications.id=recent.id ORDER BY sequence DESC`,
     ).all();
     return json({
-      publications: rows.results,
+      currentId: rows.results[0]?.currentId ?? null,
+      publications: rows.results.map(
+        ({ currentId: _currentId, change_reasons, ...row }) => {
+          const reasons: unknown =
+            typeof change_reasons === "string"
+              ? JSON.parse(change_reasons)
+              : null;
+          return Array.isArray(reasons) && reasons.every(isChangelogReason)
+            ? { ...row, changeReasons: reasons }
+            : row;
+        },
+      ),
     });
   }
   const slim =
@@ -265,6 +309,11 @@ async function api(
         400,
         "A publication and explanation (10–4000 characters) are required",
       );
+    if (!isPublishable(p))
+      throw new HttpError(
+        403,
+        "Corrections are available for frozen published evidence.",
+      );
     const memberId = typeof b.memberId === "string" ? b.memberId : undefined;
     const voteId = typeof b.voteId === "string" ? b.voteId : undefined;
     if (
@@ -308,10 +357,63 @@ async function api(
       .run();
     return json({ id }, 201);
   }
+  if (path === "/ingestion/roster" && method === "POST") {
+    const { ROSTER_INGESTION_TOKEN } = env as Env & {
+      ROSTER_INGESTION_TOKEN?: string;
+    };
+    await authorizeRosterCapture(request, ROSTER_INGESTION_TOKEN);
+    const capture = await body(request, 1_500_000);
+    const roster = await normalizeRosterCapture(capture);
+    // Keep the original source pages with their normalized roster. Separate rows
+    // keep each payload within the database's per-row limit.
+    const [result] = await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO staged_roster(singleton,captured_at,roster) VALUES(1,?,?)
+         ON CONFLICT(singleton) DO UPDATE SET captured_at=excluded.captured_at,roster=excluded.roster
+         WHERE excluded.captured_at > staged_roster.captured_at`,
+      ).bind(roster.asOf, JSON.stringify(roster)),
+      env.DB.prepare(
+        `INSERT INTO staged_roster_capture(singleton,captured_at,capture) VALUES(1,?,?)
+         ON CONFLICT(singleton) DO UPDATE SET captured_at=excluded.captured_at,capture=excluded.capture
+         WHERE excluded.captured_at > staged_roster_capture.captured_at`,
+      ).bind(
+        roster.asOf,
+        JSON.stringify({ asOf: roster.asOf, pages: capture.pages }),
+      ),
+    ]);
+    return json({ capturedAt: roster.asOf, stored: result.meta.changes === 1 });
+  }
   if (!path.startsWith("/staff/"))
     throw new HttpError(404, "API route not found");
+  if (env.DEPLOYMENT_TIER === "production" && env.STAFF_OPEN_STAGING === "true")
+    throw new HttpError(503, "Open staff mode is unavailable in production.");
   const actor = await authenticate(request, env);
   if (path === "/staff/session" && method === "GET") return json(actor);
+  if (path === "/staff/stage/rollcall" && method === "POST") {
+    if (actor.open)
+      throw new HttpError(403, "Official imports require a staff sign-in.");
+    const input = await body(request, 4096);
+    const { SENATE_LIS_CROSSWALK } = env as Env & {
+      SENATE_LIS_CROSSWALK?: string;
+    };
+    return json(await stageOfficialRollcall(input.url, SENATE_LIS_CROSSWALK));
+  }
+  if (path === "/staff/stage/bill-support" && method === "POST") {
+    if (actor.open)
+      throw new HttpError(403, "Official imports require a staff sign-in.");
+    const input = await body(request, 4096);
+    const { CONGRESS_API_KEY } = env as Env & { CONGRESS_API_KEY?: string };
+    return json(await stageBillSupport(input, CONGRESS_API_KEY));
+  }
+  if (path === "/staff/stage/roster" && method === "GET") {
+    if (actor.open)
+      throw new HttpError(403, "Official imports require a staff sign-in.");
+    const row = await env.DB.prepare(
+      "SELECT roster FROM staged_roster WHERE singleton=1",
+    ).first<{ roster: string }>();
+    if (!row) throw new HttpError(404, "No scheduled roster capture is ready.");
+    return json(JSON.parse(row.roster));
+  }
   if (path === "/staff/status" && method === "GET") {
     const p = await publication(env);
     const pointer = await env.DB.prepare(
@@ -381,7 +483,7 @@ async function api(
     );
   if (path === "/staff/drafts" && method === "POST") {
     const b = await body(request);
-    const errors = checkDataset(b.dataset, actor);
+    const errors = checkDataset(b.dataset, actor, env);
     if (errors.length)
       return json({ error: "Dataset validation failed", errors }, 422);
     if (
@@ -467,7 +569,7 @@ async function api(
         throw new HttpError(409, "Published drafts cannot be edited");
       if (b.basePublicationId !== d.base_publication_id)
         throw new HttpError(409, "Draft base changed; reload");
-      const errors = checkDataset(b.dataset, actor);
+      const errors = checkDataset(b.dataset, actor, env);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
       if (
@@ -503,7 +605,7 @@ async function api(
       if (d.author === actor.email)
         throw new HttpError(403, "A second person must review");
       const dataset = await decodeStoredJson<Dataset>(d.dataset);
-      const errors = checkDataset(dataset, actor);
+      const errors = checkDataset(dataset, actor, env);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
       try {
@@ -545,9 +647,15 @@ async function api(
       if (d.status !== "review" || !d.reviewer)
         throw new HttpError(409, "Review required");
       const dataset = await decodeStoredJson<Dataset>(d.dataset);
-      const errors = checkDataset(dataset, actor);
+      const errors = checkDataset(dataset, actor, env);
       if (errors.length)
         return json({ error: "Dataset validation failed", errors }, 422);
+      const previous = d.base_publication_id
+        ? await publication(env, d.base_publication_id)
+        : null;
+      if (d.base_publication_id && !previous)
+        throw new HttpError(409, "Base publication is unavailable.");
+      const reasons = publicationReasons(previous?.dataset ?? null, dataset);
       const p = await buildPublication(
         dataset,
         d.summary,
@@ -556,13 +664,14 @@ async function api(
       );
       const serialized = await storePublication(p);
       const r = await env.DB.prepare(
-        "INSERT INTO publications(id,draft_id,snapshot,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM drafts WHERE id=? AND version=? AND status='review') AND EXISTS(SELECT 1 FROM current_publication WHERE publication_id IS ?)",
+        "INSERT INTO publications(id,draft_id,snapshot,created_at,change_reasons) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM drafts WHERE id=? AND version=? AND status='review') AND EXISTS(SELECT 1 FROM current_publication WHERE publication_id IS ?)",
       )
         .bind(
           p.id,
           d.id,
           serialized,
           p.createdAt,
+          JSON.stringify(reasons),
           d.id,
           d.version,
           p.previousId,
@@ -577,9 +686,12 @@ async function api(
     if (actor.role !== "publisher")
       throw new HttpError(403, "Publisher role required");
     const b = await body(request, 20_000);
+    const target =
+      typeof b.publicationId === "string"
+        ? await publication(env, b.publicationId)
+        : null;
     if (
-      typeof b.publicationId !== "string" ||
-      !(await publication(env, b.publicationId)) ||
+      !target ||
       typeof b.reason !== "string" ||
       b.reason.trim().length < 10 ||
       b.reason.length > 4000 ||
@@ -589,10 +701,18 @@ async function api(
         400,
         "Existing publication, pointer revision and reason required",
       );
+    if (
+      env.DEPLOYMENT_TIER === "production" &&
+      containsUnreviewedEvidence(target.dataset)
+    )
+      throw new HttpError(
+        422,
+        "Production requires reviewed evidence without placeholders.",
+      );
     const r = await env.DB.prepare(
       "UPDATE current_publication SET publication_id=?,revision=revision+1,actor=?,reason=? WHERE singleton=1 AND revision=?",
     )
-      .bind(b.publicationId, actor.email, b.reason, b.revision)
+      .bind(target.id, actor.email, b.reason, b.revision)
       .run();
     if (!r.meta.changes)
       throw new HttpError(409, "Publication pointer changed");
@@ -683,21 +803,21 @@ async function renderPage(
   let description =
     "Evidence, methodology, and voting records behind surveillance reform grades.";
   const requested = url.searchParams.get("publication");
-  const demo = p?.dataset.demo ?? true;
+  const demo = !p || isPreviewDataset(p.dataset) || /^placeholder-/i.test(p.id);
   const data: PageData = {
     dataset: p?.dataset ?? demoDataset,
     publication: p ?? undefined,
     linkId: requested && p ? p.id : undefined,
   };
+  let share: ReturnType<typeof memberShareMeta>;
   let root: { kind: string; render: () => string } | undefined;
   if (route.name === "home")
     root = { kind: "home", render: () => renderHome(data) };
   if (route.name === "member") {
     const m = data.dataset.members.find((m) => m.id === route.id);
     if (!m) return notFound(request, env, url);
-    // TODO(phase 6, items 6.1-6.2): grade in the title and og tags and a per-member og:image,
-    // only for non-demo publications with frozen scoring. Not before.
-    title = `${m.name} — Surveillance reform scorecard`;
+    share = memberShareMeta(p, m, url);
+    title = share?.title ?? `${m.name} — Surveillance reform scorecard`;
     description = `Explore ${m.name}’s surveillance reform record and the evidence behind the grade.`;
     root = { kind: "member", render: () => renderMember(data, m) };
   } else if (route.name === "legislation" && route.voteId !== undefined) {
@@ -729,6 +849,7 @@ async function renderPage(
     noindex: demo || route.name === "editor",
     canonical: canonical.href,
     root: rootHtml,
+    share,
     publication: p ? { id: p.id, digest: p.digest } : undefined,
   });
 }
@@ -750,6 +871,7 @@ async function shell(
     description: string;
     noindex: boolean;
     canonical?: string;
+    share?: ReturnType<typeof memberShareMeta>;
     status?: number;
     /** Escaped markup for #root (worker/render.ts) and the page kind for data-server. */
     root?: { kind: string; html: string };
@@ -760,7 +882,7 @@ async function shell(
     publication?: { id: string; digest: string };
   },
 ): Promise<Response> {
-  const { title, description, noindex, canonical } = meta;
+  const { title, description, noindex, canonical, share } = meta;
   const index = new URL(url);
   index.pathname = "/index.html";
   index.search = "";
@@ -787,7 +909,12 @@ async function shell(
     (canonical
       ? `<meta property="og:url" content="${escape(canonical)}">`
       : "") +
-    `<meta property="og:type" content="website">`;
+    `<meta property="og:type" content="website">` +
+    (share
+      ? `<meta property="og:image" content="${escape(share.image)}">` +
+        `<meta property="og:image:alt" content="${escape(share.imageAlt)}">` +
+        '<meta name="twitter:card" content="summary_large_image">'
+      : "");
   return new HTMLRewriter()
     .on("title", {
       element(e) {

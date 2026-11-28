@@ -13,6 +13,7 @@
   --motion-fast: 150ms;
   --motion-base: 200ms;
   --motion-slow: 300ms;
+  --motion-highlight: 1s;
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -70,6 +71,25 @@
   animation: motion-filter-b var(--motion-fast) var(--motion-ease);
 }
 
+/* A temporary cue alongside the archive's persistent Changed marker. */
+@keyframes motion-archive-change {
+  from {
+    opacity: 1;
+  }
+}
+.motion-archive-change {
+  position: relative;
+}
+.motion-archive-change::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+  opacity: 0;
+  animation: motion-archive-change var(--motion-highlight) var(--motion-ease);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -78,4 +98,25 @@
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Snapshot only matching rows. Exit snapshots are visual only, never interactive. */
+:root.motion-filter-transition {
+  view-transition-name: none;
+}
+.motion-filter-transition [data-filter-list] [data-filter-row] {
+  view-transition-name: match-element;
+}
+:root.motion-filter-transition::view-transition {
+  pointer-events: none;
+}
+:root.motion-filter-transition::view-transition-group(*) {
+  animation-duration: var(--motion-fast);
+  animation-timing-function: var(--motion-ease);
+}
+:root.motion-filter-transition::view-transition-old(*):only-child {
+  animation: motion-filter-a var(--motion-fast) var(--motion-ease) reverse both;
+}
+:root.motion-filter-transition::view-transition-new(*):only-child {
+  animation: motion-filter-a var(--motion-fast) var(--motion-ease) both;
 }

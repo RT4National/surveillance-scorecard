@@ -37,7 +37,7 @@ const summaries = [
 ];
 
 /** `list` null makes the publication list request fail. */
-async function show(pinned: string, list: unknown) {
+async function show(pinned: string, list: unknown, currentId = "p3") {
   window.history.replaceState(null, "", `/scorecard/?publication=${pinned}`);
   vi.stubGlobal("crypto", webcrypto);
   vi.stubGlobal(
@@ -45,6 +45,7 @@ async function show(pinned: string, list: unknown) {
     vi.fn(
       fakeApi([publication(pinned)], {
         list: list as PublicationSummary[] | null,
+        currentId,
       }),
     ),
   );
@@ -93,18 +94,37 @@ describe("newer-publication notice", () => {
   it("shows for an older pinned publication and links to the latest", async () => {
     await show("p1", summaries);
     const link = await screen.findByRole("link", {
-      name: "Newer version available",
+      name: "View current publication",
     });
     expect(link.getAttribute("href")).toBe("/scorecard/?publication=p3");
+  });
+  it("does not promote a newer archive over the rolled-back current publication", async () => {
+    await show("p1", summaries, "p1");
+    await screen.findByText(/Publication 1/);
+    expect(
+      screen.queryByRole("link", { name: "View current publication" }),
+    ).toBeNull();
+  });
+  it("names the live publication and links to its comparison after rollback", async () => {
+    await show("p3", summaries, "p1");
+    const link = await screen.findByRole("link", { name: "See what changed" });
+    expect(link.getAttribute("href")).toBe(
+      "/scorecard/archive?publication=p1#publication-p3",
+    );
+    expect(screen.getByText(/Publication 1 is current/)).toBeTruthy();
   });
   it("shows nothing on the latest publication", async () => {
     await show("p3", summaries);
     await screen.findByText(/Publication 3/);
-    expect(screen.queryByText("Newer version available")).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: "View current publication" }),
+    ).toBeNull();
   });
   it("shows nothing when the list failed to load", async () => {
     await show("p1", null);
     await screen.findByText(/Updated 7 Sep 2026/);
-    expect(screen.queryByText("Newer version available")).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: "View current publication" }),
+    ).toBeNull();
   });
 });

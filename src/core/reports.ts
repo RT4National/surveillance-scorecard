@@ -1,4 +1,5 @@
-import { percentLabel } from "./copy";
+import { exportAttribution } from "./dataExports";
+import { fictional, percentLabel } from "./copy";
 import type { Dataset, Publication } from "./publication";
 import type { Outcome, Party, Status, Member } from "./types";
 import { scoreMember } from "./scoring";
@@ -209,13 +210,21 @@ export function executeReport(
     ],
   };
 }
-function reportRows(data: Dataset, input: unknown, publicationId?: string) {
+function reportRows(
+  data: Dataset,
+  input: unknown,
+  publicationId?: string,
+  origin?: string,
+) {
+  const attribution = exportAttribution(data, publicationId, origin);
   const result = executeReport(data, input);
   return [
     [
-      data.demo
+      fictional(data)
         ? "FICTIONAL DEMO — not congressional evidence"
-        : "Surveillance reform scorecard",
+        : data.demo
+          ? "UNREVIEWED VOTE DIRECTIONS — real congressional records"
+          : "Surveillance reform scorecard",
     ],
     [
       "Dataset",
@@ -227,6 +236,8 @@ function reportRows(data: Dataset, input: unknown, publicationId?: string) {
       "Rubric",
       data.rubric.version,
     ],
+    ["Licence", attribution.licence, attribution.licenceUrl ?? ""],
+    ["Citation", attribution.citation],
     ["Query", JSON.stringify(result.query)],
     ["Effective cutoff", result.cutoff],
     ["Coverage", data.coverage.join("; ")],
@@ -264,15 +275,17 @@ export function reportCsv(
   data: Dataset,
   input: unknown,
   publicationId?: string,
+  origin?: string,
 ) {
-  return toCsv(reportRows(data, input, publicationId));
+  return toCsv(reportRows(data, input, publicationId, origin));
 }
 export function reportTsv(
   data: Dataset,
   input: unknown,
   publicationId?: string,
+  origin?: string,
 ) {
-  return reportRows(data, input, publicationId)
+  return reportRows(data, input, publicationId, origin)
     .map((row) =>
       row
         .map((value) => {
@@ -354,10 +367,12 @@ export function reportSvg(
   data: Dataset,
   query: ReportQuery,
   publicationId?: string,
+  origin?: string,
 ) {
   const result = executeReport(data, query);
   const rows = result.rows.slice(0, 30);
   const metadata = {
+    ...exportAttribution(data, publicationId, origin),
     datasetId: data.id,
     publicationId: publicationId ?? null,
     demo: data.demo,
@@ -371,8 +386,17 @@ export function reportSvg(
     totalResults: result.rows.length,
     membershipSemantics,
   };
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="${205 + rows.length * 34}" role="img" aria-labelledby="title description"><title id="title">Surveillance reform alignment${data.demo ? " — demo, unreviewed placeholders" : ""}</title><desc id="description">${xml(`Published evidence through ${result.cutoff}. Showing ${rows.length} of ${result.rows.length} results. Bars range from 0 to 100 percent. Exact query and source URLs are embedded in metadata.`)}</desc><metadata>${xml(JSON.stringify(metadata))}</metadata><rect width="100%" height="100%" fill="#f7fafb"/><g font-family="sans-serif" fill="#2f3a42"><text x="24" y="32" font-size="22">Surveillance reform alignment${data.demo ? " — FICTIONAL DEMO" : ""}</text><text x="24" y="57" font-size="12">${xml(`Dataset ${data.id} | Publication ${publicationId ?? "unpublished"}`)}</text><text x="24" y="78" font-size="11">${xml(`Rubric ${data.rubric.version}; issue: ${query.topic ?? "all"}; dates: ${query.from ?? "earliest"}–${result.cutoff}; context: ${query.context ?? "all"}`)}</text><text x="280" y="98" font-size="10">0%</text><text x="653" y="98" font-size="10">100%</text>${rows.map((r, i) => `<text x="24" y="${131 + i * 34}" font-size="13">${xml(r.member.name)}</text><rect x="280" y="${116 + i * 34}" width="400" height="20" fill="#e6f2f6"/><rect x="280" y="${116 + i * 34}" width="${(r.score.value ?? 0) * 4}" height="20" fill="#17a1ce"/><text x="700" y="${131 + i * 34}" font-size="12">${r.score.value === null ? "Insufficient evidence" : percentLabel(r.score.value)} (${r.score.counted} votes)</text>`).join("")}<text x="24" y="${163 + rows.length * 34}" font-size="11">${xml(`Showing ${rows.length} of ${result.rows.length}. Exact query, rubric, and original sources embedded in SVG metadata.`)}</text></g></svg>`;
+  const heading = `Surveillance reform alignment${
+    fictional(data)
+      ? " — FICTIONAL DEMO"
+      : data.demo
+        ? " — UNREVIEWED VOTE DIRECTIONS"
+        : ""
+  }`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="${205 + rows.length * 34}" role="img" aria-labelledby="title description"><title id="title">${heading}</title><desc id="description">${xml(`Published evidence through ${result.cutoff}. Showing ${rows.length} of ${result.rows.length} results. Bars range from 0 to 100 percent. Exact query and source URLs are embedded in metadata.`)}</desc><metadata>${xml(JSON.stringify(metadata))}</metadata><rect width="100%" height="100%" fill="#f7fafb"/><g font-family="sans-serif" fill="#2f3a42"><text x="24" y="32" font-size="22">${heading}</text><text x="24" y="57" font-size="12">${xml(`Dataset ${data.id} | Publication ${publicationId ?? "unpublished"}`)}</text><text x="24" y="78" font-size="11">${xml(`Rubric ${data.rubric.version}; issue: ${query.topic ?? "all"}; dates: ${query.from ?? "earliest"}–${result.cutoff}; context: ${query.context ?? "all"}`)}</text><text x="280" y="98" font-size="10">0%</text><text x="653" y="98" font-size="10">100%</text>${rows.map((r, i) => `<text x="24" y="${131 + i * 34}" font-size="13">${xml(r.member.name)}</text><rect x="280" y="${116 + i * 34}" width="400" height="20" fill="#e6f2f6"/><rect x="280" y="${116 + i * 34}" width="${(r.score.value ?? 0) * 4}" height="20" fill="#17a1ce"/><text x="700" y="${131 + i * 34}" font-size="12">${r.score.value === null ? "Insufficient evidence" : percentLabel(r.score.value)} (${r.score.counted} votes)</text>`).join("")}<text x="24" y="${163 + rows.length * 34}" font-size="11">${xml(`Showing ${rows.length} of ${result.rows.length}. Exact query, rubric, and original sources embedded in SVG metadata.`)}</text></g></svg>`;
 }
+export type PublicationChangeReason = "rubric" | "evidence" | "cutoff";
+
 export function publicationChanges(
   before: Publication,
   after: Publication,
@@ -382,24 +406,43 @@ export function publicationChanges(
     b = after.dataset;
   const oldMember = a.members.find((m) => m.id === memberId),
     newMember = b.members.find((m) => m.id === memberId);
-  const relevant = (data: Dataset) =>
-    data.records
-      .filter((r) => r.memberId === memberId)
-      .map((r) => ({
-        record: r,
-        vote: data.votes.find((v) => v.id === r.voteId),
-      }))
-      .sort((x, y) => x.record.voteId.localeCompare(y.record.voteId));
+  const relevant = (data: Dataset) => {
+    const votes = new Map(data.votes.map((vote) => [vote.id, vote]));
+    return new Map(
+      data.records
+        .filter((record) => record.memberId === memberId)
+        .map((record) => [
+          record.voteId,
+          JSON.stringify({ record, vote: votes.get(record.voteId) }),
+        ]),
+    );
+  };
+  const previousEvidence = relevant(a);
+  const currentEvidence = relevant(b);
+  const changedVoteIds = [
+    ...new Set([...previousEvidence.keys(), ...currentEvidence.keys()]),
+  ]
+    .filter((id) => previousEvidence.get(id) !== currentEvidence.get(id))
+    .sort();
   const rubricChanged = JSON.stringify(a.rubric) !== JSON.stringify(b.rubric);
-  const evidenceChanged =
-    JSON.stringify(relevant(a)) !== JSON.stringify(relevant(b));
+  const evidenceChanged = changedVoteIds.length > 0;
+  const asOfChanged = a.asOf !== b.asOf;
+  const oldScore = oldMember ? publishedScore(before, oldMember) : null;
+  const newScore = newMember ? publishedScore(after, newMember) : null;
+  const reasons: PublicationChangeReason[] = [];
+  if (rubricChanged) reasons.push("rubric");
+  if (evidenceChanged) reasons.push("evidence");
+  if (asOfChanged) reasons.push("cutoff");
   return {
     rubricChanged,
     evidenceChanged,
-    asOfChanged: a.asOf !== b.asOf,
+    asOfChanged,
     memberChanged: JSON.stringify(oldMember) !== JSON.stringify(newMember),
-    before: oldMember ? publishedScore(before, oldMember) : null,
-    after: newMember ? publishedScore(after, newMember) : null,
+    before: oldScore,
+    after: newScore,
+    gradeChanged: oldScore?.grade !== newScore?.grade,
+    changedVoteIds,
+    reasons,
     explanation: [
       rubricChanged ? "The scoring methodology changed." : "",
       evidenceChanged

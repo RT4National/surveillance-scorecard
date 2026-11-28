@@ -137,6 +137,7 @@ export const splitCopy = {
   chipAll: "All",
   chipOwn: "Own-party president",
   chipOther: "Other-party president",
+  chipUnaligned: "Not aligned",
   sharedTopics: (n: number) => `Shared topics: ${n}`,
 } as const;
 
@@ -255,7 +256,6 @@ export function shortDate(value: string): string {
 export const updatedLabel = (date: string) => `Updated ${shortDate(date)}`;
 export const publicationNumberLabel = (n: number) => `Publication ${n}`;
 export const methodologyLinkLabel = "Methodology";
-export const newerVersionLabel = "Newer version available";
 
 /** One-line page heading above the finder. */
 export const heroCopy = {
@@ -290,6 +290,16 @@ export const browseAllLabel = (n: number) => `Browse all ${n}`;
 /** What the directory's roster columns mean. Methodology page only. */
 export const rosterNote =
   "Current party and chamber describe the roster in this publication, including the last recorded affiliation for former members. Historical date filters narrow vote evidence, not roster membership.";
+
+/**
+ * Demo datasets without sources are the fictional preview; others hold real records with placeholder
+ * scoring. Slim views (the publication index) carry `sourceCount` instead of the source captures.
+ */
+export const fictional = (dataset: {
+  demo: boolean;
+  sources: unknown[];
+  sourceCount?: number;
+}) => dataset.demo && !(dataset.sourceCount ?? dataset.sources.length);
 
 /** Site banner. Shown by the app and in the Worker's server-rendered first paint. */
 export const bannerCopy = {
@@ -327,6 +337,7 @@ export const profileCopy = {
     `${fictional ? "FICTIONAL LEGISLATOR" : "LEGISLATOR"} · ${status.toUpperCase()}`,
   alignment: (percent: string) => `${percent} reform alignment`,
   splitHeading: "Principles across presidencies",
+  compare: "Compare records",
   copyLink: "Copy profile link",
   memberships: "Committees & caucuses",
   noMemberships: "No current memberships listed",

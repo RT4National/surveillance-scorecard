@@ -13,6 +13,7 @@ export type Route =
   | { name: "legislation"; voteId?: string }
   | { name: "research" }
   | { name: "methodology" }
+  | { name: "methodologyLab" }
   | { name: "archive" }
   | { name: "editor" }
   | { name: "member"; id: string }
@@ -30,9 +31,11 @@ const staticRoutes: Record<string, StaticRouteName> = {
   research: "research",
   reports: "research",
   methodology: "methodology",
+  "methodology/lab": "methodologyLab",
   archive: "archive",
   archives: "archive",
   editor: "editor",
+  staff: "editor",
 };
 
 /** Retired paths and where they now live. Served as permanent redirects by the Worker. */
@@ -59,9 +62,10 @@ export function matchRoute(pathname: string): Route {
   const parts = segments(pathname);
   if (!parts) return { name: "notFound" };
   if (parts.length === 0) return { name: "home" };
-  if (parts.length === 1) {
-    const name = Object.hasOwn(staticRoutes, parts[0])
-      ? staticRoutes[parts[0]]
+  if (parts.length === 1 || parts.join("/") === "methodology/lab") {
+    const path = parts.join("/");
+    const name = Object.hasOwn(staticRoutes, path)
+      ? staticRoutes[path]
       : undefined;
     return name ? { name } : { name: "notFound" };
   }

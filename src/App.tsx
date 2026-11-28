@@ -1,3 +1,6 @@
+import { exportAttribution } from "./core/dataExports";
+import { SeriesTrends } from "./features/public/SeriesTrends";
+import { isPublishable } from "./core/publication";
 import {
   Fragment,
   useEffect,
@@ -48,7 +51,11 @@ import { Profile } from "./features/public/Profile";
 import { Finder } from "./features/public/Finder";
 import { Freshness } from "./features/public/Freshness";
 import { Avatar, Grade } from "./features/public/member";
-import { useFilterClass } from "./features/public/motion";
+import {
+  filterChange,
+  filterMotionLimit,
+  useFilterClass,
+} from "./features/public/motion";
 import {
   base,
   fictional,
@@ -65,6 +72,7 @@ import {
   writeState,
 } from "./features/public/helpers";
 import { EditorPage } from "./features/editor/EditorPage";
+import { Methodology } from "./features/public/Methodology";
 import { PolicyLab } from "./features/PolicyLab";
 import { toCsv } from "./core/research";
 import { evidenceLabel } from "./core/evidence";
@@ -110,6 +118,13 @@ function exportRows(
   asOf?: string,
   publication?: Publication,
 ) {
+  const attribution = exportAttribution(
+    dataset,
+    publication?.id,
+    location.origin,
+    "/scorecard/",
+    publication?.createdAt,
+  );
   const rubric = dataset.rubric;
   return [
     [
@@ -121,6 +136,8 @@ function exportRows(
     ],
     ["Dataset", dataset.id],
     ["Publication", publication?.id ?? "unpublished"],
+    ["Licence", attribution.licence, attribution.licenceUrl ?? ""],
+    ["Citation", attribution.citation],
     ["Scorer", publication?.scoring?.version ?? "legacy/recalculated"],
     ["Rubric", rubric.version],
     ["As of", asOf ?? dataset.asOf],
@@ -179,34 +196,50 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
   const firstUngraded = list.findIndex((m) => score(m, asOf).value === null);
   const ungradedCount = firstUngraded < 0 ? 0 : list.length - firstUngraded;
   return (
-    <div className="table-scroll">
-      <table className="member-table">
-        <thead>
-          <tr>
-            <th>Legislator</th>
-            <th>Current party / chamber</th>
-            <th>Grade</th>
-            <th>Reform alignment</th>
-            <th>Across administrations</th>
-            <th>
+    <div
+      className="table-scroll directory-table"
+      role="region"
+      aria-label="Legislator directory"
+      tabIndex={0}
+    >
+      <table className="member-table" role="table">
+        <caption className="sr-only">Legislator directory</caption>
+        <thead role="rowgroup">
+          <tr role="row">
+            <th scope="col" role="columnheader">
+              Legislator
+            </th>
+            <th scope="col" role="columnheader">
+              Current party / chamber
+            </th>
+            <th scope="col" role="columnheader">
+              Grade
+            </th>
+            <th scope="col" role="columnheader">
+              Reform alignment
+            </th>
+            <th scope="col" role="columnheader">
+              Across administrations
+            </th>
+            <th scope="col" role="columnheader">
               <span className="sr-only">Profile</span>
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {list.map((m, i) => {
             const s = score(m, asOf);
             return (
               <Fragment key={m.id}>
                 {i === firstUngraded && (
-                  <tr className="not-graded-group">
-                    <th scope="rowgroup" colSpan={6}>
+                  <tr className="not-graded-group" role="row">
+                    <th role="rowheader" scope="rowgroup" colSpan={6}>
                       {notGradedGroupLabel(ungradedCount)}
                     </th>
                   </tr>
                 )}
-                <tr>
-                  <td>
+                <tr role="row" data-filter-row="">
+                  <td role="cell">
                     <a
                       className="member-name"
                       href={publicationUrl(
@@ -227,15 +260,15 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                       </span>
                     </a>
                   </td>
-                  <td>
+                  <td role="cell">
                     <span className={`party-dot ${m.party.toLowerCase()}`} />
                     {m.party}
                     <small>{m.chamber}</small>
                   </td>
-                  <td>
+                  <td role="cell">
                     <Grade member={m} asOf={asOf} />
                   </td>
-                  <td>
+                  <td role="cell">
                     {s.value === null ? (
                       <span className="alignment-text not-graded">
                         {notGraded}
@@ -249,7 +282,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                       </>
                     )}
                   </td>
-                  <td>
+                  <td role="cell">
                     <span className={`category ${s.group}`}>
                       <span />
                       {s.group === "reformer"
@@ -267,7 +300,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                         : "Both contexts reviewed"}
                     </small>
                   </td>
-                  <td>
+                  <td role="cell">
                     <a
                       className="icon-link"
                       href={publicationUrl(
@@ -396,7 +429,9 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
   };
   function changeFilter(key: keyof Filters, value: string) {
     const next = { ...filters, [key]: value };
-    setFilters(next);
+    filterChange(() =>
+      setFilters((previous) => ({ ...previous, [key]: value })),
+    );
     if (key === "state" || key === "q") {
       writeFragment(key, value);
       // A pick (or a clear) in the finder is remembered in this browser only.
@@ -420,7 +455,7 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
     writeFragment("browse", open ? "all" : "");
   }
   function reset() {
-    setFilters(defaults);
+    filterChange(() => setFilters(defaults));
     const p = query();
     Object.keys(defaults).forEach((key) => p.delete(key));
     window.history.replaceState(
@@ -463,6 +498,11 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
           />
         </div>
       )}
+      {!isFormer &&
+      isPublishable(publication) &&
+      dataset.seriesTrends?.length ? (
+        <SeriesTrends series={dataset.seriesTrends} publicationId={linkId} />
+      ) : null}
       <section
         className="container scorecard-section"
         aria-label="Explore legislators"
@@ -594,6 +634,8 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
           </section>
         );
       case "methodology":
+        return <Methodology dataset={dataset} publication={publication} />;
+      case "methodologyLab":
         return <PolicyLab dataset={dataset} />;
       case "editor":
         return <EditorPage dataset={dataset} />;
@@ -992,7 +1034,12 @@ function Directory({
               </button>
             </div>
           </div>
-          <div className={`directory-results ${resultsMotion}`.trim()}>
+          <div
+            className={`directory-results ${resultsMotion}`.trim()}
+            data-filter-list={
+              filtered.length <= filterMotionLimit ? "" : undefined
+            }
+          >
             <MemberTable list={filtered} asOf={date} />
           </div>
           <div className="table-footer">

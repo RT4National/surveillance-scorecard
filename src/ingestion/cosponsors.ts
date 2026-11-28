@@ -91,6 +91,12 @@ export function parseCosponsorPages(pages: readonly unknown[]): Sponsorship[] {
 
 export interface Supporter { memberId: string; role: 'sponsor' | 'cosponsor'; date: string; original: boolean; party: string }
 export type CosponsorshipVote = Pick<Vote, 'id' | 'kind' | 'chamber' | 'date' | 'bill' | 'source'> & { officialTitle: string };
+export type BillSupportStage = CosponsorshipVote & {
+  kind: 'cosponsorship';
+  records: RecordEntry[];
+  sources: SourceCapture[];
+  warnings: string[];
+};
 export function cosponsorshipItem(bill: BillInfo, cosponsors: readonly Sponsorship[], options: { signedBefore?: string }) {
   const id = `cosponsor-${bill.congress}-${bill.type}-${bill.number}`;
   if (options.signedBefore !== undefined) day(options.signedBefore);
@@ -118,8 +124,11 @@ export async function fetchBillSupport(id: BillId, options: { apiKey: string; fe
   if (!options.apiKey) throw new Error('Congress.gov API key required');
   const raw: { url: string; text: string }[] = [];
   const load = async (url: string) => {
-    const response = await get(url, { headers: { 'X-Api-Key': options.apiKey, Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(60_000) });
-    if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+    const response = await get(url, { headers: { 'X-Api-Key': options.apiKey, Accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(60_000) });
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error(`HTTP ${response.status} for ${url}`);
+    }
     const text = await readSource(response, 5_000_000);
     raw.push({ url, text });
     return JSON.parse(text) as unknown;
@@ -128,6 +137,9 @@ export async function fetchBillSupport(id: BillId, options: { apiKey: string; fe
   const pages: unknown[] = [];
   for (let offset = 0; offset === 0 || offset < bill.countIncludingWithdrawn; offset += PAGE) pages.push(await load(cosponsorsApiUrl(id, offset)));
   const cosponsors = parseCosponsorPages(pages);
+  if (cosponsors.length !== bill.countIncludingWithdrawn || cosponsors.filter(c => !c.withdrawn).length !== bill.count)
+    throw new Error('Cosponsor list totals disagree with the bill');
+
   const sources: SourceCapture[] = await Promise.all(raw.map(r => capture(r.text, r.url, 'votes', retrievedAt)));
   return { bill, cosponsors, raw, sources };
 }

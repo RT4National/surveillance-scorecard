@@ -7,7 +7,11 @@
 // profile headline in the app, change it here too. Strings come from src/core/copy.ts.
 //
 // Every piece of data passes through escapeHtml. Nothing here reads request location data.
-import type { Dataset, Publication } from "../src/core/publication";
+import {
+  frozenShareScore,
+  type Dataset,
+  type Publication,
+} from "../src/core/publication";
 import type { Group, Member, RecordEntry } from "../src/core/types";
 import { publishedScore } from "../src/core/publication-scores";
 import {
@@ -15,7 +19,7 @@ import {
   groupLabels,
   scoreMember,
 } from "../src/core/scoring";
-import { publicationUrl } from "../src/core/navigation";
+import { compareMemberUrl, publicationUrl } from "../src/core/navigation";
 import { bandRange, profileSummary } from "../src/core/summary";
 import {
   bandLine,
@@ -324,6 +328,41 @@ export function renderMember(data: PageData, m: Member): string {
       : split.kind === "unproven"
         ? `<p class="split-counts"><strong>${e(split.counts)}</strong></p><p>${e(split.message)}</p>`
         : `<p>${e(split.message)}</p>`;
+  const publication = data.publication;
+  const frozen = frozenShareScore(publication, m.id);
+  const sourceLinks = new Map<string, string>();
+  if (frozen) {
+    for (const entry of s.evidence) {
+      const source = entry.vote.source;
+      if (entry.scored && source?.startsWith("https://"))
+        sourceLinks.set(source, `${entry.vote.bill} · ${entry.vote.date}`);
+    }
+    if (!sourceLinks.size) {
+      for (const capture of dataset.sources) {
+        if (capture.kind === "votes" && capture.url.startsWith("https://"))
+          sourceLinks.set(capture.url, capture.url);
+      }
+    }
+  }
+  const frozenSummary =
+    publication && frozen
+      ? `<details class="panel frozen-summary" data-frozen-summary><summary>Published grade and sources</summary><p>${e(m.name)} · ${e(
+          frozen.value === null
+            ? notGradedLabel(dataset.rubric.minVotes)
+            : `Grade ${frozen.grade}`,
+        )} · ${e(scoredLabel(s, dataset.votes))} · ${e(
+          `Publication ${publication.id} · ${publication.createdAt.slice(0, 10)}`,
+        )}</p>${
+          sourceLinks.size
+            ? `<ul>${[...sourceLinks]
+                .map(
+                  ([url, label]) =>
+                    `<li><a href="${e(url)}">${e(label)}</a></li>`,
+                )
+                .join("")}</ul>`
+            : ""
+        }</details>`
+      : "";
   const main = `<section class="container inner-page"><a class="back-link" href="${e(
     publicationUrl("/scorecard/", linkId),
   )}">${icons.arrowLeft} ${e(profileCopy.back)}</a><div class="profile-heading"><figure class="profile-portrait">${avatar(
@@ -332,7 +371,9 @@ export function renderMember(data: PageData, m: Member): string {
     profileCopy.eyebrow(fictional(dataset), m.status),
   )}</div><h1>${e(m.name)}</h1><p>${e(
     `${m.party} · ${m.state} · ${m.chamber}${m.district !== undefined ? `, District ${m.district}` : ""}`,
-  )}</p></div><button class="button">${icons.copy} ${e(
+  )}</p></div><a class="button" href="${e(compareMemberUrl(m.id, linkId))}">${e(
+    profileCopy.compare,
+  )}</a><button class="button">${icons.copy} ${e(
     profileCopy.copyLink,
   )}</button></div><div class="profile-layout"><aside class="profile-sidebar"><div class="profile-grade"><span class="grade ${gradeTone(
     s.grade,
@@ -360,6 +401,6 @@ export function renderMember(data: PageData, m: Member): string {
     fictional(dataset) ? profileCopy.demoRecord : profileCopy.verify,
   )}</p></aside><div class="profile-main"><div class="panel"><div class="section-heading"><h2>${e(
     profileCopy.splitHeading,
-  )}</h2></div><p class="muted">${e(splitCopy.meaning)}</p>${splitHtml}</div></div></div></section>`;
+  )}</h2></div><p class="muted">${e(splitCopy.meaning)}</p>${splitHtml}</div>${frozenSummary}</div></div></section>`;
   return chrome(data, main);
 }

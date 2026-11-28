@@ -141,14 +141,20 @@ export function PolicyLab({ dataset }: { dataset: Dataset }) {
                 <p>
                   {current.after.reason}. {current.after.topicCoverageWarning}
                 </p>
-                <div className="table-scroll">
+                <div
+                  className="table-scroll"
+                  role="region"
+                  aria-label="Weight and inclusion by action"
+                  tabIndex={0}
+                >
                   <table className="member-table">
+                    <caption>Weight and inclusion by action</caption>
                     <thead>
                       <tr>
-                        <th>Evidence</th>
-                        <th>Base weight</th>
-                        <th>Effective weight</th>
-                        <th>Included?</th>
+                        <th scope="col">Evidence</th>
+                        <th scope="col">Base weight</th>
+                        <th scope="col">Effective weight</th>
+                        <th scope="col">Included?</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -197,13 +203,19 @@ export function PolicyLab({ dataset }: { dataset: Dataset }) {
                 </small>
               </div>
             </div>
-            <div className="table-scroll">
+            <div
+              className="table-scroll"
+              role="region"
+              aria-label="Projected grade and category changes"
+              tabIndex={0}
+            >
               <table className="member-table">
+                <caption>Projected grade and category changes</caption>
                 <thead>
                   <tr>
-                    <th>Member</th>
-                    <th>Grade change</th>
-                    <th>Category change</th>
+                    <th scope="col">Member</th>
+                    <th scope="col">Grade change</th>
+                    <th scope="col">Category change</th>
                   </tr>
                 </thead>
                 <tbody>

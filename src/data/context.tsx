@@ -1,3 +1,4 @@
+import type { SeriesTrend } from "../core/seriesTrends";
 import {
   createContext,
   useContext,
@@ -43,7 +44,10 @@ export type ViewScore = Score & { actions?: ActionCounts };
  * votes and rubric from the index, plus one member's records on a profile; `sourceCount` stands
  * in for the source captures, which are not loaded there.
  */
-export type ViewDataset = Dataset & { sourceCount?: number };
+export type ViewDataset = Dataset & {
+  sourceCount?: number;
+  seriesTrends?: SeriesTrend[];
+};
 /**
  * How much of the publication is loaded. "index": the slim index (home, finder). "member": the
  * index plus one member's evidence (a profile). "full": the complete, verified publication.
@@ -66,6 +70,7 @@ type DataState = LoadState & {
   linkId?: string;
   /** Newest first. Null until loaded, and if the list request fails. */
   publications: PublicationSummary[] | null;
+  currentPublicationId?: string;
   score: (member: Member, asOf?: string) => ViewScore;
 };
 const demoScore = (member: Member, asOf = demoDataset.asOf) =>
@@ -224,6 +229,9 @@ export function slimView(
     rubric: index.dataset.rubric,
     coverage: index.dataset.coverage,
     votes: index.dataset.votes,
+    voteSeries: index.dataset.voteSeries,
+    reuseLicence: index.dataset.reuseLicence,
+    seriesTrends: index.dataset.seriesTrends,
     members: [...index.members, ...extra],
     records: slice?.records ?? [],
     affiliations: slice?.affiliations,
@@ -317,6 +325,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [publications, setPublications] = useState<PublicationSummary[] | null>(
     null,
   );
+  const [currentPublicationId, setCurrentPublicationId] = useState<string>();
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
@@ -392,10 +401,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
         void fetch("/scorecard/api/publications", { signal })
           .then(async (r) => (r.ok ? ((await r.json()) as unknown) : null))
           .then((body) => {
-            const rows = (body as { publications?: unknown } | null)
-              ?.publications;
-            if (!signal.aborted && Array.isArray(rows) && rows.every(isSummary))
+            const list = body as {
+              publications?: unknown;
+              currentId?: unknown;
+            } | null;
+            const rows = list?.publications;
+            if (
+              !signal.aborted &&
+              Array.isArray(rows) &&
+              rows.every(isSummary)
+            ) {
               setPublications(rows);
+              setCurrentPublicationId(
+                typeof list?.currentId === "string"
+                  ? list.currentId
+                  : undefined,
+              );
+            }
           })
           .catch(() => undefined);
       })
@@ -420,7 +442,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       : undefined;
   const score = useMemo(() => makeScorer(state), [state]);
   return (
-    <DataContext.Provider value={{ ...state, publications, linkId, score }}>
+    <DataContext.Provider
+      value={{ ...state, publications, currentPublicationId, linkId, score }}
+    >
       {children}
     </DataContext.Provider>
   );
