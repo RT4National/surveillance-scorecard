@@ -5,6 +5,12 @@ import { splitDisplay, voteCount, type SplitInput } from "./split";
 import { publicationUrl } from "../../core/navigation";
 import { evidenceLabel } from "../../core/evidence";
 import {
+  hasCosponsorships,
+  notGradedLabel,
+  scoredActionCounts,
+  scoredLabel,
+} from "../../core/copy";
+import {
   executeReport,
   publicationChanges,
   reportCsv,
@@ -391,11 +397,12 @@ export function ComparePage({ dataset, publication }: Props) {
             </p>
             <strong className="public-score">
               {score.value === null
-                ? "Insufficient evidence"
+                ? notGradedLabel(dataset.rubric.minVotes)
                 : `${score.grade} · ${Math.round(score.value)}%`}
             </strong>
             <p>
-              {score.counted} scored votes · minimum {dataset.rubric.minVotes}
+              {scoredLabel(score, dataset.votes)} · minimum{" "}
+              {dataset.rubric.minVotes}
             </p>
             <p>{score.reason}</p>
             {score.topicCoverageWarning && <p>{score.topicCoverageWarning}</p>}
@@ -940,7 +947,11 @@ export function ReportsPage({ dataset, publication }: Props) {
                   <th>Current chamber</th>
                   <th>Grade</th>
                   <th>Alignment</th>
-                  <th>Scored votes</th>
+                  <th>
+                    {hasCosponsorships(dataset.votes)
+                      ? "Scored actions (votes, cosponsorships)"
+                      : "Scored votes"}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -952,10 +963,17 @@ export function ReportsPage({ dataset, publication }: Props) {
                     <td>{score.grade}</td>
                     <td>
                       {score.value === null
-                        ? "Insufficient evidence"
+                        ? notGradedLabel(dataset.rubric.minVotes)
                         : `${Math.round(score.value)}%`}
                     </td>
-                    <td>{score.counted}</td>
+                    <td>
+                      {score.counted}
+                      {hasCosponsorships(dataset.votes) &&
+                        (({ votes, cosponsorships }) =>
+                          ` (${votes}, ${cosponsorships})`)(
+                          scoredActionCounts(score, dataset.votes),
+                        )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

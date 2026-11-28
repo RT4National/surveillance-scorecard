@@ -23,10 +23,35 @@
   --line: #dde3e5;
   --paper: #f7fafb;
 }
-.policy-field {display:flex;flex-direction:column;gap:7px;font-size:12px;margin:17px 0;}
-.policy-field input,.policy-field select,.policy-field textarea {border:1px solid #cad4d7;border-radius:4px;padding:9px;color:#17353f;background:#fffefa;width:100%;font:inherit;}
-.coverage-warning {display:flex;gap:8px;padding:12px;background:#f5e6dd;border:1px solid #e6cab9;border-radius:4px;}
-img.avatar {object-fit:cover;}
+.policy-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  margin: 17px 0;
+}
+.policy-field input,
+.policy-field select,
+.policy-field textarea {
+  border: 1px solid #cad4d7;
+  border-radius: 4px;
+  padding: 9px;
+  color: #17353f;
+  background: #fffefa;
+  width: 100%;
+  font: inherit;
+}
+.coverage-warning {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: #f5e6dd;
+  border: 1px solid #e6cab9;
+  border-radius: 4px;
+}
+img.avatar {
+  object-fit: cover;
+}
 * {
   box-sizing: border-box;
 }
@@ -980,6 +1005,16 @@ input[type="date"] {
 .timeline small {
   font-size: 12px;
 }
+.timeline .recalculated-tag {
+  border: 1px solid #698791;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  color: #3f5860;
+  background: #fff;
+}
 .evidence-row {
   display: flex;
   align-items: flex-start;
@@ -1752,7 +1787,27 @@ input[type="date"] {
     display: none;
   }
 }
-@media(max-width:700px){.site-header nav{height:auto;min-height:44px;flex-wrap:wrap;justify-content:flex-start;gap:0 22px;padding:4px 0}.site-header nav a{height:36px}.profile-main,.method-layout>div,.method-layout>aside{min-width:0}.grade-key{flex-wrap:wrap}}
+@media (max-width: 700px) {
+  .site-header nav {
+    height: auto;
+    min-height: 44px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0 22px;
+    padding: 4px 0;
+  }
+  .site-header nav a {
+    height: 36px;
+  }
+  .profile-main,
+  .method-layout > div,
+  .method-layout > aside {
+    min-width: 0;
+  }
+  .grade-key {
+    flex-wrap: wrap;
+  }
+}
 .profile-portrait {
   margin: 0;
   max-width: 120px;
@@ -1766,4 +1821,13 @@ input[type="date"] {
 }
 .profile-portrait figcaption a {
   text-decoration: underline;
+}
+.member-table tr.not-graded-group th {
+  background: #f1f4f5;
+  color: #4d5f66;
+  font-size: 12px;
+  text-align: left;
+}
+.alignment-text.not-graded {
+  white-space: normal;
 }
