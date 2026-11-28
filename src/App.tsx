@@ -9,7 +9,6 @@ import {
   FlaskConical,
   Info,
   Search,
-  ShieldCheck,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -17,6 +16,7 @@ import { useScorecard } from "./data/context";
 import { groupLabels, scoreMember } from "./core/scoring";
 import {
   hasCosponsorships,
+  heroCopy,
   notGradedGroupLabel,
   notGradedLabel,
   scoredLabel,
@@ -39,11 +39,13 @@ import {
   base,
   fictional,
   fmt,
-  migrateLegacyState,
+  migrateLegacyFragment,
   normalize,
   query,
   readAsOf,
+  readFragment,
   readState,
+  writeFragment,
   writeState,
 } from "./features/public/helpers";
 import { EditorPage } from "./features/editor/EditorPage";
@@ -69,6 +71,7 @@ const readFilters = (): Filters =>
       Object.entries(defaults).map(([k, v]) => [k, query().get(k) ?? v]),
     ),
     state: readState(),
+    q: readFragment("q"),
   }) as Filters;
 function saveFile(name: string, value: string, type: string) {
   const url = URL.createObjectURL(new Blob([value], { type }));
@@ -288,7 +291,7 @@ export default function App() {
   const [filters, setFilters] = useState<Filters>(readFilters);
   const [notice, setNotice] = useState("");
   useEffect(() => {
-    migrateLegacyState();
+    migrateLegacyFragment();
     const listener = () => setFilters(readFilters());
     window.addEventListener("popstate", listener);
     window.addEventListener("hashchange", listener);
@@ -315,13 +318,13 @@ export default function App() {
   function changeFilter(key: keyof Filters, value: string) {
     const next = { ...filters, [key]: value };
     setFilters(next);
-    if (key === "state") {
-      writeState(value);
+    if (key === "state" || key === "q") {
+      writeFragment(key, value);
       return;
     }
     const params = query();
     Object.entries(next).forEach(([k, v]) =>
-      k !== "state" && v && v !== defaults[k as keyof Filters]
+      k !== "state" && k !== "q" && v && v !== defaults[k as keyof Filters]
         ? params.set(k, v)
         : params.delete(k),
     );
@@ -341,6 +344,7 @@ export default function App() {
       window.location.pathname + (p.size ? `?${p}` : "") + window.location.hash,
     );
     writeState("");
+    writeFragment("q", "");
   }
   // A state that is not in the data (stale link) filters nothing and selects nothing.
   const knownState = members.some((m) => m.state === filters.state)
@@ -369,67 +373,20 @@ export default function App() {
   );
   const directoryPage = (
     <>
+      <section className="hero-line container">
+        <h1>{isFormer ? heroCopy.former : heroCopy.home}</h1>
+      </section>
       {!isFormer && (
         <div className="container finder-wrap">
           <Finder
             state={effectiveFilters.state}
             onState={(s) => changeFilter("state", s)}
+            name={filters.q}
+            onName={(q) => changeFilter("q", q)}
             level={2}
           />
         </div>
       )}
-      <section className="hero container">
-        <div className="hero-copy">
-          <div className="eyebrow">
-            <span /> THE SURVEILLANCE SCORECARD
-          </div>
-          <h1>
-            {isFormer ? (
-              <>
-                The record.
-                <br />
-                <em>Over time.</em>
-              </>
-            ) : (
-              <>
-                Privacy is a right.
-                <br />
-                <em>Who votes like it?</em>
-              </>
-            )}
-          </h1>
-          <p>
-            {isFormer
-              ? "Explore former members and revisit the evidence available at a moment in time."
-              : "Follow the votes. Understand the record. See who protects your privacy—and whose principles change with the presidency."}
-          </p>
-          <a
-            className="text-link"
-            href={publicationUrl(`${base}/methodology`, publication?.id)}
-          >
-            Every grade has a paper trail <ArrowRight size={16} />
-          </a>
-        </div>
-        <aside className="hero-note">
-          <div className="note-top">
-            <ShieldCheck size={23} />
-            <span>PRINCIPLES OVER PARTY</span>
-          </div>
-          <h2>
-            A voting record.
-            <br />
-            Not a campaign promise.
-          </h2>
-          <p>
-            We look at actions across administrations to see where support for
-            surveillance reform holds up.
-          </p>
-          <div className="note-foot">
-            <span className="tiny-line" /> Transparent scores. Accountable
-            power.
-          </div>
-        </aside>
-      </section>
       <section
         className="container scorecard-section"
         aria-label="Explore legislators"
@@ -521,6 +478,8 @@ export default function App() {
             <Finder
               state={effectiveFilters.state}
               onState={(s) => changeFilter("state", s)}
+              name={filters.q}
+              onName={(q) => changeFilter("q", q)}
               level={1}
             />
           </section>
@@ -806,16 +765,18 @@ function Directory({
           date filters narrow vote evidence, not roster membership.
         </p>
         <div className="filter-bar">
-          <label className="search-box">
-            <Search size={18} />
-            <span className="sr-only">Search legislators</span>
-            <input
-              type="search"
-              placeholder="Search by name or state…"
-              value={filters.q}
-              onChange={(e) => setFilter("q", e.target.value)}
-            />
-          </label>
+          {archive && (
+            <label className="search-box">
+              <Search size={18} />
+              <span className="sr-only">Search legislators</span>
+              <input
+                type="search"
+                placeholder="Search by name or state…"
+                value={filters.q}
+                onChange={(e) => setFilter("q", e.target.value)}
+              />
+            </label>
+          )}
           <Select
             label="Current chamber"
             value={filters.chamber}

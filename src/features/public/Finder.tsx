@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId } from "react";
 import { useScorecard } from "../../data/context";
 import { publicationUrl } from "../../core/navigation";
 import {
@@ -62,23 +62,28 @@ function Group({ label, list }: { label: string; list: Member[] }) {
 export function Finder({
   state,
   onState,
+  name,
+  onName,
   level,
 }: {
   state: string;
   onState: (state: string) => void;
+  name: string;
+  onName: (name: string) => void;
   level: 1 | 2;
 }) {
   const { members } = useScorecard();
-  const [name, setName] = useState("");
   const id = useId();
   const active = members.filter((m) => m.status === "active");
   const states = [...new Set(active.map((m) => m.state))].sort();
   const chosen = states.includes(state) ? state : "";
-  const list = chosen ? delegation(members, chosen) : [];
   const terms = normalize(name).split(/\s+/).filter(Boolean);
-  const matches = terms.length
+  const named = (m: Member) =>
+    terms.every((t) => normalize(m.name).includes(t));
+  const list = chosen ? delegation(members, chosen).filter(named) : [];
+  const matches = terms.length && !chosen
     ? active
-        .filter((m) => terms.every((t) => normalize(m.name).includes(t)))
+        .filter(named)
         .sort((a, b) => a.name.localeCompare(b.name))
     : [];
   const Heading = level === 1 ? "h1" : "h2";
@@ -102,7 +107,7 @@ export function Finder({
             placeholder={finderCopy.namePlaceholder}
             autoComplete="off"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => onName(e.target.value)}
           />
         </label>
       </div>
@@ -113,7 +118,7 @@ export function Finder({
           {finderCopy.houseLink}
         </a>
       </p>
-      {terms.length > 0 && (
+      {terms.length > 0 && !chosen && (
         <>
           <h3>
             {finderHeading(finderCopy.matches, matches.length)}

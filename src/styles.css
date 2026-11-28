@@ -1832,6 +1832,20 @@ input[type="date"] {
   white-space: normal;
 }
 
+/* One-line page heading above the finder. */
+.hero-line {
+  padding-top: 28px;
+}
+.hero-line h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.hero-line + .finder-wrap {
+  padding-top: 16px;
+}
+
 /* Finder: state picker, name search, delegation list. */
 .finder-wrap {
   padding-top: 28px;

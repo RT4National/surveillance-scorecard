@@ -23,20 +23,24 @@ export const normalize = (s: string) =>
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
 /**
- * The chosen state lives in the URL fragment (`#state=CA`), never in the query string:
- * fragments are not sent to the server, query strings are logged by the Worker.
- * An old `?state=` link is still read, then rewritten by `migrateLegacyState`.
+ * The chosen state and the name search live in the URL fragment (`#state=CA&q=smith`),
+ * never in the query string: fragments are not sent to the server, query strings are
+ * logged by the Worker. Old `?state=` and `?q=` links are still read, then rewritten
+ * by `migrateLegacyFragment`.
  */
-export const readState = () =>
-  new URLSearchParams(window.location.hash.slice(1)).get("state") ??
-  query().get("state") ??
+export type FragmentKey = "state" | "q";
+const fragmentKeys: FragmentKey[] = ["state", "q"];
+export const readFragment = (key: FragmentKey) =>
+  new URLSearchParams(window.location.hash.slice(1)).get(key) ??
+  query().get(key) ??
   "";
-export function writeState(state: string) {
+export const readState = () => readFragment("state");
+export function writeFragment(key: FragmentKey, value: string) {
   const hash = new URLSearchParams(window.location.hash.slice(1));
-  if (state) hash.set("state", state);
-  else hash.delete("state");
+  if (value) hash.set(key, value);
+  else hash.delete(key);
   const search = query();
-  search.delete("state");
+  search.delete(key);
   const fragment = hash.toString();
   window.history.replaceState(
     null,
@@ -46,8 +50,10 @@ export function writeState(state: string) {
       (fragment ? `#${fragment}` : ""),
   );
 }
-export function migrateLegacyState() {
-  if (query().has("state")) writeState(readState());
+export const writeState = (state: string) => writeFragment("state", state);
+export function migrateLegacyFragment() {
+  for (const key of fragmentKeys)
+    if (query().has(key)) writeFragment(key, readFragment(key));
 }
 /** A state's current members: senators first, then the House by district. */
 export function delegation<

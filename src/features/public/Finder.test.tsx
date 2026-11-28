@@ -112,15 +112,47 @@ describe("finder on the home page", () => {
     const link = within(finder()).getByRole("link", { name: /house\.gov/i });
     expect(link.getAttribute("href")).toMatch(/^https:\/\/www\.house\.gov\//);
   });
-  it("searches active members by name without touching the URL", () => {
+  it("has one search box on the home page", () => {
+    render(<App />);
+    expect(screen.getAllByRole("searchbox")).toHaveLength(1);
+    expect(document.querySelector(".search-box")).toBeNull();
+  });
+  it("filters the finder and the directory from one name search, in the fragment", () => {
     render(<App />);
     fireEvent.change(within(finder()).getByLabelText("Name"), {
       target: { value: "senator one" },
     });
     expect(delegation()).toHaveLength(1);
     expect(delegation()[0]).toContain("Yan Senator One");
+    expect(directoryNames()).toEqual(["Yan Senator One"]);
     expect(window.location.search).toBe("");
-    expect(window.location.hash).toBe("");
+    expect(window.location.hash).toBe("#q=senator+one");
+  });
+  it("filters a chosen delegation by name", () => {
+    render(<App />);
+    pick("California");
+    fireEvent.change(within(finder()).getByLabelText("Name"), {
+      target: { value: "house three" },
+    });
+    expect(delegation()).toHaveLength(1);
+    expect(delegation()[0]).toContain("Zed House Three");
+    expect(window.location.hash).toBe("#state=California&q=house+three");
+    expect(window.location.search).toBe("");
+  });
+  it("moves an old ?q= link to the fragment and still filters", () => {
+    window.history.replaceState(null, "", "/scorecard/?q=senator%20one&sort=name");
+    render(<App />);
+    expect(directoryNames()).toEqual(["Yan Senator One"]);
+    expect(window.location.search).toBe("?sort=name");
+    expect(window.location.hash).toBe("#q=senator+one");
+  });
+  it("shows a one-line hero above the finder", () => {
+    render(<App />);
+    expect(document.querySelectorAll(".hero p")).toHaveLength(0);
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(
+      h1.compareDocumentPosition(finder()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });
 
