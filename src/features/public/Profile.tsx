@@ -22,6 +22,7 @@ import { CorrectionForm, Source } from ".";
 import { evidenceLabel } from "../../core/evidence";
 import { base, fictional, fmt, query, readAsOf } from "./helpers";
 import { Avatar, Grade } from "./member";
+import { splitDisplay } from "./split";
 
 /** How a member of each party is named in running text ("a Democrat at the time"). */
 const partyMember: Record<Party, string> = {
@@ -42,6 +43,7 @@ export function Profile({
   const { score, dataset, rubric, publication } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
   const s = score(member, asOf);
+  const split = splitDisplay(s, member.party);
   // The whole record, independent of the selected date, so the timeline and the date minimum stay stable.
   const dates = score(member).evidence.map((e) => e.vote.date);
   const earliest = dates.reduce<string | undefined>(
@@ -134,31 +136,44 @@ export function Profile({
               A strong score alone does not prove consistency. We compare the
               record in both party contexts.
             </p>
-            <div className="context-grid">
-              <div>
-                <span>President of their own party</span>
-                <strong>{fmt(s.ownScore)}</strong>
-                <small>
-                  {s.ownCount} {noun}
-                </small>
-              </div>
-              <div>
-                <span>President of another party</span>
-                <strong>{fmt(s.otherScore)}</strong>
-                <small>
-                  {s.otherCount} {noun}
-                </small>
-              </div>
-            </div>
-            {s.topicCoverageWarning && (
-              <p className="coverage-warning">
-                <Info size={15} /> {s.topicCoverageWarning}
-              </p>
+            {split.kind === "comparable" ? (
+              <>
+                <div className="context-grid">
+                  <div>
+                    <span>President of their own party</span>
+                    <strong>{split.own.percent}%</strong>
+                    <small>
+                      {split.own.count} {noun}
+                    </small>
+                  </div>
+                  <div>
+                    <span>President of another party</span>
+                    <strong>{split.other.percent}%</strong>
+                    <small>
+                      {split.other.count} {noun}
+                    </small>
+                  </div>
+                </div>
+                {s.topicCoverageWarning && (
+                  <p className="coverage-warning">
+                    <Info size={15} /> {s.topicCoverageWarning}
+                  </p>
+                )}
+                <p className="footnote">
+                  {s.sharedTopics.length} shared issue topics across party
+                  contexts. Different issue mixes can affect this comparison.
+                </p>
+              </>
+            ) : split.kind === "unproven" ? (
+              <>
+                <p className="split-counts">
+                  <strong>{split.counts}</strong>
+                </p>
+                <p>{split.message}</p>
+              </>
+            ) : (
+              <p>{split.message}</p>
             )}
-            <p className="footnote">
-              {s.sharedTopics.length} shared issue topics across party contexts.
-              Different issue mixes can affect this comparison.
-            </p>
           </div>
           <div className="panel">
             <div className="section-heading">

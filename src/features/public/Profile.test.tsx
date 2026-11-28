@@ -4,6 +4,7 @@ import { cleanup, render } from "@testing-library/react";
 import { members, records, votes } from "../../data/demo";
 import { scoreMember } from "../../core/scoring";
 import { Profile } from "./Profile";
+import { splitCopy } from "./split";
 
 // Lets a test swap in a different dataset or publication for the profile page.
 let override: ((real: any) => any) | null = null;
@@ -121,6 +122,45 @@ describe("profile evidence rows", () => {
       expect(text(row)).toContain("Source unavailable");
       expect(text(row)).not.toContain("Fictional source");
     }
+  });
+});
+
+describe("profile split panel", () => {
+  function split(memberIndex: number) {
+    render(<Profile member={members[memberIndex]} copy={vi.fn()} />);
+    const first = document.querySelector(".profile-main > .panel")!;
+    expect(text(first)).toContain("Principles across presidencies");
+    return first;
+  }
+
+  it("shows both percentages with N when the record is comparable", () => {
+    const panel = split(2);
+    const cells = [...panel.querySelectorAll(".context-grid > div")].map(
+      (cell) => [...cell.children].map(text),
+    );
+    expect(cells).toEqual([
+      ["President of their own party", "33%", "4 votes"],
+      ["President of another party", "100%", "2 votes"],
+    ]);
+  });
+
+  it("shows counts and no percentage when the scorer reports the record unproven", () => {
+    const panel = split(8);
+    expect(text(panel)).toContain(
+      "2 own-party · 0 other-party votes",
+    );
+    expect(text(panel)).toContain(splitCopy.notEnough);
+    expect(text(panel)).not.toContain("%");
+    expect(panel.querySelector(".context-grid")).toBeNull();
+    expect(text(panel)).not.toContain("Not yet rated");
+  });
+
+  it("shows the not-applicable sentence for an Independent", () => {
+    const panel = split(6);
+    expect(text(panel)).toContain(splitCopy.independent);
+    expect(text(panel)).not.toContain("%");
+    expect(panel.querySelector(".context-grid")).toBeNull();
+    expect(text(panel)).not.toContain("other-party votes");
   });
 });
 
