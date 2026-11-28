@@ -66,3 +66,20 @@ Chrome’s accessibility tree verifies exposed names and roles. The launch candi
 The local workerd/D1 capacity harness now seeds a separate fictional frozen snapshot to exercise the public profile read path. With 250 roll calls and 66,875 records, one local run returned 17,638 bytes of HTML including the frozen summary and source links. The first request took 109 ms and reported a memo miss. The repeat took 1 ms, reported a memo hit, and returned byte-identical HTML.
 
 These are local elapsed times from a synthetic fixture. The request harness does not expose isolate CPU time. Production CPU, edge latency, and the live share-unfurl and summary checks remain launch qualification items.
+
+## Rebuild plan and launch gates
+
+[PR #23](https://github.com/RT4National/surveillance-scorecard/pull/23) carries the implementation. This record distinguishes local checks from launch conditions.
+
+| Plan phase | Evidence and remaining work |
+| --- | --- |
+| 1–2. Labels, evidence and profiles | Scorer-backed evidence and split display, frozen and recalculated labels, report form, and profile filters are exercised by the profile and correction tests. Staff still need to approve final absence policy, band descriptions, minimums, group wording, independent treatment, and the correction service policy. |
+| 3. Finder and directory | Finder and Worker route tests cover state links and the former directory. Chrome exercised filtering, exit and entry animation, and reduced motion. The freshness tests and D1 rollback test verify the live publication pointer. |
+| 4. Vote pages | Vote page tests cover order, tallies, non-participation, search, and cosponsorship. Export tests cover licence, pinned citation, and an empty party field for out-of-office records. The new download controls need the approved data licence recorded in a publication. |
+| 5. Methodology and archives | Methodology, changelog, archive, and profile revision tests cover the current rules and older published evidence. The corrections review timeframe, retention period, public outcomes, and a reply-capable staff contact still need approval. |
+| 6. Sharing | Worker tests cover frozen share metadata, the summary, and cache reuse. Chrome downloaded a profile PNG. Production unfurls, the summary, and edge CPU still need live verification. |
+| 7. Compare and data | Compare and report tests cover pinned selection, saved queries, and publication data. An actual screen-reader check of the member picker is pending. The party and chamber median feature waits for the D7 decision. |
+| 8. Accessibility | Local Chrome passed the six reader journeys at 390 px and the sampled contrast checks above. Repeat with the reviewed launch candidate and a screen reader before launch. |
+| 9. Cutover | The staff-approved canonical domain, legacy scope, and one-time sheet capture are still required. Follow the launch runbook for the original domain, hosting, and old key. The code and route for the approved archive still need implementation after those decisions. |
+| 10. Staff intake | Local tests cover official roll-call and bill intake, per-item impact, and durable scheduled roster staging. Apply the D1 migrations, configure real Cloudflare Access identities and ingestion credentials, and run the workflow against the target environment. |
+| 11. Trends | Local tests cover curated series, counts, correct presidential context, and chart/CSV parity. Staff still need to approve the series and publish the reviewed vote directions before the trends appear publicly. |

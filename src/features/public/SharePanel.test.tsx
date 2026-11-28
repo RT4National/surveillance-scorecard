@@ -37,6 +37,19 @@ it("pins copied links and citations to the frozen publication", async () => {
     screen.queryByRole("link", { name: "Contact this office" }),
   ).toBeNull();
 
+  const contact = "https://example.house.gov/contact";
+  rerender(
+    <SharePanel
+      {...{ publication, publications, copy }}
+      member={{ ...member, contactUrl: contact }}
+    />,
+  );
+  expect(
+    screen
+      .getByRole("link", { name: "Contact this office" })
+      .getAttribute("href"),
+  ).toBe(contact);
+
   rerender(
     <SharePanel
       {...{ member, publications, copy }}

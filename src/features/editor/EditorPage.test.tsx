@@ -267,6 +267,17 @@ describe("Staff editing workflow", () => {
       },
     ]);
   });
+  it("lets staff add and clear the office contact link in a draft", async () => {
+    render(<EditorPage dataset={fixture} />);
+    await openDraft();
+    openTab("Legislators");
+    const field = screen.getByLabelText("Official office contact page");
+    const url = "https://example.house.gov/contact";
+    fireEvent.change(field, { target: { value: url } });
+    expect(raw().members[0].contactUrl).toBe(url);
+    fireEvent.change(field, { target: { value: "" } });
+    expect(raw().members[0].contactUrl).toBeUndefined();
+  });
   it("previews retirement and removes the item only after confirmation", async () => {
     render(<EditorPage dataset={fixture} />);
     await openDraft();

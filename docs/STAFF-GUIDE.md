@@ -25,6 +25,10 @@ Under **Legislators**, open **Scheduled roster update** and choose **Preview lat
 
 In **Votes to score**, open **Repeated-vote series**. Name the reform question, choose a chamber, select at least two roll calls, and explain why the questions are comparable. Save the series in the draft and send it through **Review & publish**. Start with the Section 702 reauthorization and its reform amendments once staff have reviewed which roll calls test the same question.
 
+## Add an official contact link
+
+Under **Legislators**, choose a member and enter the office’s official HTTPS contact page. The link appears in the share panel after the draft is reviewed and published. Clear the field if the scorecard should omit the link.
+
 ## Environment setup
 
 The intake endpoint requires real staff authentication. Configure Cloudflare Access and `STAFF_ROLES` before enabling the staff workflow. Never set `STAFF_OPEN_STAGING` in production.

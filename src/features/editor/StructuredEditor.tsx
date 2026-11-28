@@ -562,6 +562,24 @@ export function LegislatorsPanel({
                 {partyOptions}
               </select>
             </label>
+            <div>
+              <label>
+                Official office contact page
+                <input
+                  type="url"
+                  value={m.contactUrl ?? ""}
+                  onChange={(event) =>
+                    member({
+                      contactUrl: event.target.value.trim() || undefined,
+                    })
+                  }
+                />
+              </label>
+              <p className="gr-help">
+                Use the office’s official HTTPS contact page. Leave blank to
+                omit the link from the profile.
+              </p>
+            </div>
             <label>
               Committees (one per line)
               <textarea
