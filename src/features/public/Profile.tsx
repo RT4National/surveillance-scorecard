@@ -3,7 +3,7 @@ import { ArrowLeft, Copy, History, Info, ShieldCheck } from "lucide-react";
 import { useScorecard } from "../../data/context";
 import { defaultGradeBands, groupLabels } from "../../core/scoring";
 import { frozenShareScore } from "../../core/publication";
-import { GradeChange } from "./GradeChange";
+import { usePublicationChange } from "./GradeChange";
 import { bandRange, profileSummary } from "../../core/summary";
 import {
   bandLine,
@@ -85,6 +85,18 @@ export function Profile({
   const frozen = (d: string) =>
     Boolean(publication?.scoring) && d === dataset.asOf;
   const frozenGrade = frozenShareScore(publication, member.id)?.grade;
+  const reasons = publications?.find(
+    (entry) => entry.id === publication?.id,
+  )?.changeReasons;
+  const publicationChange = usePublicationChange({
+    memberId: member.id,
+    grade: asOf === dataset.asOf ? frozenGrade : undefined,
+    publicationId: publication?.id,
+    previousId: publication?.previousId,
+    records:
+      !reasons || reasons.includes("correction") ? dataset.records : undefined,
+    votes: dataset.votes,
+  });
   const noun = scoredNoun(hasCosponsorships(dataset.votes));
   const count = (n: number) => `${n} ${n === 1 ? noun.slice(0, -1) : noun}`;
   // Evidence filter from the split chips. A side shows only items scored on that side.
@@ -177,14 +189,10 @@ export function Profile({
                 : profileCopy.alignment(fmt(s.value))}
             </h2>
           </div>
-          {publication?.previousId && frozenGrade && asOf === dataset.asOf && (
-            <GradeChange
-              key={`${publication.id}/${member.id}`}
-              memberId={member.id}
-              grade={frozenGrade}
-              publicationId={publication.id}
-              previousId={publication.previousId}
-            />
+          {publicationChange?.type === "grade" && (
+            <p>
+              <a href={publicationChange.href}>{publicationChange.label}</a>
+            </p>
           )}
           <ul className="headline-lines">
             <li>
@@ -362,6 +370,11 @@ export function Profile({
             </div>
             {!s.evidence.length && <p>No evidence before this date.</p>}
             <Legend />
+            {publicationChange?.type === "evidence" && (
+              <p>
+                <a href={publicationChange.href}>{publicationChange.label}</a>
+              </p>
+            )}
             <p className="footnote">
               {dataset.demo
                 ? fictional(dataset)
