@@ -65,6 +65,7 @@ import {
   writeState,
 } from "./features/public/helpers";
 import { EditorPage } from "./features/editor/EditorPage";
+import { Methodology } from "./features/public/Methodology";
 import { PolicyLab } from "./features/PolicyLab";
 import { toCsv } from "./core/research";
 import { evidenceLabel } from "./core/evidence";
@@ -594,6 +595,8 @@ export default function App({ serverHtml }: { serverHtml?: string } = {}) {
           </section>
         );
       case "methodology":
+        return <Methodology dataset={dataset} publication={publication} />;
+      case "methodologyLab":
         return <PolicyLab dataset={dataset} />;
       case "editor":
         return <EditorPage dataset={dataset} />;
