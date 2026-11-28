@@ -18,6 +18,7 @@ import { groupLabels, scoreMember } from "./core/scoring";
 import type { Dataset, Publication } from "./core/publication";
 import { publishedScore } from "./core/publication-scores";
 import { publicationUrl } from "./core/navigation";
+import { matchRoute } from "./core/routes";
 import {
   LegislationPage,
   ComparePage,
@@ -27,7 +28,13 @@ import {
 } from "./features/public";
 import { Profile } from "./features/public/Profile";
 import { Avatar, Grade } from "./features/public/member";
-import { base, fictional, fmt, query, readAsOf } from "./features/public/helpers";
+import {
+  base,
+  fictional,
+  fmt,
+  query,
+  readAsOf,
+} from "./features/public/helpers";
 import { EditorPage } from "./features/editor/EditorPage";
 import { PolicyLab } from "./features/PolicyLab";
 import { toCsv } from "./core/research";
@@ -245,7 +252,8 @@ export default function App() {
     error: dataError,
   } = useScorecard();
   const path = window.location.pathname.replace(/\/$/, "");
-  const isArchive = path === `${base}/archive`;
+  const route = matchRoute(window.location.pathname);
+  const isFormer = route.name === "former";
   const [filters, setFilters] = useState<Filters>(readFilters);
   const [notice, setNotice] = useState("");
   useEffect(() => {
@@ -301,11 +309,175 @@ export default function App() {
     { href: `${base}/methodology`, title: "Methodology" },
     { href: `${base}/archive`, title: "Archive" },
   ];
-  const member = path.startsWith(`${base}/members/`)
-    ? members.find((m) => m.id === path.split("/").at(-1))
-    : undefined;
-  const knownPath =
-    path === base || nav.some((n) => n.href === path) || !!member;
+  const member =
+    route.name === "member"
+      ? members.find((m) => m.id === route.id)
+      : undefined;
+  const notFoundPage = (
+    <section className="container empty">
+      <h1>Page not found</h1>
+      <a href={publicationUrl(`${base}/`, publication?.id)}>
+        Back to the directory
+      </a>
+    </section>
+  );
+  const directoryPage = (
+    <>
+      <section className="hero container">
+        <div className="hero-copy">
+          <div className="eyebrow">
+            <span /> THE SURVEILLANCE SCORECARD
+          </div>
+          <h1>
+            {isFormer ? (
+              <>
+                The record.
+                <br />
+                <em>Over time.</em>
+              </>
+            ) : (
+              <>
+                Privacy is a right.
+                <br />
+                <em>Who votes like it?</em>
+              </>
+            )}
+          </h1>
+          <p>
+            {isFormer
+              ? "Explore former members and revisit the evidence available at a moment in time."
+              : "Follow the votes. Understand the record. See who protects your privacy—and whose principles change with the presidency."}
+          </p>
+          <a
+            className="text-link"
+            href={publicationUrl(`${base}/methodology`, publication?.id)}
+          >
+            Every grade has a paper trail <ArrowRight size={16} />
+          </a>
+        </div>
+        <aside className="hero-note">
+          <div className="note-top">
+            <ShieldCheck size={23} />
+            <span>PRINCIPLES OVER PARTY</span>
+          </div>
+          <h2>
+            A voting record.
+            <br />
+            Not a campaign promise.
+          </h2>
+          <p>
+            We look at actions across administrations to see where support for
+            surveillance reform holds up.
+          </p>
+          <div className="note-foot">
+            <span className="tiny-line" /> Transparent scores. Accountable
+            power.
+          </div>
+        </aside>
+      </section>
+      <section
+        className="container scorecard-section"
+        aria-label="Explore legislators"
+      >
+        <div className="section-heading">
+          <div>
+            <div className="eyebrow muted">
+              {isFormer ? "HISTORICAL EXPLORER" : "EXPLORE THE RECORD"}
+            </div>
+            <h2>
+              {isFormer ? "Former members" : "Find your legislators"}
+              <span className="count-pill">
+                {
+                  members.filter((m) =>
+                    isFormer ? m.status !== "active" : m.status === "active",
+                  ).length
+                }{" "}
+                {fictional(dataset) ? "demo members" : "members"}
+              </span>
+            </h2>
+          </div>
+          <a
+            className="subtle-link"
+            href={publicationUrl(
+              isFormer ? `${base}/` : `${base}/former`,
+              publication?.id,
+            )}
+          >
+            {isFormer ? "Current members" : "Former members"}{" "}
+            <ArrowRight size={16} />
+          </a>
+          <a
+            className="subtle-link"
+            href={publicationUrl(`${base}/research`, publication?.id)}
+          >
+            Build a research report <ArrowUpRight size={16} />
+          </a>
+        </div>
+        <Directory
+          filters={filters}
+          setFilter={changeFilter}
+          reset={reset}
+          archive={isFormer}
+          copy={copy}
+        />
+      </section>
+      <section className="container bottom-callout">
+        <div>
+          <span className="eyebrow">FOLLOW THE EVIDENCE</span>
+          <h2>A score should start a conversation.</h2>
+          <p>
+            Open a profile to see the votes, the calculation, and what the
+            record can—and cannot—tell us.
+          </p>
+        </div>
+        <a
+          className="button dark"
+          href={publicationUrl(`${base}/methodology`, publication?.id)}
+        >
+          Explore the methodology <ArrowRight size={16} />
+        </a>
+      </section>
+    </>
+  );
+  function routePage(): ReactNode {
+    switch (route.name) {
+      case "home":
+      case "former":
+        return directoryPage;
+      case "member":
+        return member ? <Profile member={member} copy={copy} /> : notFoundPage;
+      case "research":
+        return <ReportsPage dataset={dataset} publication={publication} />;
+      case "compare":
+        return <ComparePage dataset={dataset} publication={publication} />;
+      case "legislation":
+        return (
+          <LegislationPage
+            dataset={dataset}
+            publication={publication}
+            voteId={route.voteId}
+          />
+        );
+      case "archive":
+        return <ArchivesPage dataset={dataset} publication={publication} />;
+      case "find":
+        return (
+          <section className="container inner-page">
+            <RepresentativeFinder dataset={dataset} />
+          </section>
+        );
+      case "methodology":
+        return <PolicyLab dataset={dataset} />;
+      case "editor":
+        return <EditorPage dataset={dataset} />;
+      case "notFound":
+        return notFoundPage;
+      default: {
+        const unhandled: never = route;
+        return unhandled;
+      }
+    }
+  }
   return (
     <>
       <a className="skip-link" href="#main">
@@ -349,7 +521,7 @@ export default function App() {
                 href={publicationUrl(n.href, publication?.id)}
                 className={
                   n.href.replace(/\/$/, "") === path ||
-                  (n.title === "Scorecard" && !!member)
+                  (n.title === "Scorecard" && (!!member || isFormer))
                     ? "active"
                     : ""
                 }
@@ -364,7 +536,7 @@ export default function App() {
         </div>
       </header>
       <main id="main">
-        {path === `${base}/editor` ? (
+        {route.name === "editor" ? (
           <EditorPage dataset={dataset} />
         ) : dataState === "loading" ? (
           <section className="container empty" role="status">
@@ -378,144 +550,8 @@ export default function App() {
               Try again
             </button>
           </section>
-        ) : member ? (
-          <Profile member={member} copy={copy} />
-        ) : path === `${base}/research` || path === `${base}/reports` ? (
-          <ReportsPage dataset={dataset} publication={publication} />
-        ) : path === `${base}/compare` ? (
-          <ComparePage dataset={dataset} publication={publication} />
-        ) : path === `${base}/legislation` ||
-          path.startsWith(`${base}/legislation/`) ? (
-          <LegislationPage
-            dataset={dataset}
-            publication={publication}
-            voteId={path.split("/")[3]}
-          />
-        ) : path === `${base}/archive` || path === `${base}/archives` ? (
-          <ArchivesPage dataset={dataset} publication={publication} />
-        ) : path === `${base}/find` ? (
-          <section className="container inner-page">
-            <RepresentativeFinder dataset={dataset} />
-          </section>
-        ) : path === `${base}/methodology` ? (
-          <PolicyLab dataset={dataset} />
-        ) : !knownPath ? (
-          <section className="container empty">
-            <h1>Profile not found</h1>
-            <p>This address does not match a member in this preview.</p>
-            <a href={publicationUrl(`${base}/`, publication?.id)}>
-              Return to the scorecard
-            </a>
-          </section>
         ) : (
-          <>
-            <section className="hero container">
-              <div className="hero-copy">
-                <div className="eyebrow">
-                  <span /> THE SURVEILLANCE SCORECARD
-                </div>
-                <h1>
-                  {isArchive ? (
-                    <>
-                      The record.
-                      <br />
-                      <em>Over time.</em>
-                    </>
-                  ) : (
-                    <>
-                      Privacy is a right.
-                      <br />
-                      <em>Who votes like it?</em>
-                    </>
-                  )}
-                </h1>
-                <p>
-                  {isArchive
-                    ? "Explore former members and revisit the evidence available at a moment in time."
-                    : "Follow the votes. Understand the record. See who protects your privacy—and whose principles change with the presidency."}
-                </p>
-                <a
-                  className="text-link"
-                  href={publicationUrl(`${base}/methodology`, publication?.id)}
-                >
-                  Every grade has a paper trail <ArrowRight size={16} />
-                </a>
-              </div>
-              <aside className="hero-note">
-                <div className="note-top">
-                  <ShieldCheck size={23} />
-                  <span>PRINCIPLES OVER PARTY</span>
-                </div>
-                <h2>
-                  A voting record.
-                  <br />
-                  Not a campaign promise.
-                </h2>
-                <p>
-                  We look at actions across administrations to see where support
-                  for surveillance reform holds up.
-                </p>
-                <div className="note-foot">
-                  <span className="tiny-line" /> Transparent scores. Accountable
-                  power.
-                </div>
-              </aside>
-            </section>
-            <section
-              className="container scorecard-section"
-              aria-label="Explore legislators"
-            >
-              <div className="section-heading">
-                <div>
-                  <div className="eyebrow muted">
-                    {isArchive ? "HISTORICAL EXPLORER" : "EXPLORE THE RECORD"}
-                  </div>
-                  <h2>
-                    {isArchive ? "The archive" : "Find your legislators"}
-                    <span className="count-pill">
-                      {
-                        members.filter((m) =>
-                          isArchive
-                            ? m.status !== "active"
-                            : m.status === "active",
-                        ).length
-                      }{" "}
-                      {fictional(dataset) ? "demo members" : "members"}
-                    </span>
-                  </h2>
-                </div>
-                <a
-                  className="subtle-link"
-                  href={publicationUrl(`${base}/research`, publication?.id)}
-                >
-                  Build a research report <ArrowUpRight size={16} />
-                </a>
-              </div>
-              <Directory
-                filters={filters}
-                setFilter={changeFilter}
-                reset={reset}
-                archive={isArchive}
-                copy={copy}
-              />
-            </section>
-            <section className="container bottom-callout">
-              <div>
-                <span className="eyebrow">FOLLOW THE EVIDENCE</span>
-                <h2>A score should start a conversation.</h2>
-                <p>
-                  Open a profile to see the votes, the calculation, and what the
-                  record can—and cannot—tell us.
-                </p>
-              </div>
-              <a
-                className="button dark"
-                href={publicationUrl(`${base}/methodology`, publication?.id)}
-              >
-                Explore the methodology <ArrowRight size={16} />
-              </a>
-            </section>
-          </>
+          routePage()
         )}
       </main>
       <footer className="container">
