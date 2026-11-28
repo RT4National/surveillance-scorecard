@@ -1,3 +1,4 @@
+import { percentLabel } from "../../core/copy";
 // Plain (non-component) helpers shared by the scorecard directory (App.tsx) and the member profile.
 // Kept out of member.tsx so that module exports only components and Vite Fast Refresh can hot-swap it.
 import type { Dataset } from "../../core/publication";
@@ -15,7 +16,7 @@ export const readAsOf = (dataset: Dataset) => {
     : dataset.asOf;
 };
 export const fmt = (n: number | null) =>
-  n === null ? "Not yet rated" : `${Math.round(n)}%`;
+  n === null ? "Not yet rated" : percentLabel(n);
 /** Lowercase, accent-free text for name matching. */
 export const normalize = (s: string) =>
   s

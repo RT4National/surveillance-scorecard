@@ -5,8 +5,10 @@ import { splitDisplay, voteCount, type SplitInput } from "./split";
 import { publicationUrl } from "../../core/navigation";
 import { evidenceLabel } from "../../core/evidence";
 import {
+  correctionCopy,
   hasCosponsorships,
   notGradedLabel,
+  percentLabel,
   scoredActionCounts,
   scoredLabel,
 } from "../../core/copy";
@@ -22,15 +24,23 @@ import {
   validateReportQuery,
   type ReportQuery,
 } from "../../core/reports";
+import { EvidenceRow } from "./EvidenceRow";
+import { Legend } from "./Legend";
 import "./public.css";
 
 type Props = { dataset: Dataset; publication?: Publication };
 const servingOutcomes: Outcome[] = ["Yes", "No", "Not voting"];
 const base = "/scorecard";
+/** The publication a page is pinned to: the loaded one, else the one named in the URL. */
+function pinnedId(publication?: Publication) {
+  return (
+    publication?.id ??
+    new URLSearchParams(location.search).get("publication") ??
+    undefined
+  );
+}
 function publicUrl(path: string, publication?: Publication) {
-  const id =
-    publication?.id ?? new URLSearchParams(location.search).get("publication");
-  return publicationUrl(path, id ?? undefined);
+  return publicationUrl(path, pinnedId(publication));
 }
 function save(name: string, text: string, type: string) {
   const url = URL.createObjectURL(new Blob([text], { type }));
@@ -397,7 +407,7 @@ export function ComparePage({ dataset, publication }: Props) {
             <strong className="public-score">
               {score.value === null
                 ? notGradedLabel(dataset.rubric.minVotes)
-                : `${score.grade} · ${Math.round(score.value)}%`}
+                : `${score.grade} · ${percentLabel(score.value)}`}
             </strong>
             <p>
               {scoredLabel(score, dataset.votes)} · minimum{" "}
@@ -409,19 +419,13 @@ export function ComparePage({ dataset, publication }: Props) {
             <details>
               <summary>Inspect evidence</summary>
               {score.evidence.map((e) => (
-                <p key={e.voteId}>
-                  <a
-                    href={publicUrl(
-                      `${base}/legislation/${encodeURIComponent(e.voteId)}`,
-                      publication,
-                    )}
-                  >
-                    {e.vote.bill}
-                  </a>
-                  : {evidenceLabel(e.vote, e.outcome)} · {e.vote.topic}
-                  {!e.inWindow ? " · Outside rubric time window" : ""}
-                </p>
+                <EvidenceRow
+                  key={e.voteId}
+                  entry={e}
+                  publicationId={pinnedId(publication)}
+                />
               ))}
+              <Legend />
             </details>
           </article>
         ))}
@@ -434,16 +438,31 @@ export function CorrectionForm({
   publication,
   memberId,
   voteId,
-}: Props & { memberId?: string; voteId?: string }) {
+  id,
+}: Props & { memberId?: string; voteId?: string; id?: string }) {
   const [message, setMessage] = useState(""),
     [status, setStatus] = useState(""),
     [busy, setBusy] = useState(false);
+  // Names, not ids: the reader should see exactly which record the report is about.
+  const reference = [
+    memberId &&
+      (dataset.members.find((m) => m.id === memberId)?.name ?? memberId),
+    voteId && (dataset.votes.find((v) => v.id === voteId)?.title ?? voteId),
+  ].filter(Boolean);
+  const closed = dataset.demo
+    ? correctionCopy.closedDemo
+    : !publication
+      ? correctionCopy.closedUnpublished
+      : null;
   return (
     <form
+      id={id}
       className="public-correction"
+      data-member-id={memberId}
+      data-vote-id={voteId}
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!publication) return;
+        if (closed || !publication) return;
         setBusy(true);
         setStatus("");
         try {
@@ -457,12 +476,8 @@ export function CorrectionForm({
               message,
             }),
           });
-          if (!r.ok)
-            throw new Error(
-              `Submission failed (${r.status}). Please try again later.`,
-            );
-          const body = (await r.json()) as { id: string };
-          setStatus(`Correction received: ${body.id}`);
+          if (!r.ok) throw new Error(correctionCopy.failed(r.status));
+          setStatus(correctionCopy.sent);
           setMessage("");
         } catch (e) {
           setStatus((e as Error).message);
@@ -471,13 +486,12 @@ export function CorrectionForm({
         }
       }}
     >
-      <h3>Report an evidence error</h3>
+      <h3>{correctionCopy.title}</h3>
       <p>
-        Reference: {voteId ?? memberId ?? dataset.id}. Include the correction
-        and a public source; please omit personal information.
+        <strong>{reference.join(" · ") || dataset.id}</strong>
       </p>
       <label>
-        Correction
+        {correctionCopy.label}
         <textarea
           required
           minLength={10}
@@ -486,12 +500,12 @@ export function CorrectionForm({
           onChange={(e) => setMessage(e.target.value)}
         />
       </label>
-      <button disabled={!publication || dataset.demo || busy}>
-        {busy ? "Submitting…" : "Submit correction"}
+      <p className="muted">{correctionCopy.hint}</p>
+      <p className="muted">{correctionCopy.next}</p>
+      <button disabled={Boolean(closed) || busy}>
+        {busy ? correctionCopy.busy : correctionCopy.submit}
       </button>
-      {(!publication || dataset.demo) && (
-        <p>Corrections open when verified evidence is published.</p>
-      )}
+      {closed && <p>{closed}</p>}
       <p role="status">{status}</p>
     </form>
   );
@@ -914,7 +928,7 @@ export function ReportsPage({ dataset, publication }: Props) {
                     <td>
                       {score.value === null
                         ? notGradedLabel(dataset.rubric.minVotes)
-                        : `${Math.round(score.value)}%`}
+                        : percentLabel(score.value)}
                     </td>
                     <td>
                       {score.counted}
@@ -1099,21 +1113,14 @@ export function ArchivesPage({ dataset, publication }: Props) {
                   <summary>Evidence in this publication</summary>
                   {(index === 0 ? change.before : change.after)?.evidence.map(
                     (e) => (
-                      <p key={e.voteId}>
-                        <a
-                          href={publicUrl(
-                            `${base}/legislation/${encodeURIComponent(e.voteId)}`,
-                            frame,
-                          )}
-                        >
-                          {e.vote.bill}
-                        </a>
-                        : {evidenceLabel(e.vote, e.outcome)} · {e.vote.date} ·{" "}
-                        {e.scored ? "Scored" : "Not scored"} ·{" "}
-                        <Source url={e.vote.source} />
-                      </p>
+                      <EvidenceRow
+                        key={e.voteId}
+                        entry={e}
+                        publicationId={frame.id}
+                      />
                     ),
                   ) ?? <p>Member absent from this publication.</p>}
+                  <Legend />
                 </details>
               </article>
             ))}

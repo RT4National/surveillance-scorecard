@@ -1,37 +1,35 @@
-import { useState } from "react";
-import {
-  ArrowLeft,
-  Check,
-  Copy,
-  History,
-  Info,
-  ShieldCheck,
-  X,
-} from "lucide-react";
+import { Fragment, useState } from "react";
+import { ArrowLeft, Copy, History, Info, ShieldCheck } from "lucide-react";
 import { useScorecard } from "../../data/context";
-import { groupLabels } from "../../core/scoring";
+import { defaultGradeBands, groupLabels } from "../../core/scoring";
+import { bandRange, profileSummary } from "../../core/summary";
 import {
+  bandLine,
+  correctionCopy,
+  evidenceCopy,
+  headlineCopy,
   hasCosponsorships,
   notGradedLabel,
   scoredLabel,
   scoredNoun,
+  splitCopy,
 } from "../../core/copy";
 import { publicationUrl } from "../../core/navigation";
-import type { Member, Party } from "../../core/types";
-import { CorrectionForm, Source } from ".";
-import { evidenceLabel } from "../../core/evidence";
+import type { Member } from "../../core/types";
+import { CorrectionForm } from ".";
 import { base, fictional, fmt, query, readAsOf } from "./helpers";
 import { Avatar, Grade } from "./member";
 import { splitDisplay } from "./split";
+import { EvidenceRow, type EvidenceEntry } from "./EvidenceRow";
+import { Legend } from "./Legend";
+import { useChangeClass, useSeenOnce } from "./motion";
 
-/** How a member of each party is named in running text ("a Democrat at the time"). */
-const partyMember: Record<Party, string> = {
-  Democratic: "Democrat",
-  Republican: "Republican",
-  Independent: "Independent",
-};
-const withArticle = (word: string) =>
-  `${/^[AEIOU]/i.test(word) ? "an" : "a"} ${word}`;
+const newestFirst = (list: EvidenceEntry[]) =>
+  [...list].sort(
+    (a, b) =>
+      b.vote.date.localeCompare(a.vote.date) ||
+      a.voteId.localeCompare(b.voteId),
+  );
 
 export function Profile({
   member,
@@ -42,8 +40,27 @@ export function Profile({
 }) {
   const { score, dataset, rubric, publication } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
+  // Motion (src/styles/motion.css): the grade and evidence restart a short change animation on each
+  // timeline date change, and the split bars grow once on first view. Values are final either way.
+  const [changeClass, bumpChange] = useChangeClass();
+  const [barsRef, barsSeen] = useSeenOnce<HTMLDivElement>();
+  const changeAsOf = (d: string) => {
+    if (d === asOf) return;
+    setAsOf(d);
+    bumpChange();
+    const p = query();
+    p.set("asOf", d);
+    window.history.replaceState(null, "", `${window.location.pathname}?${p}`);
+  };
+  // Vote id of the row whose error report is open; one at a time.
+  const [reporting, setReporting] = useState<string | null>(null);
   const s = score(member, asOf);
   const split = splitDisplay(s, member.party);
+  const summary = profileSummary(s, dataset.votes);
+  const band =
+    s.value === null
+      ? null
+      : bandRange(s.grade, rubric.gradeBands ?? defaultGradeBands);
   // The whole record, independent of the selected date, so the timeline and the date minimum stay stable.
   const dates = score(member).evidence.map((e) => e.vote.date);
   const earliest = dates.reduce<string | undefined>(
@@ -60,6 +77,43 @@ export function Profile({
   const frozen = (d: string) =>
     Boolean(publication?.scoring) && d === dataset.asOf;
   const noun = scoredNoun(hasCosponsorships(dataset.votes));
+  const count = (n: number) => `${n} ${n === 1 ? noun.slice(0, -1) : noun}`;
+  // Evidence filter from the split chips. A side shows only items scored on that side.
+  const [side, setSide] = useState<"all" | "own" | "other">("all");
+  const shownEvidence = s.evidence.filter(
+    (e) => side === "all" || (e.scored && e.ownParty === (side === "own")),
+  );
+  const unscored = shownEvidence.filter((e) => !e.scored);
+  const row = (e: EvidenceEntry) => (
+    <Fragment key={e.voteId}>
+      <EvidenceRow
+        entry={e}
+        publicationId={publication?.id}
+        actions={
+          <button
+            type="button"
+            className="link-button"
+            aria-expanded={reporting === e.voteId}
+            aria-controls={`report-${e.voteId}`}
+            onClick={() =>
+              setReporting((v) => (v === e.voteId ? null : e.voteId))
+            }
+          >
+            {correctionCopy.rowAction}
+          </button>
+        }
+      />
+      {reporting === e.voteId && (
+        <CorrectionForm
+          id={`report-${e.voteId}`}
+          dataset={dataset}
+          publication={publication}
+          memberId={member.id}
+          voteId={e.voteId}
+        />
+      )}
+    </Fragment>
+  );
   return (
     <section className="container inner-page">
       <a
@@ -101,16 +155,36 @@ export function Profile({
       </div>
       <div className="profile-layout">
         <aside className="profile-sidebar">
-          <Grade member={member} asOf={asOf} />
-          <h2>
-            {s.value === null
-              ? notGradedLabel(rubric.minVotes)
-              : `${fmt(s.value)} reform alignment`}
-          </h2>
-          <p>
-            {Number(s.earned.toFixed(2))} aligned weighted points out of{" "}
-            {Number(s.possible.toFixed(2))} possible · {scoredLabel(s, dataset.votes)}
-          </p>
+          <div className={`profile-grade ${changeClass}`.trim()}>
+            <Grade member={member} asOf={asOf} />
+            <h2>
+              {s.value === null
+                ? notGradedLabel(rubric.minVotes)
+                : `${fmt(s.value)} reform alignment`}
+            </h2>
+          </div>
+          <ul className="headline-lines">
+            <li>
+              {headlineCopy.aligned(
+                summary.aligned,
+                summary.scored,
+                summary.years,
+              )}
+            </li>
+            <li>{scoredLabel(s, dataset.votes)}</li>
+            {band && <li>{bandLine(band)}</li>}
+            {summary.notVoted > 0 && (
+              <li>{headlineCopy.notVoted(summary.notVoted)}</li>
+            )}
+          </ul>
+          <details className="does-not-measure">
+            <summary>{headlineCopy.doesNotMeasure}</summary>
+            <ul>
+              {headlineCopy.doesNotMeasureItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </details>
           <span className={`category ${s.group}`}>{groupLabels[s.group]}</span>
           <p>{s.reason}</p>
           <hr />
@@ -132,27 +206,31 @@ export function Profile({
               <h2>Principles across presidencies</h2>
               <ShieldCheck size={20} />
             </div>
-            <p className="muted">
-              A strong score alone does not prove consistency. We compare the
-              record in both party contexts.
-            </p>
+            <p className="muted">{splitCopy.meaning}</p>
             {split.kind === "comparable" ? (
               <>
-                <div className="context-grid">
-                  <div>
-                    <span>President of their own party</span>
-                    <strong>{split.own.percent}%</strong>
-                    <small>
-                      {split.own.count} {noun}
-                    </small>
-                  </div>
-                  <div>
-                    <span>President of another party</span>
-                    <strong>{split.other.percent}%</strong>
-                    <small>
-                      {split.other.count} {noun}
-                    </small>
-                  </div>
+                <div
+                  ref={barsRef}
+                  className={`split-bars${barsSeen ? " motion-grow-x" : ""}`}
+                >
+                  {(
+                    [
+                      [splitCopy.ownLabel, split.own],
+                      [splitCopy.otherLabel, split.other],
+                    ] as const
+                  ).map(([label, part]) => (
+                    <div className="split-side" key={label}>
+                      <span className="split-label">{label}</span>
+                      <div className="split-bar" aria-hidden="true">
+                        <span
+                          className="split-fill motion-fill"
+                          style={{ width: `${part.percent}%` }}
+                        />
+                      </div>
+                      <strong className="split-percent">{part.percent}%</strong>
+                      <small className="split-count">{count(part.count)}</small>
+                    </div>
+                  ))}
                 </div>
                 {s.topicCoverageWarning && (
                   <p className="coverage-warning">
@@ -160,8 +238,8 @@ export function Profile({
                   </p>
                 )}
                 <p className="footnote">
-                  {s.sharedTopics.length} shared issue topics across party
-                  contexts. Different issue mixes can affect this comparison.
+                  {splitCopy.limits}{" "}
+                  {splitCopy.sharedTopics(s.sharedTopics.length)}
                 </p>
               </>
             ) : split.kind === "unproven" ? (
@@ -170,9 +248,35 @@ export function Profile({
                   <strong>{split.counts}</strong>
                 </p>
                 <p>{split.message}</p>
+                <p className="footnote">{splitCopy.limits}</p>
               </>
             ) : (
               <p>{split.message}</p>
+            )}
+            {split.kind !== "not-applicable" && (
+              <div
+                className="split-chips"
+                role="group"
+                aria-label={splitCopy.chipsLabel}
+              >
+                {(
+                  [
+                    ["all", splitCopy.chipAll, null],
+                    ["own", splitCopy.chipOwn, s.ownCount],
+                    ["other", splitCopy.chipOther, s.otherCount],
+                  ] as const
+                ).map(([value, label, n]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    aria-pressed={side === value}
+                    onClick={() => setSide(value)}
+                  >
+                    {label}
+                    {n !== null && ` · ${n}`}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           <div className="panel">
@@ -187,15 +291,7 @@ export function Profile({
                 max={dataset.asOf}
                 value={asOf}
                 onChange={(e) => {
-                  if (!e.target.value) return;
-                  setAsOf(e.target.value);
-                  const p = query();
-                  p.set("asOf", e.target.value);
-                  window.history.replaceState(
-                    null,
-                    "",
-                    `${window.location.pathname}?${p}`,
-                  );
+                  if (e.target.value) changeAsOf(e.target.value);
                 }}
               />
             </div>
@@ -213,16 +309,7 @@ export function Profile({
                 <button
                   key={d}
                   aria-pressed={d === asOf}
-                  onClick={() => {
-                    setAsOf(d);
-                    const p = query();
-                    p.set("asOf", d);
-                    window.history.replaceState(
-                      null,
-                      "",
-                      `${window.location.pathname}?${p}`,
-                    );
-                  }}
+                  onClick={() => changeAsOf(d)}
                 >
                   <small>{d.slice(0, 4)}</small>
                   <Grade member={member} asOf={d} />
@@ -237,78 +324,23 @@ export function Profile({
           <div className="panel">
             <div className="section-heading">
               <h2>The evidence behind the grade</h2>
-              <span className="count-pill">{s.evidence.length} records</span>
+              <span className="count-pill evidence-scored-count">
+                {scoredLabel(s, dataset.votes)}
+              </span>
             </div>
-            {[...s.evidence]
-              .sort(
-                (a, b) =>
-                  b.vote.date.localeCompare(a.vote.date) ||
-                  a.voteId.localeCompare(b.voteId),
-              )
-              .map((e) => (
-                <div className="evidence-row" key={e.voteId}>
-                  <div
-                    className={`vote-mark ${!e.scored ? "neutral" : e.aligned ? "yes" : "no"}`}
-                  >
-                    {!e.scored ? (
-                      <span aria-hidden="true">—</span>
-                    ) : e.aligned ? (
-                      <Check size={18} />
-                    ) : (
-                      <X size={18} />
-                    )}
-                    <span className="sr-only">
-                      {!e.scored
-                        ? "Not scored"
-                        : e.aligned
-                          ? "Aligned with reform position"
-                          : "Not aligned with reform position"}
-                    </span>
-                  </div>
-                  <div>
-                    <strong>{e.vote.title}</strong>
-                    <p>{e.vote.rationale}</p>
-                    <p className="evidence-context">
-                      <span>Reform position: {e.vote.reformVote}</span>
-                      <span>
-                        Under {withArticle(e.vote.presidentParty)} president
-                        {/* Not eligible: no service on this date, so no party to report. */}
-                        {e.outcome !== "Not eligible" &&
-                          ` · ${partyMember[e.partyAtVote]} at the time`}
-                      </span>
-                      {e.scored && (
-                        <span>
-                          Counts toward:{" "}
-                          {e.ownParty ? "own-party" : "other-party"} president
-                        </span>
-                      )}
-                    </p>
-                    <small>
-                      {e.vote.date} ·{" "}
-                      <a
-                        href={publicationUrl(
-                          `${base}/legislation/${encodeURIComponent(e.vote.id)}`,
-                          publication?.id,
-                        )}
-                      >
-                        {e.vote.bill}
-                      </a>{" "}
-                      · {e.vote.topic} · <Source url={e.vote.source} />
-                    </small>
-                  </div>
-                  <div className="vote-result">
-                    <strong>{evidenceLabel(e.vote, e.outcome)}</strong>
-                    <small>
-                      {e.scored
-                        ? `${Number((e.aligned ? e.effectiveWeight : 0).toFixed(2))} / ${Number(e.effectiveWeight.toFixed(2))} points`
-                        : e.inWindow
-                          ? "Excluded: not cast"
-                          : "Outside scoring window"}
-                    </small>
-                  </div>
-                </div>
-              ))}
+            <div className={`evidence-lists ${changeClass}`.trim()}>
+              <div className="evidence-scored">
+                {newestFirst(shownEvidence.filter((e) => e.scored)).map(row)}
+              </div>
+              {unscored.length > 0 && (
+                <section className="evidence-unscored">
+                  <h3>{evidenceCopy.contextHeading(unscored.length)}</h3>
+                  {newestFirst(unscored).map(row)}
+                </section>
+              )}
+            </div>
             {!s.evidence.length && <p>No evidence before this date.</p>}
+            <Legend />
             <p className="footnote">
               {dataset.demo
                 ? fictional(dataset)

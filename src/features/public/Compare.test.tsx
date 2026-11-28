@@ -42,3 +42,23 @@ describe("compare page split", () => {
     expect(u).not.toMatch(/Same party|Other party/);
   });
 });
+
+describe("compare page evidence", () => {
+  it("uses the shared evidence row and legend, with no party on not eligible rows", () => {
+    render(<ComparePage dataset={demoDataset} />);
+    const [first] = document.querySelectorAll(".public-controls select");
+    const member = demoDataset.members[7];
+    fireEvent.change(first, { target: { value: member.id } });
+    const c = card(member.name);
+    const rows = [...c.querySelectorAll(".evidence-row")];
+    expect(rows.length).toBe(
+      demoDataset.records.filter((r) => r.memberId === member.id).length,
+    );
+    expect(c.querySelector(".evidence-legend")).not.toBeNull();
+    const notInOffice = rows.filter(
+      (r) => r.getAttribute("data-state") === "not-in-office",
+    );
+    expect(notInOffice.length).toBeGreaterThan(0);
+    for (const r of notInOffice) expect(text(r)).not.toContain("at the time");
+  });
+});

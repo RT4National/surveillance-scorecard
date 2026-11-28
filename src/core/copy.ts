@@ -1,4 +1,5 @@
-import type { Vote } from "./types";
+import type { Outcome, Vote } from "./types";
+import type { AlignmentState } from "./evidence";
 
 /**
  * User-facing wording about what a score counts. Kept in one place so it can change
@@ -66,6 +67,136 @@ export const notGradedLabel = (minVotes: number) =>
 export const notGradedGroupLabel = (count: number) =>
   `Not graded (${count})`;
 
+/** One word per evidence state. Each pairs with an icon shape in EvidenceRow, so colour is never the only signal. */
+export const alignmentLabels: Record<AlignmentState, string> = {
+  aligned: "Aligned",
+  "not-aligned": "Not aligned",
+  "did-not-vote": "Did not vote",
+  "not-in-office": "Not in office",
+  "outside-window": "Outside the scoring window",
+};
+
+/** "A YES vote was the pro-reform vote.", or the cosponsorship equivalent. */
+export const reformLine = (vote: Pick<Vote, "kind" | "reformVote">) =>
+  vote.kind === "cosponsorship"
+    ? `Cosponsoring was the ${vote.reformVote === "Yes" ? "pro" : "anti"}-reform action.`
+    : `A ${vote.reformVote.toUpperCase()} vote was the pro-reform vote.`;
+
+/** The member's own action, or null when nothing was cast (the state word already says so). */
+export const memberAction = (vote: Pick<Vote, "kind">, outcome: Outcome) =>
+  outcome === "Yes" || outcome === "No"
+    ? vote.kind === "cosponsorship" && outcome === "Yes"
+      ? "Cosponsored"
+      : `Voted ${outcome}`
+    : null;
+
+const points = (n: number) => Number(n.toFixed(2));
+/** "Weight 2 · 0 of 2" for a scored item, "Weight 2" otherwise. */
+export const weightLabel = (e: {
+  vote: Pick<Vote, "weight">;
+  scored: boolean;
+  aligned: boolean;
+  effectiveWeight: number;
+}) =>
+  e.scored
+    ? `Weight ${points(e.vote.weight)} · ${points(e.aligned ? e.effectiveWeight : 0)} of ${points(e.effectiveWeight)}`
+    : `Weight ${points(e.vote.weight)}`;
+
+/** Evidence row and legend labels. */
+export const evidenceCopy = {
+  votePage: "Vote page",
+  legend: "Legend",
+  /** Heading for items that do not count: not cast, not in office, or outside the scoring window. */
+  contextHeading: (n: number) => `Context, not scored (${n})`,
+} as const;
+
+/**
+ * Own-party / other-party president split.
+ * The Independent sentence follows the plan's D6 recommendation (no split shown), not yet confirmed by staff.
+ * `meaning` and `limits` print for every member, so they must never contain a percentage.
+ */
+export const splitCopy = {
+  notEnough: "Too few votes to compare.",
+  independent: "Not shown for Independents.",
+  ownLabel: "Own party's president",
+  otherLabel: "Other party's president",
+  meaning: "Same record, split by which party held the White House.",
+  limits: "Different votes come up under different presidents: a pattern, not a motive.",
+  chipsLabel: "Show evidence",
+  chipAll: "All",
+  chipOwn: "Own-party president",
+  chipOther: "Other-party president",
+  sharedTopics: (n: number) => `Shared topics: ${n}`,
+} as const;
+
+/** "B: 80–89%". Numeric only: band phrases wait on decision D3. */
+export const bandLine = (b: { label: string; min: number; max: number }) =>
+  `${b.label}: ${b.min}–${b.max}%`;
+
+/** Profile headline lines. */
+export const headlineCopy = {
+  /** "7 of 9 aligned · 2015–2026". */
+  aligned: (
+    aligned: number,
+    scored: number,
+    years: { from: number; to: number } | null,
+  ) =>
+    `${aligned} of ${scored} aligned` +
+    (years
+      ? ` · ${years.from === years.to ? years.from : `${years.from}–${years.to}`}`
+      : ""),
+  notVoted: (n: number) => `Did not vote: ${n} · not counted`,
+  doesNotMeasure: "What this grade does not measure",
+  doesNotMeasureItems: [
+    "Why a vote was missed.",
+    "Speeches, statements and committee work.",
+    "Votes and bills not on this scorecard.",
+  ],
+} as const;
+
+/**
+ * Error-report form. The response policy (decision D10: review time, retention, where outcomes appear)
+ * is not decided, so nothing here promises a time or a reply channel.
+ */
+export const correctionCopy = {
+  rowAction: "Report an error",
+  title: "Report an error",
+  label: "What is wrong, and where can we check it?",
+  hint: "No personal details. We can't reply.",
+  next: "Staff review every report. Fixes ship as a new publication; old ones stay archived.",
+  submit: "Send",
+  busy: "Sending…",
+  sent: "Sent. Staff review every report.",
+  failed: (status: number) => `Not sent (${status}). Try again later.`,
+  closedDemo: "Closed: demo data.",
+  closedUnpublished: "Closed until a publication is live.",
+} as const;
+
+/** Party context on an evidence row. Not eligible records get no party: the member was not serving. */
+const partyMember = {
+  Democratic: "Democrat",
+  Republican: "Republican",
+  Independent: "Independent",
+} as const;
+const withArticle = (word: string) =>
+  `${/^[AEIOU]/i.test(word) ? "an" : "a"} ${word}`;
+export function evidenceContext(e: {
+  vote: Pick<Vote, "presidentParty">;
+  outcome: Outcome;
+  partyAtVote: keyof typeof partyMember;
+  scored: boolean;
+  ownParty: boolean;
+}): string {
+  const parts = [`Under ${withArticle(e.vote.presidentParty)} president`];
+  if (e.outcome !== "Not eligible")
+    parts.push(`${partyMember[e.partyAtVote]} at the time`);
+  if (e.scored)
+    parts.push(
+      `Counts toward: ${e.ownParty ? "own-party" : "other-party"} president`,
+    );
+  return parts.join(" · ");
+}
+
 /** Finder on the home page and /find. Short labels; the data does the explaining. */
 export const finderCopy = {
   title: "Find your members",
@@ -107,3 +238,9 @@ export const heroCopy = {
   home: "Who votes for privacy?",
   former: "Former members",
 } as const;
+
+/**
+ * A score as a whole percentage, rounded down. The scorer compares the raw value with each band's
+ * minimum, so rounding down keeps the shown number inside the shown band (89.6 is a B, shown as 89%).
+ */
+export const percentLabel = (n: number) => `${Math.floor(n)}%`;

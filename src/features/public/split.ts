@@ -4,6 +4,7 @@
 // evidence minimum here.
 import type { scoreMember } from "../../core/scoring";
 import type { Party } from "../../core/types";
+import { splitCopy } from "../../core/copy";
 
 type Score = ReturnType<typeof scoreMember>;
 export type SplitInput = Pick<
@@ -22,14 +23,8 @@ export type SplitDisplay =
     }
   | { kind: "not-applicable"; message: string };
 
-/**
- * Public wording for the split, kept in one place.
- * The Independent sentence follows the plan's D6 recommendation (no split shown), not yet confirmed by staff.
- */
-export const splitCopy = {
-  notEnough: "Too few votes to compare.",
-  independent: "Not shown for Independents.",
-};
+// Wording lives in src/core/copy.ts with the other public strings.
+export { splitCopy };
 
 /** "1 vote", "4 votes". */
 export const voteCount = (n: number) => `${n} ${n === 1 ? "vote" : "votes"}`;
@@ -44,8 +39,8 @@ export function splitDisplay(score: SplitInput, party: Party): SplitDisplay {
   )
     return {
       kind: "comparable",
-      own: { percent: Math.round(score.ownScore), count: score.ownCount },
-      other: { percent: Math.round(score.otherScore), count: score.otherCount },
+      own: { percent: Math.floor(score.ownScore), count: score.ownCount },
+      other: { percent: Math.floor(score.otherScore), count: score.otherCount },
     };
   return {
     kind: "unproven",

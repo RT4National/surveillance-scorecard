@@ -1,0 +1,59 @@
+/*
+ * Shared motion module (UX rebuild plan, section 5, "Motion"). CSS only, no library.
+ *
+ * Rules for every phase that adds motion:
+ * - Motion only shows change. Durations come from the tokens below (150 to 300 ms).
+ * - The resting style is the final state. Keyframes declare only a `from` step, on transform or
+ *   opacity, so text and values are final in the DOM on first render and nothing waits on motion.
+ * - Every animated change also has text (a number, "Changed", "Recalculated").
+ * - prefers-reduced-motion: reduce turns all of it off, at the end of this file. Do not use
+ *   !important on transition or animation anywhere else: src/styles/motion.test.ts checks.
+ */
+:root {
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 300ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* A value replaced in place (for example a grade after a timeline date change). Two identical
+   keyframes with different names: switching between them restarts the animation without
+   remounting the element, so focus and form state survive. */
+@keyframes motion-change-a {
+  from {
+    opacity: 0.35;
+  }
+}
+@keyframes motion-change-b {
+  from {
+    opacity: 0.35;
+  }
+}
+.motion-change-a {
+  animation: motion-change-a var(--motion-base) var(--motion-ease);
+}
+.motion-change-b {
+  animation: motion-change-b var(--motion-base) var(--motion-ease);
+}
+
+/* Bars that grow from zero to their final width once. Put .motion-grow-x on the container when it
+   first comes into view; each bar's fill carries .motion-fill. */
+@keyframes motion-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+.motion-grow-x .motion-fill {
+  transform-origin: left center;
+  animation: motion-grow-x var(--motion-slow) var(--motion-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
