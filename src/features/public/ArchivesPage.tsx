@@ -4,7 +4,7 @@ import {
   publicationReasons,
   type ChangelogReason,
 } from "../../core/changelog";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Publication, PublicationSummary } from "../../core/publication";
 import {
   loadArchivedPublication,
@@ -85,6 +85,7 @@ function ChangeReasons({
 export function ArchivesPage({ dataset, publication }: Props) {
   const [list, setList] = useState<PublicationSummary[]>([]),
     [status, setStatus] = useState("Loading publications…"),
+    [comparisonStatus, setComparisonStatus] = useState(""),
     [before, setBefore] = useState<Publication | null>(null),
     [memberId, setMemberId] = useState(() => {
       const requested = new URLSearchParams(location.search).get("m");
@@ -124,16 +125,46 @@ export function ArchivesPage({ dataset, publication }: Props) {
       });
     return () => controller.abort();
   }, []);
+  const compare = useCallback(async (id: string) => {
+    comparisonRequest.current?.abort();
+    const controller = new AbortController();
+    comparisonRequest.current = controller;
+    setBefore(null);
+    setComparisonStatus(`Loading ${id}…`);
+    try {
+      const archived = await loadArchivedPublication(
+        id,
+        fetch,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      setBefore(archived);
+      setComparisonStatus("");
+    } catch (error) {
+      if (!controller.signal.aborted)
+        setComparisonStatus((error as Error).message);
+    }
+  }, []);
+  const comparisonHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    if (!location.hash.startsWith("#publication-")) return;
-    const publication = list.find(
-      ({ id }) => location.hash === `#publication-${encodeURIComponent(id)}`,
-    );
-    if (publication)
-      document
-        .getElementById(`publication-${publication.id}`)
-        ?.scrollIntoView?.();
-  }, [list]);
+    if (before) comparisonHeading.current?.focus();
+  }, [before]);
+  const publicationId = publication?.id;
+  useEffect(() => {
+    const openLinkedComparison = () => {
+      const prefix = "#publication-";
+      if (!publicationId || !location.hash.startsWith(prefix)) return;
+      try {
+        const id = decodeURIComponent(location.hash.slice(prefix.length));
+        if (id && id !== publicationId) void compare(id);
+      } catch {
+        setComparisonStatus("The archive comparison link is invalid.");
+      }
+    };
+    openLinkedComparison();
+    addEventListener("hashchange", openLinkedComparison);
+    return () => removeEventListener("hashchange", openLinkedComparison);
+  }, [compare, publicationId]);
   const change =
     before && publication
       ? publicationChanges(before, publication, memberId)
@@ -152,6 +183,7 @@ export function ArchivesPage({ dataset, publication }: Props) {
         using the current scoring engine.
       </p>
       <p role="status">{status}</p>
+      {comparisonStatus && <p role="status">{comparisonStatus}</p>}
       {list.map((p) => (
         <article key={p.id} id={`publication-${p.id}`}>
           <h2>
@@ -162,25 +194,13 @@ export function ArchivesPage({ dataset, publication }: Props) {
           <p>{p.summary}</p>
           <ChangeReasons entry={p} loaded={publication} />
           <button
-            disabled={!publication}
-            onClick={async () => {
-              comparisonRequest.current?.abort();
-              const controller = new AbortController();
-              comparisonRequest.current = controller;
-              setBefore(null);
-              setStatus(`Loading ${p.id}…`);
-              try {
-                const archived = await loadArchivedPublication(
-                  p.id,
-                  fetch,
-                  controller.signal,
-                );
-                if (controller.signal.aborted) return;
-                setBefore(archived);
-                setStatus("");
-              } catch (e) {
-                if (!controller.signal.aborted) setStatus((e as Error).message);
-              }
+            type="button"
+            disabled={!publication || p.id === publication.id}
+            onClick={() => {
+              const url = new URL(location.href);
+              url.hash = `publication-${encodeURIComponent(p.id)}`;
+              history.replaceState(history.state, "", url);
+              void compare(p.id);
             }}
           >
             Compare with loaded publication
@@ -189,7 +209,9 @@ export function ArchivesPage({ dataset, publication }: Props) {
       ))}
       {change && (
         <section>
-          <h2>Why did the grade change?</h2>
+          <h2 ref={comparisonHeading} tabIndex={-1}>
+            Publication comparison
+          </h2>
           <label>
             Member
             <select
