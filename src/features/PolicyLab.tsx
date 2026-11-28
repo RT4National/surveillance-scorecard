@@ -7,6 +7,11 @@ import {
   validateRubric,
 } from "../core/scoring";
 import type { Rubric } from "../core/types";
+import {
+  hasCosponsorships,
+  methodologyCopy,
+  scoredNoun,
+} from "../core/copy";
 import { GradingRulesControls } from "./GradingRules";
 
 export function PolicyLab({ dataset }: { dataset: Dataset }) {
@@ -66,14 +71,11 @@ export function PolicyLab({ dataset }: { dataset: Dataset }) {
         <div>
           <div className="panel">
             <h2>What the published score measures</h2>
+            <p>{methodologyCopy.definition}</p>
+            <p>{methodologyCopy.cosponsorships}</p>
             <p>
-              Reform-aligned weighted votes divided by the weight of all scored
-              votes cast, multiplied by 100. Abstentions and ineligible votes
-              are excluded. Co-sponsorship is not counted as a vote.
-            </p>
-            <p>
-              At least {dataset.rubric.minVotes} cast votes are required for a
-              grade. Consistency requires {dataset.rubric.minPerContext} votes
+              At least {dataset.rubric.minVotes} scored actions are required for
+              a grade. Consistency requires {dataset.rubric.minPerContext} votes
               in each presidential party context, with{" "}
               {dataset.rubric.consistencyThreshold}% alignment in each for a
               reformer and at most {100 - dataset.rubric.consistencyThreshold}%
@@ -131,7 +133,8 @@ export function PolicyLab({ dataset }: { dataset: Dataset }) {
                   {current.after.value === null
                     ? "insufficient evidence"
                     : `${current.after.value.toFixed(2)}%`}
-                  . {current.after.counted} scored votes.
+                  . {current.after.counted}{" "}
+                  {scoredNoun(hasCosponsorships(dataset.votes))}.
                 </p>
                 <p>
                   {current.after.reason}. {current.after.topicCoverageWarning}

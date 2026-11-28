@@ -1822,3 +1822,12 @@ input[type="date"] {
 .profile-portrait figcaption a {
   text-decoration: underline;
 }
+.member-table tr.not-graded-group th {
+  background: #f1f4f5;
+  color: #4d5f66;
+  font-size: 12px;
+  text-align: left;
+}
+.alignment-text.not-graded {
+  white-space: normal;
+}

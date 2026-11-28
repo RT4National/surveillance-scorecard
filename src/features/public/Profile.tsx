@@ -10,6 +10,12 @@ import {
 } from "lucide-react";
 import { useScorecard } from "../../data/context";
 import { groupLabels } from "../../core/scoring";
+import {
+  hasCosponsorships,
+  notGradedLabel,
+  scoredLabel,
+  scoredNoun,
+} from "../../core/copy";
 import { publicationUrl } from "../../core/navigation";
 import type { Member, Party } from "../../core/types";
 import { CorrectionForm, Source } from ".";
@@ -51,6 +57,7 @@ export function Profile({
   // Only the publication's own as-of date carries the frozen published grade.
   const frozen = (d: string) =>
     Boolean(publication?.scoring) && d === dataset.asOf;
+  const noun = scoredNoun(hasCosponsorships(dataset.votes));
   return (
     <section className="container inner-page">
       <a
@@ -93,10 +100,14 @@ export function Profile({
       <div className="profile-layout">
         <aside className="profile-sidebar">
           <Grade member={member} asOf={asOf} />
-          <h2>{fmt(s.value)} reform alignment</h2>
+          <h2>
+            {s.value === null
+              ? notGradedLabel(rubric.minVotes)
+              : `${fmt(s.value)} reform alignment`}
+          </h2>
           <p>
             {Number(s.earned.toFixed(2))} aligned weighted points out of{" "}
-            {Number(s.possible.toFixed(2))} possible · {s.counted} scored votes
+            {Number(s.possible.toFixed(2))} possible · {scoredLabel(s, dataset.votes)}
           </p>
           <span className={`category ${s.group}`}>{groupLabels[s.group]}</span>
           <p>{s.reason}</p>
@@ -127,12 +138,16 @@ export function Profile({
               <div>
                 <span>President of their own party</span>
                 <strong>{fmt(s.ownScore)}</strong>
-                <small>{s.ownCount} cast votes</small>
+                <small>
+                  {s.ownCount} {noun}
+                </small>
               </div>
               <div>
                 <span>President of another party</span>
                 <strong>{fmt(s.otherScore)}</strong>
-                <small>{s.otherCount} cast votes</small>
+                <small>
+                  {s.otherCount} {noun}
+                </small>
               </div>
             </div>
             {s.topicCoverageWarning && (
