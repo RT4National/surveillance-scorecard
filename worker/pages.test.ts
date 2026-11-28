@@ -19,9 +19,11 @@ import {
   groupCountLabel,
   headlineCopy,
   heroCopy,
+  updatedLabel,
 } from "../src/core/copy";
 import { escapeHtml } from "./render";
 import { encodeStoredJson } from "./storage";
+import { digest } from "./validation";
 import type { Dataset, Publication } from "../src/core/publication";
 import type { Member } from "../src/core/types";
 
@@ -31,6 +33,7 @@ type Score = ReturnType<typeof scoreMember>;
 // ASSETS is a stand-in for the built dist/ directory.
 const shell =
   '<!doctype html><html><head><meta name="description" content="x"><meta name="robots" content="noindex, nofollow"><title>Shell</title></head><body><div id="root"></div><script type="module" src="/scorecard/assets/app.js"></script></body></html>';
+const csp = "default-src 'self'; frame-ancestors 'none'";
 async function startWorker(): Promise<Miniflare> {
   const bundle = await build({
     entryPoints: [new URL("./index.ts", import.meta.url).pathname],
@@ -59,7 +62,13 @@ async function startWorker(): Promise<Miniflare> {
           const { pathname } = new URL(request.url);
           if (pathname === "/index.html")
             return new Response(shell, {
-              headers: { "Content-Type": "text/html; charset=utf-8" },
+              headers: {
+                "Content-Type": "text/html; charset=utf-8",
+                // As the static _headers rules add them to every asset.
+                "Content-Security-Policy": csp,
+                "X-Frame-Options": "DENY",
+                "X-Content-Type-Options": "nosniff",
+              },
             });
           if (pathname === "/scorecard/assets/app.js")
             return new Response("console.log(1)", {
@@ -92,6 +101,53 @@ async function startWorker(): Promise<Miniflare> {
   }, []))
     if (statement.trim()) await db.prepare(statement).run();
   return mf;
+}
+/** A stored publication fixture with its real dataset digest and frozen scores. */
+async function publish(
+  id: string,
+  dataset: Dataset,
+  previousId: string | null,
+  createdAt: string,
+): Promise<Publication> {
+  return {
+    id,
+    createdAt,
+    publishedBy: "fixture",
+    previousId,
+    summary: `Fixture ${id}`,
+    digest: await digest(dataset),
+    dataset,
+    scoring: await createPublicationScoring(dataset),
+  };
+}
+/** Inserts a publication; the publish trigger moves the current pointer to it. */
+async function store(mf: Miniflare, p: Publication) {
+  const db = await mf.getD1Database("DB", "pages");
+  await db
+    .prepare(
+      "INSERT INTO drafts(id,dataset,summary,status,author,updated_at) VALUES(?,?,?,'draft','fixture',?)",
+    )
+    .bind(`draft-${p.id}`, JSON.stringify(p.dataset), p.summary, p.createdAt)
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO publications(id,draft_id,snapshot,created_at) VALUES(?,?,?,?)",
+    )
+    .bind(
+      p.id,
+      `draft-${p.id}`,
+      await encodeStoredJson(p, {
+        id: p.id,
+        createdAt: p.createdAt,
+        publishedBy: p.publishedBy,
+        summary: p.summary,
+        digest: p.digest,
+        previousId: p.previousId,
+        datasetId: p.dataset.id,
+      }),
+      p.createdAt,
+    )
+    .run();
 }
 describe("public page routing in the Worker", () => {
   let mf: Miniflare;
@@ -223,7 +279,7 @@ describe("server-rendered first paint with no publication (fictional demo)", () 
   it("puts the heading, finder states, count row and demo banner in the home HTML", async () => {
     const r = await get("/scorecard/");
     expect(r.status).toBe(200);
-    expect(r.headers.get("cache-control")).toBe("no-store");
+    expect(r.headers.get("cache-control")).toBe("public, max-age=60");
     const root = rootOf(await r.text());
     expect(root).toContain('data-server="home"');
     expect(root).toContain(`<h1>${escapeHtml(heroCopy.home)}</h1>`);
@@ -263,7 +319,7 @@ describe("server-rendered first paint with no publication (fictional demo)", () 
     for (const m of demoDataset.members.slice(0, 4)) {
       const r = await get(`/scorecard/members/${m.id}`);
       expect(r.status).toBe(200);
-      expect(r.headers.get("cache-control")).toBe("no-store");
+      expect(r.headers.get("cache-control")).toBe("public, max-age=60");
       const root = rootOf(await r.text());
       expectMember(root, demoDataset, m, demoScore(m));
       expect(root).toContain(escapeHtml(bannerCopy.fictional));
@@ -300,49 +356,6 @@ describe("server-rendered first paint from stored publications", () => {
     sources: [source],
   });
   let p2: Publication;
-  const publish = async (
-    id: string,
-    dataset: Dataset,
-    previousId: string | null,
-    createdAt: string,
-  ): Promise<Publication> => ({
-    id,
-    createdAt,
-    publishedBy: "fixture",
-    previousId,
-    summary: `Fixture ${id}`,
-    digest: "0".repeat(64),
-    dataset,
-    scoring: await createPublicationScoring(dataset),
-  });
-  async function store(mf: Miniflare, p: Publication) {
-    const db = await mf.getD1Database("DB", "pages");
-    await db
-      .prepare(
-        "INSERT INTO drafts(id,dataset,summary,status,author,updated_at) VALUES(?,?,?,'draft','fixture',?)",
-      )
-      .bind(`draft-${p.id}`, JSON.stringify(p.dataset), p.summary, p.createdAt)
-      .run();
-    await db
-      .prepare(
-        "INSERT INTO publications(id,draft_id,snapshot,created_at) VALUES(?,?,?,?)",
-      )
-      .bind(
-        p.id,
-        `draft-${p.id}`,
-        await encodeStoredJson(p, {
-          id: p.id,
-          createdAt: p.createdAt,
-          publishedBy: p.publishedBy,
-          summary: p.summary,
-          digest: p.digest,
-          previousId: p.previousId,
-          datasetId: p.dataset.id,
-        }),
-        p.createdAt,
-      )
-      .run();
-  }
   beforeAll(async () => {
     mf = await startWorker();
     await store(
@@ -407,5 +420,133 @@ describe("server-rendered first paint from stored publications", () => {
     const r = await get("/scorecard/members/no-such-member");
     expect(r.status).toBe(404);
     expect(rootOf(await r.text())).toBe('<div id="root"></div>');
+  });
+});
+
+// HTTP caching and the in-isolate publication memo. Published publications are immutable, so a
+// response for one ID may be cached for a year; "latest" and HTML are short; staff, drafts,
+// corrections and unknown publications are never cached.
+describe("caching", () => {
+  let mf: Miniflare;
+  const first = { ...demoDataset, id: "cache-1" };
+  const second = { ...demoDataset, id: "cache-2" };
+  beforeAll(async () => {
+    mf = await startWorker();
+    await store(
+      mf,
+      await publish("cache-pub-1", first, null, "2026-09-01T00:00:00Z"),
+    );
+  }, 60_000);
+  afterAll(async () => {
+    await mf?.dispose();
+  });
+  const get = (path: string, headers: Record<string, string> = {}) =>
+    mf.dispatchFetch(`https://scorecard.example${path}`, {
+      headers,
+      redirect: "manual",
+    });
+  const immutable = "public, max-age=31536000, immutable";
+  const short = "public, max-age=60";
+  it("memoizes a publication in the isolate: the second request is a hit", async () => {
+    // "latest" never goes to the edge cache, so a hit here is the isolate memo.
+    const a = await get("/scorecard/api/publications/latest");
+    expect(a.status).toBe(200);
+    expect(a.headers.get("server-timing")).toBe('memo;desc="miss"');
+    const b = await get("/scorecard/api/publications/latest");
+    expect(b.headers.get("server-timing")).toBe('memo;desc="hit"');
+    expect(await b.json()).toEqual(await a.json());
+  });
+  it("marks a publication by ID immutable, with an ETag that answers 304", async () => {
+    const r = await get("/scorecard/api/publications/cache-pub-1");
+    expect(r.headers.get("cache-control")).toBe(immutable);
+    const etag = r.headers.get("etag");
+    expect(etag).toMatch(/^"[^"]+"$/);
+    await r.text();
+    const again = await get("/scorecard/api/publications/cache-pub-1", {
+      "If-None-Match": etag!,
+    });
+    expect(again.status).toBe(304);
+    expect(again.headers.get("cache-control")).toBe(immutable);
+    expect(await again.text()).toBe("");
+  });
+  it("gives the latest pointer a short TTL", async () => {
+    const r = await get("/scorecard/api/publications/latest");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("cache-control")).toBe(short);
+    expect(((await r.json()) as Publication).id).toBe("cache-pub-1");
+  });
+  it("never caches unknown publications, staff routes, drafts or corrections", async () => {
+    for (const path of [
+      "/scorecard/api/publications/missing",
+      "/scorecard/api/staff/session",
+      "/scorecard/api/staff/drafts",
+      "/scorecard/api/staff/drafts/some-draft",
+      "/scorecard/api/staff/status",
+    ]) {
+      const r = await get(path);
+      expect(r.status, path).toBeGreaterThanOrEqual(400);
+      expect(r.headers.get("cache-control"), path).toBe("no-store");
+      await r.text();
+    }
+    const correction = await mf.dispatchFetch(
+      "https://scorecard.example/scorecard/api/corrections",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicationId: "cache-pub-1", message: "x" }),
+      },
+    );
+    expect(correction.headers.get("cache-control")).toBe("no-store");
+    await correction.text();
+  });
+  it("caches public HTML briefly with an ETag, and never the editor or a 404", async () => {
+    const home = await get("/scorecard/");
+    expect(home.status).toBe(200);
+    expect(home.headers.get("cache-control")).toBe(short);
+    const etag = home.headers.get("etag");
+    expect(etag).toMatch(/^"[^"]+"$/);
+    const html = await home.text();
+    expect(html).toContain('data-server="home"');
+    const again = await get("/scorecard/", { "If-None-Match": etag! });
+    expect(again.status).toBe(304);
+    await again.text();
+    // A memoized page is served whole on the next request too.
+    const repeat = await get("/scorecard/");
+    expect(repeat.headers.get("server-timing")).toBe('memo;desc="hit"');
+    // The shell's static security headers (public/_headers) survive the memo.
+    for (const r of [home, repeat]) {
+      expect(r.headers.get("content-security-policy")).toBe(csp);
+      expect(r.headers.get("x-frame-options")).toBe("DENY");
+      expect(r.headers.get("x-content-type-options")).toBe("nosniff");
+    }
+    expect(await repeat.text()).toBe(html);
+    for (const path of [
+      "/scorecard/editor",
+      "/scorecard/no-such-page",
+      "/scorecard/members/no-such-member",
+      "/scorecard/?publication=missing",
+    ]) {
+      const r = await get(path);
+      expect(r.headers.get("cache-control"), path).toBe("no-store");
+      await r.text();
+    }
+  });
+  it("shows a new publication on the next latest request and keeps the old one by ID", async () => {
+    await store(
+      mf,
+      await publish(
+        "cache-pub-2",
+        second,
+        "cache-pub-1",
+        "2026-09-08T00:00:00Z",
+      ),
+    );
+    const latest = await get("/scorecard/api/publications/latest");
+    expect(((await latest.json()) as Publication).id).toBe("cache-pub-2");
+    expect(await (await get("/scorecard/")).text()).toContain(
+      escapeHtml(updatedLabel("2026-09-08T00:00:00Z")),
+    );
+    const old = await get("/scorecard/api/publications/cache-pub-1");
+    expect(((await old.json()) as Publication).id).toBe("cache-pub-1");
   });
 });

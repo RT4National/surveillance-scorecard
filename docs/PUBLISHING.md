@@ -45,7 +45,7 @@ Rollback selects an existing publication ID using the current pointer revision a
 
 ## API contract
 
-All responses are JSON with `Cache-Control: no-store`. Failures include `{error}` and validation errors include `errors`. Important status codes: 401 identity required/invalid; 403 role or independent review failure; 409 stale edit/pointer/state; 422 invalid dataset; 429 correction limit; 503 unavailable dependencies/configuration.
+All responses are JSON. Failures include `{error}` and validation errors include `errors`. Important status codes: 401 identity required/invalid; 403 role or independent review failure; 409 stale edit/pointer/state; 422 invalid dataset; 429 correction limit; 503 unavailable dependencies/configuration.
 
 | Method and suffix                | Contract                                                                                  |
 | -------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -66,6 +66,20 @@ All responses are JSON with `Cache-Control: no-store`. Failures include `{error}
 | GET `/staff/audit`               | Most recent 200 audit events                                                              |
 | GET `/staff/corrections`         | Most recent 200 corrections                                                               |
 | PATCH `/staff/corrections/:id`   | `{status:'resolved'                                                                       | 'dismissed',resolution}`; audited |
+
+### Caching
+
+Published publications are immutable (database triggers refuse updates), so `worker/cache.ts` caches by publication ID:
+
+| Response                                                                            | `Cache-Control`                       | Notes                                                                                |
+| ----------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------ |
+| GET `/publications/:id` (a specific ID)                                             | `public, max-age=31536000, immutable` | Strong `ETag`; `If-None-Match` answers 304. Also stored in the edge cache on a zone. |
+| GET `/publications/latest`                                                          | `public, max-age=60`                  | The pointer is read from D1 on every request; a new publication shows within 60 s.   |
+| Public HTML pages (home, profiles, other app routes)                                | `public, max-age=60`                  | `ETag` over the rendered page. Rendered HTML never depends on identity.              |
+| Hashed build assets and portraits under `/scorecard/`                               | `public, max-age=31536000, immutable` | Their file names change with their content.                                          |
+| Staff routes, the editor page, drafts, corrections, research, 404s and other errors | `no-store`                            | Never cached anywhere.                                                               |
+
+Inside one Worker isolate the decoded publication is memoized by ID (at most three, least recently used first), together with values derived from it (the serialized response, rendered HTML up to about 4 MB). "latest" is never a memo key: it is resolved to an ID first. Unknown IDs and failures are not memoized. The `Server-Timing` header reports `memo;desc="hit"` or `"miss"` (`edge;desc="hit"` from the edge cache). The Cache API does nothing on `*.workers.dev`, which staging uses, so the isolate memo is what makes staging fast; on the production zone the edge cache additionally shares immutable responses between isolates.
 
 Corrections collect no name, email, or address. They are tied to an immutable publication and require at least one member or vote; paired evidence must actually exist. Message limits are 10–4000 characters; a D1 counter caps submissions at five per IP-derived hourly bucket, retained for approximately 24 hours. These pseudonymous abuse counters are not guaranteed anonymization. Shared IPs share limits. Add edge WAF/rate rules for high-volume attacks; application counters alone do not protect bandwidth or D1 capacity. Review staff should redact personal information accidentally included in freeform reports according to the organization's retention policy; no self-service deletion is currently implemented.
 
