@@ -141,10 +141,7 @@ function Select({
 }
 function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
   const { score, publication, dataset } = useScorecard();
-  const notGraded = notGradedLabel(
-    dataset.rubric.minVotes,
-    hasCosponsorships(dataset.votes),
-  );
+  const notGraded = notGradedLabel(dataset.rubric.minVotes);
   // The directory sorts not-graded members last; the first one opens their labelled group.
   const firstUngraded = list.findIndex((m) => score(m, asOf).value === null);
   const ungradedCount = firstUngraded < 0 ? 0 : list.length - firstUngraded;

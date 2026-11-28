@@ -3,7 +3,7 @@
 import { useScorecard } from "../../data/context";
 import { defaultGradeBands } from "../../core/scoring";
 import type { Member } from "../../core/types";
-import { hasCosponsorships, notGradedLabel } from "../../core/copy";
+import { notGradedLabel } from "../../core/copy";
 import { gradeTone } from "./helpers";
 export function Avatar({
   member,
@@ -39,14 +39,14 @@ export function Avatar({
   );
 }
 export function Grade({ member, asOf }: { member: Member; asOf?: string }) {
-  const { score, rubric, votes } = useScorecard();
+  const { score, rubric } = useScorecard();
   const s = score(member, asOf);
   return (
     <span
       className={`grade ${gradeTone(s.grade, s.value, rubric.gradeBands ?? defaultGradeBands)}`}
       aria-label={
         s.value === null
-          ? notGradedLabel(rubric.minVotes, hasCosponsorships(votes))
+          ? notGradedLabel(rubric.minVotes)
           : `Grade ${s.grade}`
       }
     >

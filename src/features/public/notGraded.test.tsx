@@ -45,14 +45,12 @@ describe("fixture", () => {
 });
 
 describe("not-graded copy", () => {
-  it("reads the threshold from its argument and the noun from the dataset", () => {
-    expect(notGradedLabel(3, false)).toBe("Not graded: fewer than 3 scored votes");
-    expect(notGradedLabel(5, false)).toBe("Not graded: fewer than 5 scored votes");
-    expect(notGradedLabel(5, true)).toBe("Not graded: fewer than 5 scored actions");
+  it("reads the threshold from its argument", () => {
+    expect(notGradedLabel(3)).toBe("Not graded: fewer than 3 votes");
+    expect(notGradedLabel(5)).toBe("Not graded: fewer than 5 votes");
   });
   it("labels the group with its size", () => {
-    expect(notGradedGroupLabel(1)).toBe("Not graded (1 member)");
-    expect(notGradedGroupLabel(4)).toBe("Not graded (4 members)");
+    expect(notGradedGroupLabel(42)).toBe("Not graded (42)");
   });
 });
 
@@ -60,7 +58,7 @@ describe("profile", () => {
   it("shows the rubric's threshold for a member with no grade", () => {
     const { container } = render(<Profile member={ungraded[0]} copy={vi.fn()} />);
     const t = norm(container.textContent);
-    expect(t).toContain("Not graded: fewer than 5 scored votes");
+    expect(t).toContain("Not graded: fewer than 5 votes");
     expect(t).not.toContain("fewer than 3");
     expect(t).not.toContain("Not yet rated reform alignment");
   });
@@ -82,7 +80,7 @@ describe("directory", () => {
       const { rows } = directory(sort);
       const header = rows.findIndex((r) => r.classList.contains("not-graded-group"));
       expect(header).toBeGreaterThan(0);
-      expect(norm(rows[header].textContent)).toBe(`Not graded (${ungraded.length} members)`);
+      expect(norm(rows[header].textContent)).toBe(`Not graded (${ungraded.length})`);
       const after = rows.slice(header + 1);
       const before = rows.slice(0, header);
       expect(after).toHaveLength(ungraded.length);
@@ -91,7 +89,7 @@ describe("directory", () => {
         expect(after.some((r) => norm(r.textContent).includes(m.name))).toBe(true);
         expect(before.some((r) => norm(r.textContent).includes(m.name))).toBe(false);
       }
-      expect(after.every((r) => norm(r.textContent).includes("fewer than 5 scored votes"))).toBe(true);
+      expect(after.every((r) => norm(r.textContent).includes("fewer than 5 votes"))).toBe(true);
     });
   }
   it("does not render the group when everyone shown is graded", () => {

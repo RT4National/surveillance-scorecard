@@ -374,10 +374,7 @@ export function ComparePage({ dataset, publication }: Props) {
             </p>
             <strong className="public-score">
               {score.value === null
-                ? notGradedLabel(
-                    dataset.rubric.minVotes,
-                    hasCosponsorships(dataset.votes),
-                  )
+                ? notGradedLabel(dataset.rubric.minVotes)
                 : `${score.grade} · ${Math.round(score.value)}%`}
             </strong>
             <p>
@@ -956,10 +953,7 @@ export function ReportsPage({ dataset, publication }: Props) {
                     <td>{score.grade}</td>
                     <td>
                       {score.value === null
-                        ? notGradedLabel(
-                    dataset.rubric.minVotes,
-                    hasCosponsorships(dataset.votes),
-                  )
+                        ? notGradedLabel(dataset.rubric.minVotes)
                         : `${Math.round(score.value)}%`}
                     </td>
                     <td>

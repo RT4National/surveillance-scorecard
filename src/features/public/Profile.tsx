@@ -79,7 +79,7 @@ export function Profile({
           <Grade member={member} asOf={asOf} />
           <h2>
             {s.value === null
-              ? notGradedLabel(rubric.minVotes, hasCosponsorships(dataset.votes))
+              ? notGradedLabel(rubric.minVotes)
               : `${fmt(s.value)} reform alignment`}
           </h2>
           <p>
