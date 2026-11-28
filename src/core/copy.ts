@@ -108,6 +108,25 @@ export const evidenceCopy = {
   legend: "Legend",
 } as const;
 
+/**
+ * Own-party / other-party president split.
+ * The Independent sentence follows the plan's D6 recommendation (no split shown), not yet confirmed by staff.
+ * `meaning` and `limits` print for every member, so they must never contain a percentage.
+ */
+export const splitCopy = {
+  notEnough: "Too few votes to compare.",
+  independent: "Not shown for Independents.",
+  ownLabel: "Own party's president",
+  otherLabel: "Other party's president",
+  meaning: "Same record, split by which party held the White House.",
+  limits: "Different votes come up under different presidents: a pattern, not a motive.",
+  chipsLabel: "Show evidence",
+  chipAll: "All",
+  chipOwn: "Own-party president",
+  chipOther: "Other-party president",
+  sharedTopics: (n: number) => `Shared topics: ${n}`,
+} as const;
+
 /** "B: 80–89%". Numeric only: band phrases wait on decision D3. */
 export const bandLine = (b: { label: string; min: number; max: number }) =>
   `${b.label}: ${b.min}–${b.max}%`;

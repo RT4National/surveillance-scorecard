@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { members, records, votes } from "../../data/demo";
 import { scoreMember } from "../../core/scoring";
 import { Profile } from "./Profile";
@@ -136,15 +136,33 @@ describe("profile split panel", () => {
     return first;
   }
 
-  it("shows both percentages with N when the record is comparable", () => {
+  it("shows two labelled bars that expose percentage and N as text", () => {
     const panel = split(2);
-    const cells = [...panel.querySelectorAll(".context-grid > div")].map(
-      (cell) => [...cell.children].map(text),
-    );
-    expect(cells).toEqual([
-      ["President of their own party", "33%", "4 votes"],
-      ["President of another party", "100%", "2 votes"],
+    const sides = [...panel.querySelectorAll(".split-side")];
+    expect(
+      sides.map((side) => [
+        text(side.querySelector(".split-label")!),
+        text(side.querySelector(".split-percent")!),
+        text(side.querySelector(".split-count")!),
+      ]),
+    ).toEqual([
+      [splitCopy.ownLabel, "33%", "4 votes"],
+      [splitCopy.otherLabel, "100%", "2 votes"],
     ]);
+    const fills = sides.map(
+      (side) => side.querySelector<HTMLElement>(".split-fill")!,
+    );
+    expect(fills.map((f) => f.style.width)).toEqual(["33%", "100%"]);
+    for (const side of sides)
+      expect(side.querySelector(".split-bar")!.getAttribute("aria-hidden")).toBe(
+        "true",
+      );
+  });
+
+  it("says what the split means and what it cannot show", () => {
+    const panel = split(2);
+    expect(text(panel)).toContain(splitCopy.meaning);
+    expect(text(panel)).toContain(splitCopy.limits);
   });
 
   it("shows counts and no percentage when the scorer reports the record unproven", () => {
@@ -154,7 +172,7 @@ describe("profile split panel", () => {
     );
     expect(text(panel)).toContain(splitCopy.notEnough);
     expect(text(panel)).not.toContain("%");
-    expect(panel.querySelector(".context-grid")).toBeNull();
+    expect(panel.querySelector(".split-bar")).toBeNull();
     expect(text(panel)).not.toContain("Not yet rated");
   });
 
@@ -162,8 +180,36 @@ describe("profile split panel", () => {
     const panel = split(6);
     expect(text(panel)).toContain(splitCopy.independent);
     expect(text(panel)).not.toContain("%");
-    expect(panel.querySelector(".context-grid")).toBeNull();
+    expect(panel.querySelector(".split-bar")).toBeNull();
     expect(text(panel)).not.toContain("other-party votes");
+    expect(panel.querySelector(".split-chips")).toBeNull();
+  });
+
+  it("filters the evidence list by side with chips", () => {
+    const panel = split(2);
+    const s = scoreMember(members[2], votes, records);
+    const ids = (keep: (e: (typeof s.evidence)[number]) => boolean) =>
+      s.evidence.filter(keep).map((e) => e.voteId).sort();
+    const shown = () =>
+      [...document.querySelectorAll(".profile-main .evidence-row")]
+        .map((r) => r.getAttribute("data-vote-id")!)
+        .sort();
+    const chip = (label: string) =>
+      [...panel.querySelectorAll<HTMLButtonElement>(".split-chips button")].find(
+        (b) => text(b).startsWith(label),
+      )!;
+
+    fireEvent.click(chip(splitCopy.chipOwn));
+    expect(chip(splitCopy.chipOwn).getAttribute("aria-pressed")).toBe("true");
+    expect(shown()).toEqual(ids((e) => e.scored && e.ownParty));
+    expect(shown()).toHaveLength(s.ownCount);
+
+    fireEvent.click(chip(splitCopy.chipOther));
+    expect(shown()).toEqual(ids((e) => e.scored && !e.ownParty));
+    expect(shown()).toHaveLength(s.otherCount);
+
+    fireEvent.click(chip(splitCopy.chipAll));
+    expect(shown()).toEqual(ids(() => true));
   });
 });
 

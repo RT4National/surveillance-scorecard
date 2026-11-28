@@ -11,6 +11,7 @@ import {
   notGradedLabel,
   scoredLabel,
   scoredNoun,
+  splitCopy,
 } from "../../core/copy";
 import { publicationUrl } from "../../core/navigation";
 import type { Member } from "../../core/types";
@@ -55,6 +56,12 @@ export function Profile({
   const frozen = (d: string) =>
     Boolean(publication?.scoring) && d === dataset.asOf;
   const noun = scoredNoun(hasCosponsorships(dataset.votes));
+  const count = (n: number) => `${n} ${n === 1 ? noun.slice(0, -1) : noun}`;
+  // Evidence filter from the split chips. A side shows only items scored on that side.
+  const [side, setSide] = useState<"all" | "own" | "other">("all");
+  const shownEvidence = s.evidence.filter(
+    (e) => side === "all" || (e.scored && e.ownParty === (side === "own")),
+  );
   return (
     <section className="container inner-page">
       <a
@@ -145,27 +152,28 @@ export function Profile({
               <h2>Principles across presidencies</h2>
               <ShieldCheck size={20} />
             </div>
-            <p className="muted">
-              A strong score alone does not prove consistency. We compare the
-              record in both party contexts.
-            </p>
+            <p className="muted">{splitCopy.meaning}</p>
             {split.kind === "comparable" ? (
               <>
-                <div className="context-grid">
-                  <div>
-                    <span>President of their own party</span>
-                    <strong>{split.own.percent}%</strong>
-                    <small>
-                      {split.own.count} {noun}
-                    </small>
-                  </div>
-                  <div>
-                    <span>President of another party</span>
-                    <strong>{split.other.percent}%</strong>
-                    <small>
-                      {split.other.count} {noun}
-                    </small>
-                  </div>
+                <div className="split-bars">
+                  {(
+                    [
+                      [splitCopy.ownLabel, split.own],
+                      [splitCopy.otherLabel, split.other],
+                    ] as const
+                  ).map(([label, side]) => (
+                    <div className="split-side" key={label}>
+                      <span className="split-label">{label}</span>
+                      <div className="split-bar" aria-hidden="true">
+                        <span
+                          className="split-fill"
+                          style={{ width: `${side.percent}%` }}
+                        />
+                      </div>
+                      <strong className="split-percent">{side.percent}%</strong>
+                      <small className="split-count">{count(side.count)}</small>
+                    </div>
+                  ))}
                 </div>
                 {s.topicCoverageWarning && (
                   <p className="coverage-warning">
@@ -173,8 +181,8 @@ export function Profile({
                   </p>
                 )}
                 <p className="footnote">
-                  {s.sharedTopics.length} shared issue topics across party
-                  contexts. Different issue mixes can affect this comparison.
+                  {splitCopy.limits}{" "}
+                  {splitCopy.sharedTopics(s.sharedTopics.length)}
                 </p>
               </>
             ) : split.kind === "unproven" ? (
@@ -183,9 +191,35 @@ export function Profile({
                   <strong>{split.counts}</strong>
                 </p>
                 <p>{split.message}</p>
+                <p className="footnote">{splitCopy.limits}</p>
               </>
             ) : (
               <p>{split.message}</p>
+            )}
+            {split.kind !== "not-applicable" && (
+              <div
+                className="split-chips"
+                role="group"
+                aria-label={splitCopy.chipsLabel}
+              >
+                {(
+                  [
+                    ["all", splitCopy.chipAll, null],
+                    ["own", splitCopy.chipOwn, s.ownCount],
+                    ["other", splitCopy.chipOther, s.otherCount],
+                  ] as const
+                ).map(([value, label, n]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    aria-pressed={side === value}
+                    onClick={() => setSide(value)}
+                  >
+                    {label}
+                    {n !== null && ` · ${n}`}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           <div className="panel">
@@ -250,9 +284,9 @@ export function Profile({
           <div className="panel">
             <div className="section-heading">
               <h2>The evidence behind the grade</h2>
-              <span className="count-pill">{s.evidence.length} records</span>
+              <span className="count-pill">{shownEvidence.length} records</span>
             </div>
-            {[...s.evidence]
+            {[...shownEvidence]
               .sort(
                 (a, b) =>
                   b.vote.date.localeCompare(a.vote.date) ||
