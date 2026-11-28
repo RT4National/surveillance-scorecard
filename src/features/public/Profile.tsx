@@ -1,13 +1,28 @@
 import { useState } from "react";
-import { ArrowLeft, Check, Copy, History, Info, ShieldCheck, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  History,
+  Info,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import { useScorecard } from "../../data/context";
 import { groupLabels } from "../../core/scoring";
+import {
+  hasCosponsorships,
+  notGradedLabel,
+  scoredLabel,
+  scoredNoun,
+} from "../../core/copy";
 import { publicationUrl } from "../../core/navigation";
 import type { Member, Party } from "../../core/types";
 import { CorrectionForm, Source } from ".";
 import { evidenceLabel } from "../../core/evidence";
 import { base, fictional, fmt, query, readAsOf } from "./helpers";
 import { Avatar, Grade } from "./member";
+import { splitDisplay } from "./split";
 
 /** How a member of each party is named in running text ("a Democrat at the time"). */
 const partyMember: Record<Party, string> = {
@@ -28,6 +43,23 @@ export function Profile({
   const { score, dataset, rubric, publication } = useScorecard();
   const [asOf, setAsOf] = useState(readAsOf(dataset));
   const s = score(member, asOf);
+  const split = splitDisplay(s, member.party);
+  // The whole record, independent of the selected date, so the timeline and the date minimum stay stable.
+  const dates = score(member).evidence.map((e) => e.vote.date);
+  const earliest = dates.reduce<string | undefined>(
+    (min, d) => (min === undefined || d < min ? d : min),
+    undefined,
+  );
+  const timelineDates = [...new Set(dates.map((d) => d.slice(0, 4)))]
+    .sort()
+    .slice(-3)
+    .map((year) =>
+      `${year}-12-31` > dataset.asOf ? dataset.asOf : `${year}-12-31`,
+    );
+  // Only the publication's own as-of date carries the frozen published grade.
+  const frozen = (d: string) =>
+    Boolean(publication?.scoring) && d === dataset.asOf;
+  const noun = scoredNoun(hasCosponsorships(dataset.votes));
   return (
     <section className="container inner-page">
       <a
@@ -70,10 +102,14 @@ export function Profile({
       <div className="profile-layout">
         <aside className="profile-sidebar">
           <Grade member={member} asOf={asOf} />
-          <h2>{fmt(s.value)} reform alignment</h2>
+          <h2>
+            {s.value === null
+              ? notGradedLabel(rubric.minVotes)
+              : `${fmt(s.value)} reform alignment`}
+          </h2>
           <p>
             {Number(s.earned.toFixed(2))} aligned weighted points out of{" "}
-            {Number(s.possible.toFixed(2))} possible · {s.counted} scored votes
+            {Number(s.possible.toFixed(2))} possible · {scoredLabel(s, dataset.votes)}
           </p>
           <span className={`category ${s.group}`}>{groupLabels[s.group]}</span>
           <p>{s.reason}</p>
@@ -100,27 +136,44 @@ export function Profile({
               A strong score alone does not prove consistency. We compare the
               record in both party contexts.
             </p>
-            <div className="context-grid">
-              <div>
-                <span>President of their own party</span>
-                <strong>{fmt(s.ownScore)}</strong>
-                <small>{s.ownCount} cast votes</small>
-              </div>
-              <div>
-                <span>President of another party</span>
-                <strong>{fmt(s.otherScore)}</strong>
-                <small>{s.otherCount} cast votes</small>
-              </div>
-            </div>
-            {s.topicCoverageWarning && (
-              <p className="coverage-warning">
-                <Info size={15} /> {s.topicCoverageWarning}
-              </p>
+            {split.kind === "comparable" ? (
+              <>
+                <div className="context-grid">
+                  <div>
+                    <span>President of their own party</span>
+                    <strong>{split.own.percent}%</strong>
+                    <small>
+                      {split.own.count} {noun}
+                    </small>
+                  </div>
+                  <div>
+                    <span>President of another party</span>
+                    <strong>{split.other.percent}%</strong>
+                    <small>
+                      {split.other.count} {noun}
+                    </small>
+                  </div>
+                </div>
+                {s.topicCoverageWarning && (
+                  <p className="coverage-warning">
+                    <Info size={15} /> {s.topicCoverageWarning}
+                  </p>
+                )}
+                <p className="footnote">
+                  {s.sharedTopics.length} shared issue topics across party
+                  contexts. Different issue mixes can affect this comparison.
+                </p>
+              </>
+            ) : split.kind === "unproven" ? (
+              <>
+                <p className="split-counts">
+                  <strong>{split.counts}</strong>
+                </p>
+                <p>{split.message}</p>
+              </>
+            ) : (
+              <p>{split.message}</p>
             )}
-            <p className="footnote">
-              {s.sharedTopics.length} shared issue topics across party contexts.
-              Different issue mixes can affect this comparison.
-            </p>
           </div>
           <div className="panel">
             <div className="section-heading">
@@ -130,7 +183,7 @@ export function Profile({
               <input
                 aria-label="Profile evidence through date"
                 type="date"
-                min="2021-01-01"
+                min={earliest}
                 max={dataset.asOf}
                 value={asOf}
                 onChange={(e) => {
@@ -147,8 +200,8 @@ export function Profile({
               />
             </div>
             <p className="muted">
-              {publication?.scoring && asOf === dataset.asOf
-                ? `Frozen published grade · scorer ${publication.scoring.version} · rubric ${rubric.version}.`
+              {frozen(asOf)
+                ? `Frozen published grade · scorer ${publication?.scoring?.version} · rubric ${rubric.version}.`
                 : `Recalculated with rubric ${rubric.version} and the current scoring engine.`}{" "}
               <a href={publicationUrl(`${base}/archive`, publication?.id)}>
                 View immutable published versions
@@ -156,33 +209,29 @@ export function Profile({
               to see what was actually published at the time.
             </p>
             <div className="timeline">
-              {[...new Set(s.evidence.map((e) => e.vote.date.slice(0, 4)))]
-                .slice(-3)
-                .map((year) =>
-                  `${year}-12-31` > dataset.asOf
-                    ? dataset.asOf
-                    : `${year}-12-31`,
-                )
-                .map((d) => (
-                  <button
-                    key={d}
-                    aria-pressed={d === asOf}
-                    onClick={() => {
-                      setAsOf(d);
-                      const p = query();
-                      p.set("asOf", d);
-                      window.history.replaceState(
-                        null,
-                        "",
-                        `${window.location.pathname}?${p}`,
-                      );
-                    }}
-                  >
-                    <small>{d.slice(0, 4)}</small>
-                    <Grade member={member} asOf={d} />
-                    <span>Evidence through {d}</span>
-                  </button>
-                ))}
+              {timelineDates.map((d) => (
+                <button
+                  key={d}
+                  aria-pressed={d === asOf}
+                  onClick={() => {
+                    setAsOf(d);
+                    const p = query();
+                    p.set("asOf", d);
+                    window.history.replaceState(
+                      null,
+                      "",
+                      `${window.location.pathname}?${p}`,
+                    );
+                  }}
+                >
+                  <small>{d.slice(0, 4)}</small>
+                  <Grade member={member} asOf={d} />
+                  {!frozen(d) && (
+                    <em className="recalculated-tag">Recalculated</em>
+                  )}
+                  <span>Evidence through {d}</span>
+                </button>
+              ))}
             </div>
           </div>
           <div className="panel">

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -15,6 +15,12 @@ import {
 } from "lucide-react";
 import { useScorecard } from "./data/context";
 import { groupLabels, scoreMember } from "./core/scoring";
+import {
+  hasCosponsorships,
+  notGradedGroupLabel,
+  notGradedLabel,
+  scoredLabel,
+} from "./core/copy";
 import type { Dataset, Publication } from "./core/publication";
 import { publishedScore } from "./core/publication-scores";
 import { publicationUrl } from "./core/navigation";
@@ -141,7 +147,11 @@ function Select({
   );
 }
 function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
-  const { score, publication } = useScorecard();
+  const { score, publication, dataset } = useScorecard();
+  const notGraded = notGradedLabel(dataset.rubric.minVotes);
+  // The directory sorts not-graded members last; the first one opens their labelled group.
+  const firstUngraded = list.findIndex((m) => score(m, asOf).value === null);
+  const ungradedCount = firstUngraded < 0 ? 0 : list.length - firstUngraded;
   return (
     <div className="table-scroll">
       <table className="member-table">
@@ -158,10 +168,18 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
           </tr>
         </thead>
         <tbody>
-          {list.map((m) => {
+          {list.map((m, i) => {
             const s = score(m, asOf);
             return (
-              <tr key={m.id}>
+              <Fragment key={m.id}>
+              {i === firstUngraded && (
+                <tr className="not-graded-group">
+                  <th scope="rowgroup" colSpan={6}>
+                    {notGradedGroupLabel(ungradedCount)}
+                  </th>
+                </tr>
+              )}
+              <tr>
                 <td>
                   <a
                     className="member-name"
@@ -192,10 +210,18 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                   <Grade member={m} asOf={asOf} />
                 </td>
                 <td>
-                  <span className="alignment-text">{fmt(s.value)}</span>
-                  <div className="meter">
-                    <span style={{ width: `${s.value ?? 0}%` }} />
-                  </div>
+                  {s.value === null ? (
+                    <span className="alignment-text not-graded">
+                      {notGraded}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="alignment-text">{fmt(s.value)}</span>
+                      <div className="meter">
+                        <span style={{ width: `${s.value}%` }} />
+                      </div>
+                    </>
+                  )}
                 </td>
                 <td>
                   <span className={`category ${s.group}`}>
@@ -209,7 +235,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                           : "Not enough evidence"}
                   </span>
                   <small>
-                    {s.counted} scored votes ·{" "}
+                    {scoredLabel(s, dataset.votes)} ·{" "}
                     {s.reason.startsWith("Unproven")
                       ? "More evidence needed"
                       : "Both contexts reviewed"}
@@ -229,6 +255,7 @@ function MemberTable({ list, asOf }: { list: Member[]; asOf?: string }) {
                   </a>
                 </td>
               </tr>
+              </Fragment>
             );
           })}
         </tbody>
@@ -617,7 +644,7 @@ function Directory({
       : m.status === "active",
   );
   const date = archive ? asOf : undefined;
-  const filtered = source
+  const matching = source
     .filter((m) => {
       const terms = normalize(filters.q).split(/\s+/).filter(Boolean);
       return (
@@ -638,6 +665,11 @@ function Directory({
         : (score(b, date).value ?? -1) - (score(a, date).value ?? -1) ||
           a.name.localeCompare(b.name),
     );
+  // Members the scorer left ungraded (value null) form their own last group under either sort.
+  const filtered = [
+    ...matching.filter((m) => score(m, date).value !== null),
+    ...matching.filter((m) => score(m, date).value === null),
+  ];
   const counts = (group: Group) =>
     source.filter((m) => score(m, date).group === group).length;
   const groups: { key: Group; short: string; description: string }[] = [
