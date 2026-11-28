@@ -1,3 +1,4 @@
+import { correctionCopy } from "../../core/copy";
 import {
   canDownloadPublication,
   recordCsv,
@@ -9,6 +10,8 @@ import { servingOutcomes, tallyRollCall } from "../../core/tally";
 import type { Vote } from "../../core/types";
 import { base, Provenance, publicUrl, Source, type Props } from "./pageShared";
 import { congressLabel } from "../../core/congress";
+
+export const voteCorrectionAnchor = "report-vote-error";
 
 const outcomeLabels = {
   Yes: "Yes",
@@ -73,7 +76,10 @@ export function VotePage({
         Weight {vote.weight}.
       </p>
       <p>{vote.rationale}</p>
-      <Source url={vote.source} />
+      <div className="public-actions">
+        <Source url={vote.source} />
+        <a href={`#${voteCorrectionAnchor}`}>{correctionCopy.rowAction}</a>
+      </div>
       {tally && (
         <>
           <div

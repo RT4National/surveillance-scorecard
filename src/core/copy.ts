@@ -137,6 +137,7 @@ export const splitCopy = {
   chipAll: "All",
   chipOwn: "Own-party president",
   chipOther: "Other-party president",
+  chipUnaligned: "Not aligned",
   sharedTopics: (n: number) => `Shared topics: ${n}`,
 } as const;
 

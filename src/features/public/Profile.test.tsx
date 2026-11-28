@@ -208,6 +208,9 @@ describe("profile split panel", () => {
     expect(shown()).toEqual(ids((e) => e.scored && !e.ownParty));
     expect(shown()).toHaveLength(s.otherCount);
 
+    fireEvent.click(chip("Not aligned"));
+    expect(shown()).toEqual(ids((e) => e.scored && !e.aligned));
+
     fireEvent.click(chip(splitCopy.chipAll));
     expect(shown()).toEqual(ids(() => true));
   });

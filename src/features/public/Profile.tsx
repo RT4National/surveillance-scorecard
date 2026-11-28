@@ -99,10 +99,20 @@ export function Profile({
   });
   const noun = scoredNoun(hasCosponsorships(dataset.votes));
   const count = (n: number) => `${n} ${n === 1 ? noun.slice(0, -1) : noun}`;
-  // Evidence filter from the split chips. A side shows only items scored on that side.
-  const [side, setSide] = useState<"all" | "own" | "other">("all");
+  const [side, setSide] = useState<"all" | "own" | "other" | "unaligned">(
+    "all",
+  );
+  const filter =
+    split.kind === "not-applicable" && (side === "own" || side === "other")
+      ? "all"
+      : side;
   const shownEvidence = s.evidence.filter(
-    (e) => side === "all" || (e.scored && e.ownParty === (side === "own")),
+    (e) =>
+      filter === "all" ||
+      (e.scored &&
+        (filter === "unaligned"
+          ? !e.aligned
+          : e.ownParty === (filter === "own"))),
   );
   const unscored = shownEvidence.filter((e) => !e.scored);
   const row = (e: EvidenceEntry) => (
@@ -293,12 +303,17 @@ export function Profile({
                     ["all", splitCopy.chipAll, null],
                     ["own", splitCopy.chipOwn, s.ownCount],
                     ["other", splitCopy.chipOther, s.otherCount],
+                    [
+                      "unaligned",
+                      splitCopy.chipUnaligned,
+                      summary.scored - summary.aligned,
+                    ],
                   ] as const
                 ).map(([value, label, n]) => (
                   <button
                     type="button"
                     key={value}
-                    aria-pressed={side === value}
+                    aria-pressed={filter === value}
                     onClick={() => setSide(value)}
                   >
                     {label}
@@ -357,6 +372,28 @@ export function Profile({
                 {scoredLabel(s, dataset.votes)}
               </span>
             </div>
+            {split.kind === "not-applicable" && (
+              <div
+                className="split-chips"
+                role="group"
+                aria-label={splitCopy.chipsLabel}
+              >
+                <button
+                  type="button"
+                  aria-pressed={filter === "all"}
+                  onClick={() => setSide("all")}
+                >
+                  {splitCopy.chipAll}
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={filter === "unaligned"}
+                  onClick={() => setSide("unaligned")}
+                >
+                  {splitCopy.chipUnaligned} · {summary.scored - summary.aligned}
+                </button>
+              </div>
+            )}
             <div className={`evidence-lists ${changeClass}`.trim()}>
               <div className="evidence-scored">
                 {newestFirst(shownEvidence.filter((e) => e.scored)).map(row)}
@@ -369,6 +406,9 @@ export function Profile({
               )}
             </div>
             {!s.evidence.length && <p>No evidence before this date.</p>}
+            {s.evidence.length > 0 && !shownEvidence.length && (
+              <p>No actions match this filter.</p>
+            )}
             <Legend />
             {publicationChange?.type === "evidence" && (
               <p>

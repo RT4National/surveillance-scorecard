@@ -183,3 +183,12 @@ it("renders final tally bar widths before the shared animation", () => {
     "0%",
   ]);
 });
+
+it("links directly to the vote correction form", () => {
+  render(<LegislationPage dataset={data} voteId="v1" />);
+  const link = screen.getByRole("link", { name: "Report an error" });
+  const target = document.getElementById(link.getAttribute("href")!.slice(1));
+  expect(target?.tagName).toBe("FORM");
+  expect(target?.getAttribute("data-vote-id")).toBe("v1");
+  expect(target?.tabIndex).toBe(-1);
+});

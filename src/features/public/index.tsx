@@ -2,7 +2,7 @@ import { isPreviewDataset, isPublishable } from "../../core/publication";
 import { useState } from "react";
 import { base, publicUrl, type Props } from "./pageShared";
 import { VoteList } from "./VoteList";
-import { VotePage } from "./VotePage";
+import { VotePage, voteCorrectionAnchor } from "./VotePage";
 export { ArchivesPage } from "./ArchivesPage";
 export { ComparePage } from "./ComparePage";
 export { Source } from "./pageShared";
@@ -37,6 +37,7 @@ export function LegislationPage({
         dataset={dataset}
         publication={publication}
         voteId={vote.id}
+        id={voteCorrectionAnchor}
       />
     </VotePage>
   );
@@ -65,6 +66,7 @@ export function CorrectionForm({
   return (
     <form
       id={id}
+      tabIndex={id ? -1 : undefined}
       className="public-correction"
       data-member-id={memberId}
       data-vote-id={voteId}
