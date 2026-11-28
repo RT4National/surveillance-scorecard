@@ -1,3 +1,4 @@
+import { CongressTrends } from "./CongressTrends";
 import { useState } from "react";
 import type { Outcome } from "../../core/types";
 import { publicationUrl } from "../../core/navigation";
@@ -200,6 +201,7 @@ export function ReportsPage({ dataset, publication }: Props) {
     <section className="public-page">
       <h1>Reproducible research</h1>
       <Provenance dataset={dataset} publication={publication} />
+      <CongressTrends publication={publication} download={save} />
       <p>
         Run exact vote intersections or scoped rankings. Questions must be
         answerable from published votes and filters. Rankings omit members with

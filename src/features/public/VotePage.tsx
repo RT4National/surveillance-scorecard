@@ -2,7 +2,7 @@ import { useId, useState, type ReactNode } from "react";
 import { servingOutcomes, tallyRollCall } from "../../core/tally";
 import type { Vote } from "../../core/types";
 import { base, Provenance, publicUrl, Source, type Props } from "./pageShared";
-import { congressLabel } from "./VoteList";
+import { congressLabel } from "../../core/congress";
 
 const outcomeLabels = {
   Yes: "Yes",
