@@ -983,6 +983,12 @@ input[type="date"] {
   font-size: 9px;
   color: #819077;
 }
+.evidence-row .evidence-context {
+  color: var(--muted);
+}
+.evidence-context span {
+  display: block;
+}
 .vote-mark {
   width: 29px;
   height: 29px;
