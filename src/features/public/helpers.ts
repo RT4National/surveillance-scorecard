@@ -16,7 +16,6 @@ export const readAsOf = (dataset: Dataset) => {
 };
 export const fmt = (n: number | null) =>
   n === null ? "Not yet rated" : `${Math.round(n)}%`;
-/** Demo datasets without sources are the fictional preview; others hold real records with placeholder scoring. */
 export type GradeTone = "good" | "mixed" | "poor" | "unrated";
 /**
  * Colour tone from the position of the scorer's grade within the active rubric's bands:
@@ -33,5 +32,6 @@ export function gradeTone(
   if (bands.length > 1 && index === bands.length - 1) return "poor";
   return index < Math.floor(bands.length / 2) ? "good" : "mixed";
 }
-export const fictional =(dataset: { demo: boolean; sources: unknown[] }) =>
+/** Demo datasets without sources are the fictional preview; others hold real records with placeholder scoring. */
+export const fictional = (dataset: { demo: boolean; sources: unknown[] }) =>
   dataset.demo && !dataset.sources.length;
